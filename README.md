@@ -2,7 +2,7 @@ WikiScroll
 
 An infinite scrolling interface for exploring random Wikipedia articles in multiple languages designed in a beautiful UI. Try it out on Mobile and Desktop!
 
-🌐 Live Demo: [wikiscroll.com]
+🌐 Live Demo: [[wikiscroll.com]](https://wikiscroll.com)
 
 <img width="1464" height="826" alt="image" src="https://github.com/user-attachments/assets/2df1cbf2-bf08-4b80-a565-22a731142395" />
 

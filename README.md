@@ -11,16 +11,22 @@ An infinite scrolling interface for exploring random Wikipedia articles in multi
 Features
 
 📱 Vertical scrolling feed of random Wikipedia articles
+
 🌍 Support for 14 languages including English, Spanish, French, German, Chinese, Japanese and more
+
 🖼️ Article previews with images, titles and excerpts
+
 ❤️ Like and save your favorite articles
+
 📤 Share articles directly or copy links
+
 🎨 Beautiful dark theme with glassmorphism effects
+
 ⚡ No backend required - runs entirely in the browser
+
 📲 Progressive Web App (PWA) support
 Technologies
 
-Pure HTML/CSS/JavaScript
 Wikipedia REST API
 Deployed on Cloudflare Pages
 Local Development

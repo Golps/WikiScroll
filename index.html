@@ -442,19 +442,26 @@
 
             .article-content {
                 max-width: 95%;
-                padding: 20px;
+                padding: 16px;
+                max-height: 90vh;
             }
 
             .article-title {
-                font-size: 28px;
+                font-size: 24px;
+                -webkit-line-clamp: 3;
+                margin-bottom: 12px;
             }
 
             .article-excerpt {
-                font-size: 16px;
+                font-size: 15px;
+                line-height: 1.5;
+                -webkit-line-clamp: 8;
+                margin-bottom: 16px;
             }
 
             .article-image {
-                height: 250px;
+                height: 200px;
+                margin-bottom: 16px;
             }
 
             .likes-panel {
@@ -463,8 +470,21 @@
             }
 
             .action-button {
-                padding: 12px 20px;
-                font-size: 14px;
+                padding: 10px 16px;
+                font-size: 13px;
+                gap: 6px;
+            }
+
+            .action-button.primary {
+                padding: 10px 12px;
+            }
+
+            .action-icon {
+                font-size: 16px;
+            }
+
+            .article-actions {
+                gap: 10px;
             }
         }
 

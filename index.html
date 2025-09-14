@@ -1,4 +1,222 @@
-<!DOCTYPE html>
+<script>
+const W={
+a:[],l:'en',ld:!1,lk:new Map,pq:[],pl:!1,dt:{},
+langs:[['en','English','🇬🇧'],['es','Español','🇪🇸'],['fr','Français','🇫🇷'],['de','Deutsch','🇩🇪'],['it','Italiano','🇮🇹'],['pt','Português','🇵🇹'],['ru','Русский','🇷🇺'],['ja','日本語','🇯🇵'],['zh','中文','🇨🇳'],['ar','العربية','🇸🇦'],['hi','हिन्दी','🇮🇳'],['ko','한국어','🇰🇷'],['nl','Nederlands','🇳🇱'],['pl','Polski','🇵🇱']],
+init(){
+const s=localStorage.getItem('lk');
+if(s)try{this.lk=new Map(JSON.parse(s))}catch{}
+document.getElementById('ld').innerHTML=this.langs.map(([c,n,f])=>`<div class="language-option" data-l="${c}" data-n="${n}"><span class="flag">${f}</span> ${n}</div>`).join('');
+document.getElementById('lb').onclick=()=>document.getElementById('ld').classList.toggle('active');
+document.getElementById('ld').onclick=e=>{
+const o=e.target.closest('.language-option');
+if(o){
+this.l=o.dataset.l;
+document.getElementById('cl').textContent=o.dataset.n;
+document.getElementById('ld').classList.remove('active');
+this.a=[];this.pq=[];
+document.getElementById('fc').innerHTML='<div class="loading-spinner"><div class="spinner"></div></div>';
+this.load();
+}
+};
+document.onclick=e=>{
+if(!e.target.closest('.language-selector'))
+document.getElementById('ld').classList.remove('active');
+};
+document.getElementById('lkb').onclick=()=>this.toggleLikesPanel();
+document.getElementById('fc').onscroll=()=>{
+const f=document.getElementById('fc');
+if(f.scrollHeight-f.scrollTop-f.clientHeight<1500&&!this.ld)this.load();
+};
+document.onkeydown=e=>{
+const c=document.querySelectorAll('.article-card');
+if(!c.length)return;
+const i=Math.floor(document.getElementById('fc').scrollTop/window.innerHeight);
+if(e.key==='ArrowDown'||e.key===' '){
+e.preventDefault();
+c[Math.min(i+1,c.length-1)].scrollIntoView({behavior:'smooth'});
+}else if(e.key==='ArrowUp'){
+e.preventDefault();
+c[Math.max(i-1,0)].scrollIntoView({behavior:'smooth'});
+}
+};
+this.updateLikesCount();
+this.load();
+this.startPreload();
+},
+async startPreload(){
+setInterval(async()=>{
+if(this.pq.length<10&&!this.pl){
+this.pl=!0;
+try{
+const r=await Promise.allSettled([...Array(5)].map(()=>
+fetch(`https://${this.l}.wikipedia.org/api/rest_v1/page/random/summary`)
+.then(r=>r.ok?r.json():null)
+.then(d=>{
+if(d){
+const a={id:d.pageid,t:d.title,e:d.extract||'No description available.',i:d.thumbnail?.source||'',u:d.content_urls?.desktop?.page||'#'};
+if(a.i)new Image().src=a.i;
+return a;
+}
+return null;
+})
+));
+this.pq.push(...r.filter(x=>x.status==='fulfilled'&&x.value).map(x=>x.value));
+}catch{}finally{this.pl=!1;}
+}
+},2000);
+},
+async load(){
+if(this.ld)return;
+this.ld=!0;
+try{
+let a;
+if(this.pq.length>=5){
+a=this.pq.splice(0,5);
+}else{
+const r=await Promise.allSettled([...Array(5)].map(()=>
+fetch(`https://${this.l}.wikipedia.org/api/rest_v1/page/random/summary`)
+.then(r=>r.ok?r.json():null)
+.then(d=>d?{id:d.pageid,t:d.title,e:d.extract||'No description available.',i:d.thumbnail?.source||'',u:d.content_urls?.desktop?.page||'#'}:null)
+));
+a=r.filter(x=>x.status==='fulfilled'&&x.value).map(x=>x.value);
+}
+this.a.push(...a);
+this.render(a);
+if(this.a.length===5){
+document.getElementById('si').style.display='flex';
+setTimeout(()=>document.getElementById('si').style.display='none',5000);
+}
+}catch(e){
+this.showError();
+}finally{
+this.ld=!1;
+}
+},
+render(a){
+const s=document.querySelector('.loading-spinner');
+if(s)s.remove();
+const f=document.getElementById('fc');
+a.forEach((r,idx)=>{
+if(!r)return;
+const d=document.createElement('div');
+d.className='article-card';
+d.dataset.id=r.id;
+d.innerHTML=`<div class="article-background">${r.i?`<img src="${r.i}" alt="" loading="lazy">`:''}</div>
+<div class="article-content">
+${r.i?`<img src="${r.i}" alt="${r.t}" class="article-image" loading="lazy">`:''}
+<h2 class="article-title">${r.t}</h2>
+<p class="article-excerpt">${r.e}</p>
+<div class="article-actions">
+<button class="action-button${this.lk.has(r.id)?' liked':''}" onclick="W.toggleLike(${r.id})">
+<span class="action-icon">${this.lk.has(r.id)?'❤️':'🤍'}</span>
+<span>${this.lk.has(r.id)?'Liked':'Like'}</span>
+</button>
+<button class="action-button" onclick="W.share('${r.u}','${r.t.replace(/'/g,"\\'")}')">
+<span class="action-icon">📤</span><span>Share</span>
+</button>
+<button class="action-button primary" onclick="window.open('${r.u}','_blank')">
+<span class="action-icon">📖</span><span>Read Full Article</span>
+</button>
+</div></div>`;
+this.setupDoubleTap(d,r.id);
+f.appendChild(d);
+});
+},
+setupDoubleTap(el,id){
+let lt=0;
+el.addEventListener('touchstart',e=>{
+const n=Date.now();
+if(n-lt<300){
+e.preventDefault();
+const x=e.touches[0].clientX;
+const y=e.touches[0].clientY;
+this.toggleLike(id);
+this.showHeart(x,y);
+}
+lt=n;
+});
+},
+showHeart(x,y){
+const h=document.createElement('div');
+h.className='like-heart';
+h.innerHTML='❤️';
+h.style.left=x+'px';
+h.style.top=y+'px';
+document.body.appendChild(h);
+setTimeout(()=>h.remove(),800);
+},
+toggleLike(id){
+const a=this.a.find(x=>x&&x.id===id);
+if(!a)return;
+if(this.lk.has(id))this.lk.delete(id);
+else this.lk.set(id,a);
+localStorage.setItem('lk',JSON.stringify([...this.lk]));
+this.updateLikesCount();
+const c=document.querySelector(`.article-card[data-id="${id}"]`);
+if(c){
+const b=c.querySelector('.action-button');
+if(b){
+b.classList.toggle('liked');
+b.innerHTML=this.lk.has(id)?'<span class="action-icon">❤️</span><span>Liked</span>':'<span class="action-icon">🤍</span><span>Like</span>';
+}
+}
+},
+updateLikesCount(){
+const c=this.lk.size;
+const e=document.getElementById('lc');
+if(c>0){e.textContent=c;e.style.display='inline-block'}
+else e.style.display='none';
+},
+toggleLikesPanel(){
+document.getElementById('lp').classList.toggle('active');
+if(document.getElementById('lp').classList.contains('active'))this.renderLikes();
+},
+renderLikes(){
+const l=document.getElementById('lal');
+if(this.lk.size===0){
+l.innerHTML='<div class="no-likes">No liked articles yet.<br>Start scrolling to discover!</div>';
+return;
+}
+l.innerHTML=[...this.lk.values()].reverse().map(a=>`
+<div class="liked-article-item">
+<div class="liked-article-title">${a.t}</div>
+<div class="liked-article-excerpt">${a.e}</div>
+<div class="liked-article-actions">
+<span class="mini-action" onclick="window.open('${a.u}','_blank')">Read</span>
+<span class="mini-action" onclick="W.share('${a.u}','${a.t.replace(/'/g,"\\'")}')">Share</span>
+<span class="mini-action" onclick="W.removeLike(${a.id})">Remove</span>
+</div></div>`).join('');
+},
+removeLike(id){
+this.lk.delete(id);
+localStorage.setItem('lk',JSON.stringify([...this.lk]));
+this.updateLikesCount();
+this.renderLikes();
+const c=document.querySelector(`.article-card[data-id="${id}"]`);
+if(c){
+const b=c.querySelector('.action-button');
+if(b){
+b.classList.remove('liked');
+b.innerHTML='<span class="action-icon">🤍</span><span>Like</span>';
+}
+}
+},
+share(u,t){
+if(navigator.share)navigator.share({title:t,url:u}).catch(()=>{});
+else navigator.clipboard.writeText(u).then(()=>alert('Link copied!')).catch(()=>{});
+},
+showAbout(){
+alert('WikiScroll\n\nAn infinite scrolling interface for exploring random Wikipedia articles in multiple languages.\n\nSwipe or scroll to discover fascinating articles from Wikipedia!\n\nContact: contact@wikiscroll.com');
+},
+showError(){
+const d=document.createElement('div');
+d.className='article-card';
+d.innerHTML='<div class="article-content"><div class="error-message"><h2>Oops! Something went wrong</h2><p>Failed to load articles. Please check your connection and try again.</p><button class="action-button" onclick="location.reload()">🔄 Retry</button></div></div>';
+document.getElementById('fc').appendChild(d);
+}
+};
+W.init();
+</script><!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">

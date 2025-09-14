@@ -1,6 +1,6 @@
 <script>
 const W={
-a:[],l:'en',ld:!1,lk:new Map,pq:[],pl:!1,dt:{},
+a:[],l:'en',ld:!1,lk:new Map,pq:[],pl:!1,
 langs:[['en','English','🇬🇧'],['es','Español','🇪🇸'],['fr','Français','🇫🇷'],['de','Deutsch','🇩🇪'],['it','Italiano','🇮🇹'],['pt','Português','🇵🇹'],['ru','Русский','🇷🇺'],['ja','日本語','🇯🇵'],['zh','中文','🇨🇳'],['ar','العربية','🇸🇦'],['hi','हिन्दी','🇮🇳'],['ko','한국어','🇰🇷'],['nl','Nederlands','🇳🇱'],['pl','Polski','🇵🇱']],
 init(){
 const s=localStorage.getItem('lk');
@@ -179,6 +179,44 @@ return;
 }
 l.innerHTML=[...this.lk.values()].reverse().map(a=>`
 <div class="liked-article-item">
+<div class="liked-article-title">${a.t}</div>
+<div class="liked-article-excerpt">${a.e}</div>
+<div class="liked-article-actions">
+<span class="mini-action" onclick="window.open('${a.u}','_blank')">Read</span>
+<span class="mini-action" onclick="W.share('${a.u}','${a.t.replace(/'/g,"\\'")}')">Share</span>
+<span class="mini-action" onclick="W.removeLike(${a.id})">Remove</span>
+</div></div>`).join('');
+},
+removeLike(id){
+this.lk.delete(id);
+localStorage.setItem('lk',JSON.stringify([...this.lk]));
+this.updateLikesCount();
+this.renderLikes();
+const c=document.querySelector(`.article-card[data-id="${id}"]`);
+if(c){
+const b=c.querySelector('.action-button');
+if(b){
+b.classList.remove('liked');
+b.innerHTML='<span class="action-icon">🤍</span><span>Like</span>';
+}
+}
+},
+share(u,t){
+if(navigator.share)navigator.share({title:t,url:u}).catch(()=>{});
+else navigator.clipboard.writeText(u).then(()=>alert('Link copied!')).catch(()=>{});
+},
+showAbout(){
+alert('WikiScroll\n\nAn infinite scrolling interface for exploring random Wikipedia articles in multiple languages.\n\nSwipe or scroll to discover fascinating articles from Wikipedia!\n\nContact: contact@wikiscroll.com');
+},
+showError(){
+const d=document.createElement('div');
+d.className='article-card';
+d.innerHTML='<div class="article-content"><div class="error-message"><h2>Oops! Something went wrong</h2><p>Failed to load articles. Please check your connection and try again.</p><button class="action-button" onclick="location.reload()">🔄 Retry</button></div></div>';
+document.getElementById('fc').appendChild(d);
+}
+};
+W.init();
+</script> class="liked-article-item">
 <div class="liked-article-title">${a.t}</div>
 <div class="liked-article-excerpt">${a.e}</div>
 <div class="liked-article-actions">

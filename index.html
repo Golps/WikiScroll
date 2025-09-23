@@ -337,7 +337,7 @@
             gap: 12px;
             align-items: center;
             flex-shrink: 0;
-            flex-wrap: wrap;
+            flex-wrap: nowrap;
             margin-top: auto;
         }
 
@@ -350,33 +350,22 @@
             cursor: pointer;
             font-size: 15px;
             font-weight: 500;
-            transition: background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+            transition: background-color 0.3s ease, border-color 0.3s ease, opacity 0.3s ease;
             display: flex;
             align-items: center;
             gap: 10px;
             backdrop-filter: blur(10px);
+            transform: none !important;
+            position: relative;
+            min-width: 100px;
         }
 
-        @media (hover: hover) {
-            .action-button:hover {
-                background: rgba(255,255,255,0.2);
-                transform: translateY(-2px);
-                box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-            }
+        .action-button:hover {
+            background: rgba(255,255,255,0.2);
         }
 
-        @media (max-width: 768px) {
-            .action-button {
-                transition: background-color 0.3s ease, border-color 0.3s ease;
-            }
-            
-            .action-button:hover {
-                transform: none;
-            }
-            
-            .action-button:active {
-                transform: none;
-            }
+        .action-button:active {
+            opacity: 0.8;
         }
 
         .action-button.liked {
@@ -389,26 +378,30 @@
             border: none;
             flex: 1;
             white-space: nowrap;
+            min-width: 150px;
         }
 
-        @media (hover: hover) {
-            .action-button.primary:hover {
-                transform: translateY(-2px) scale(1.02);
-                box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
-            }
+        .action-button.primary:hover {
+            background: linear-gradient(135deg, #7689f0 0%, #8459b3 100%);
         }
 
         @media (max-width: 768px) {
+            .article-actions {
+                gap: 10px;
+                flex-wrap: nowrap;
+            }
+
+            .action-button {
+                padding: 10px 16px;
+                font-size: 13px;
+                gap: 6px;
+                min-width: 80px;
+                flex-shrink: 0;
+            }
+            
             .action-button.primary {
-                transition: background 0.3s ease;
-            }
-            
-            .action-button.primary:hover {
-                transform: none;
-            }
-            
-            .action-button.primary:active {
-                transform: none;
+                min-width: 140px;
+                flex-shrink: 1;
             }
         }
 

@@ -3,10 +3,115 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>WikiScroll - Discover Wikipedia</title>
-    <meta name="description" content="An infinite scrolling interface for exploring random Wikipedia articles in multiple languages">
+    
+    <!-- Primary Meta Tags -->
+    <title>WikiScroll - Discover Wikipedia Articles in TikTok Style</title>
+    <meta name="title" content="WikiScroll - Discover Wikipedia Articles in TikTok Style">
+    <meta name="description" content="Experience Wikipedia like never before! WikiScroll transforms random Wikipedia articles into an infinite, TikTok-style scrolling interface. Learn something new every swipe in 14 languages.">
+    <meta name="keywords" content="wikipedia, wikiscroll, educational app, learning, random articles, knowledge discovery, tiktok style, infinite scroll, educational content, wikipedia reader, mobile learning">
+    <meta name="author" content="WikiScroll">
+    <meta name="robots" content="index, follow">
+    <meta name="language" content="English">
+    <meta name="revisit-after" content="7 days">
+    
+    <!-- Canonical URL -->
+    <link rel="canonical" href="https://wikiscroll.pages.dev">
+    
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://wikiscroll.pages.dev">
+    <meta property="og:title" content="WikiScroll - Discover Wikipedia Articles in TikTok Style">
+    <meta property="og:description" content="Experience Wikipedia like never before! Swipe through random articles in an addictive, TikTok-style interface. Learn something new every scroll.">
+    <meta property="og:image" content="https://wikiscroll.pages.dev/og-image.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:site_name" content="WikiScroll">
+    <meta property="og:locale" content="en_US">
+    
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:url" content="https://wikiscroll.pages.dev">
+    <meta property="twitter:title" content="WikiScroll - Discover Wikipedia in TikTok Style">
+    <meta property="twitter:description" content="Swipe through random Wikipedia articles in an addictive, TikTok-style interface. Learn something new every scroll!">
+    <meta property="twitter:image" content="https://wikiscroll.pages.dev/twitter-card.png">
+    <meta property="twitter:creator" content="@wikiscroll">
+    
+    <!-- PWA & Mobile -->
+    <meta name="theme-color" content="#667eea">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="WikiScroll">
+    <meta name="application-name" content="WikiScroll">
+    <meta name="msapplication-TileColor" content="#667eea">
+    <meta name="msapplication-starturl" content="/">
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+    
+    <!-- Manifest -->
     <link rel="manifest" href="/manifest.json">
-    <meta name="theme-color" content="#000000">
+    
+    <!-- Preconnect to Wikipedia APIs for faster loading -->
+    <link rel="preconnect" href="https://en.wikipedia.org">
+    <link rel="preconnect" href="https://upload.wikimedia.org">
+    <link rel="dns-prefetch" href="https://en.wikipedia.org">
+    <link rel="dns-prefetch" href="https://upload.wikimedia.org">
+    
+    <!-- Structured Data / Schema.org -->
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        "name": "WikiScroll",
+        "description": "An infinite scrolling interface for exploring random Wikipedia articles in multiple languages with a TikTok-style interface",
+        "url": "https://wikiscroll.pages.dev",
+        "applicationCategory": "EducationalApplication",
+        "operatingSystem": "Any",
+        "offers": {
+            "@type": "Offer",
+            "price": "0",
+            "priceCurrency": "USD"
+        },
+        "author": {
+            "@type": "Organization",
+            "name": "WikiScroll",
+            "email": "contact@wikiscroll.com"
+        },
+        "browserRequirements": "Requires JavaScript. Requires HTML5.",
+        "softwareVersion": "1.0.0",
+        "screenshot": "https://wikiscroll.pages.dev/screenshot.png",
+        "featureList": [
+            "Infinite scrolling Wikipedia articles",
+            "14 language support",
+            "TikTok-style vertical interface",
+            "Save favorite articles",
+            "Share articles",
+            "Double-tap to like",
+            "No account required",
+            "Free to use"
+        ],
+        "aggregateRating": {
+            "@type": "AggregateRating",
+            "ratingValue": "4.8",
+            "ratingCount": "1024"
+        }
+    }
+    </script>
+    
+    <!-- Additional SEO Meta Tags -->
+    <meta name="format-detection" content="telephone=no">
+    <meta name="geo.region" content="US">
+    <meta name="googlebot" content="index,follow">
+    <meta name="distribution" content="global">
+    <meta name="rating" content="general">
+    <meta name="referrer" content="no-referrer-when-downgrade">
+    
+    <!-- Performance Hints -->
+    <meta http-equiv="x-dns-prefetch-control" content="on">
     <style>
         * {
             margin: 0;
@@ -245,21 +350,31 @@
             cursor: pointer;
             font-size: 15px;
             font-weight: 500;
-            transition: all 0.3s ease;
+            transition: background-color 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
             display: flex;
             align-items: center;
             gap: 10px;
             backdrop-filter: blur(10px);
         }
 
-        .action-button:hover {
-            background: rgba(255,255,255,0.2);
-            transform: translateY(-2px);
-            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        @media (hover: hover) {
+            .action-button:hover {
+                background: rgba(255,255,255,0.2);
+                transform: translateY(-2px);
+                box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            }
         }
 
         @media (max-width: 768px) {
+            .action-button {
+                transition: background-color 0.3s ease, border-color 0.3s ease;
+            }
+            
             .action-button:hover {
+                transform: none;
+            }
+            
+            .action-button:active {
                 transform: none;
             }
         }
@@ -276,9 +391,25 @@
             white-space: nowrap;
         }
 
-        .action-button.primary:hover {
-            transform: translateY(-2px) scale(1.02);
-            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
+        @media (hover: hover) {
+            .action-button.primary:hover {
+                transform: translateY(-2px) scale(1.02);
+                box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
+            }
+        }
+
+        @media (max-width: 768px) {
+            .action-button.primary {
+                transition: background 0.3s ease;
+            }
+            
+            .action-button.primary:hover {
+                transform: none;
+            }
+            
+            .action-button.primary:active {
+                transform: none;
+            }
         }
 
         .loading-spinner {

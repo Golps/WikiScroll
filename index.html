@@ -693,45 +693,74 @@
                     }
                 });
 
-                // Double tap to like - with zoom detection
+                // Double tap to like - with strict zoom prevention
                 let lastTap = 0;
                 let lastX = 0;
                 let lastY = 0;
-                let touchStartScale = 1;
-                let isMultiTouch = false;
+                let zoomActive = false;
+                let touchCount = 0;
                 
-                // Track when multi-touch starts (zoom/pinch)
-                document.addEventListener('touchstart', (e) => {
-                    // Record initial scale
-                    touchStartScale = window.visualViewport ? window.visualViewport.scale : 1;
+                // Detect any zoom activity
+                if (window.visualViewport) {
+                    let initialScale = window.visualViewport.scale;
                     
-                    // If multiple fingers detected, mark as multi-touch
+                    window.visualViewport.addEventListener('resize', () => {
+                        const currentScale = window.visualViewport.scale;
+                        if (Math.abs(currentScale - initialScale) > 0.01) {
+                            zoomActive = true;
+                            lastTap = 0;
+                            // Block double-tap for 1 second after zoom
+                            setTimeout(() => {
+                                zoomActive = false;
+                                initialScale = window.visualViewport.scale;
+                            }, 1000);
+                        }
+                    });
+                }
+                
+                // Track all touches
+                document.addEventListener('touchstart', (e) => {
+                    touchCount = e.touches.length;
+                    
+                    // If ANY multi-touch detected, block double-tap
                     if (e.touches.length > 1) {
-                        isMultiTouch = true;
+                        zoomActive = true;
                         lastTap = 0;
+                        setTimeout(() => { zoomActive = false; }, 1000);
                         return;
                     }
                     
-                    // Reset multi-touch flag only after all fingers lifted
-                    if (e.touches.length === 1) {
-                        // Don't process if we just had multi-touch
-                        if (isMultiTouch) {
-                            setTimeout(() => { isMultiTouch = false; }, 500);
-                            return;
-                        }
+                    // Don't process if zoom was recently active
+                    if (zoomActive) {
+                        return;
+                    }
+                    
+                    // Don't process if currently zoomed in
+                    if (window.visualViewport && window.visualViewport.scale > 1.05) {
+                        lastTap = 0;
+                        return;
                     }
                     
                     const card = e.target.closest('.article-card');
                     if (!card) return;
                     
-                    // Ignore if touching buttons or images (images often trigger zoom)
-                    if (e.target.closest('.action-button, .article-image, img')) {
+                    // NEVER work on images or near images
+                    const isNearImage = e.target.closest('.article-image, .article-background, img');
+                    if (isNearImage) {
                         lastTap = 0;
                         return;
                     }
                     
-                    // Only work on the article text area
-                    if (!e.target.closest('.article-content')) {
+                    // Only work on title or excerpt text
+                    const isTextArea = e.target.closest('.article-title, .article-excerpt');
+                    if (!isTextArea) {
+                        lastTap = 0;
+                        return;
+                    }
+                    
+                    // Ignore buttons
+                    if (e.target.closest('.action-button, button')) {
+                        lastTap = 0;
                         return;
                     }
                     
@@ -739,20 +768,19 @@
                     const x = e.touches[0].clientX;
                     const y = e.touches[0].clientY;
                     
-                    // Check if taps are in same position (within 30px)
+                    // Very strict: taps must be in almost exact same spot
                     const distance = Math.sqrt(Math.pow(x - lastX, 2) + Math.pow(y - lastY, 2));
                     
-                    // Require taps to be close together in time and space
-                    if (now - lastTap < 400 && distance < 30) {
-                        // Final check: make sure scale hasn't changed (no zoom happening)
+                    if (now - lastTap < 350 && distance < 25 && !zoomActive) {
+                        // Double-check zoom state one more time
                         const currentScale = window.visualViewport ? window.visualViewport.scale : 1;
-                        if (Math.abs(currentScale - touchStartScale) < 0.01) {
+                        if (currentScale <= 1.05) {
                             e.preventDefault();
                             e.stopPropagation();
                             const id = parseInt(card.dataset.id);
                             this.toggleLike(id);
                             this.showHeartAnimation(x, y);
-                            lastTap = 0; // Reset
+                            lastTap = 0;
                         }
                     } else {
                         lastTap = now;
@@ -761,33 +789,51 @@
                     }
                 });
                 
-                // Clear multi-touch flag when all fingers lifted
-                document.addEventListener('touchend', (e) => {
-                    if (e.touches.length === 0) {
-                        setTimeout(() => { isMultiTouch = false; }, 100);
+                // Monitor touch changes
+                document.addEventListener('touchmove', (e) => {
+                    // Any movement with 2+ fingers = zoom gesture
+                    if (e.touches.length > 1) {
+                        zoomActive = true;
+                        lastTap = 0;
                     }
                 });
                 
-                // Add CSS to control touch behavior
+                // Reset after all touches end
+                document.addEventListener('touchend', (e) => {
+                    if (e.touches.length === 0) {
+                        touchCount = 0;
+                        // Keep zoom block active briefly after touch ends
+                        setTimeout(() => {
+                            if (touchCount === 0) {
+                                zoomActive = false;
+                            }
+                        }, 500);
+                    }
+                });
+                
+                // Completely prevent double-tap zoom on content areas
                 const style = document.createElement('style');
                 style.textContent = `
-                    /* Prevent double-tap zoom on most elements */
-                    .article-card,
-                    .article-content,
                     .article-title,
                     .article-excerpt {
                         touch-action: manipulation;
+                        -webkit-user-select: none;
+                        user-select: none;
                     }
                     
-                    /* Allow zoom on images specifically */
                     .article-image,
+                    .article-background,
                     .article-background img {
                         touch-action: auto;
+                        pointer-events: auto;
                     }
                     
-                    /* Ensure smooth scrolling */
                     .feed-container {
                         touch-action: pan-y;
+                    }
+                    
+                    .article-content {
+                        touch-action: manipulation;
                     }
                 `;
                 document.head.appendChild(style);

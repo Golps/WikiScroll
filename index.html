@@ -693,21 +693,104 @@
                     }
                 });
 
-                // Double tap to like
+                // Double tap to like - with zoom detection
                 let lastTap = 0;
+                let lastX = 0;
+                let lastY = 0;
+                let touchStartScale = 1;
+                let isMultiTouch = false;
+                
+                // Track when multi-touch starts (zoom/pinch)
                 document.addEventListener('touchstart', (e) => {
+                    // Record initial scale
+                    touchStartScale = window.visualViewport ? window.visualViewport.scale : 1;
+                    
+                    // If multiple fingers detected, mark as multi-touch
+                    if (e.touches.length > 1) {
+                        isMultiTouch = true;
+                        lastTap = 0;
+                        return;
+                    }
+                    
+                    // Reset multi-touch flag only after all fingers lifted
+                    if (e.touches.length === 1) {
+                        // Don't process if we just had multi-touch
+                        if (isMultiTouch) {
+                            setTimeout(() => { isMultiTouch = false; }, 500);
+                            return;
+                        }
+                    }
+                    
                     const card = e.target.closest('.article-card');
                     if (!card) return;
                     
-                    const now = Date.now();
-                    if (now - lastTap < 300) {
-                        e.preventDefault();
-                        const id = parseInt(card.dataset.id);
-                        this.toggleLike(id);
-                        this.showHeartAnimation(e.touches[0].clientX, e.touches[0].clientY);
+                    // Ignore if touching buttons or images (images often trigger zoom)
+                    if (e.target.closest('.action-button, .article-image, img')) {
+                        lastTap = 0;
+                        return;
                     }
-                    lastTap = now;
+                    
+                    // Only work on the article text area
+                    if (!e.target.closest('.article-content')) {
+                        return;
+                    }
+                    
+                    const now = Date.now();
+                    const x = e.touches[0].clientX;
+                    const y = e.touches[0].clientY;
+                    
+                    // Check if taps are in same position (within 30px)
+                    const distance = Math.sqrt(Math.pow(x - lastX, 2) + Math.pow(y - lastY, 2));
+                    
+                    // Require taps to be close together in time and space
+                    if (now - lastTap < 400 && distance < 30) {
+                        // Final check: make sure scale hasn't changed (no zoom happening)
+                        const currentScale = window.visualViewport ? window.visualViewport.scale : 1;
+                        if (Math.abs(currentScale - touchStartScale) < 0.01) {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            const id = parseInt(card.dataset.id);
+                            this.toggleLike(id);
+                            this.showHeartAnimation(x, y);
+                            lastTap = 0; // Reset
+                        }
+                    } else {
+                        lastTap = now;
+                        lastX = x;
+                        lastY = y;
+                    }
                 });
+                
+                // Clear multi-touch flag when all fingers lifted
+                document.addEventListener('touchend', (e) => {
+                    if (e.touches.length === 0) {
+                        setTimeout(() => { isMultiTouch = false; }, 100);
+                    }
+                });
+                
+                // Add CSS to control touch behavior
+                const style = document.createElement('style');
+                style.textContent = `
+                    /* Prevent double-tap zoom on most elements */
+                    .article-card,
+                    .article-content,
+                    .article-title,
+                    .article-excerpt {
+                        touch-action: manipulation;
+                    }
+                    
+                    /* Allow zoom on images specifically */
+                    .article-image,
+                    .article-background img {
+                        touch-action: auto;
+                    }
+                    
+                    /* Ensure smooth scrolling */
+                    .feed-container {
+                        touch-action: pan-y;
+                    }
+                `;
+                document.head.appendChild(style);
             }
 
             resetFeed() {

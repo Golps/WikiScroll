@@ -18,32 +18,27 @@
 *{margin:0;padding:0;box-sizing:border-box;}
 html,body{height:100%;overflow:hidden;overscroll-behavior:none;}
 body{font-family:'DM Sans',sans-serif;background:#07070d;color:#fff;}
-
 .hdr {
   position:fixed;top:0;left:0;right:0;z-index:300;
   display:grid;grid-template-columns:1fr auto 1fr;
   align-items:center;gap:8px;
-  /* respect notch/status bar */
   padding:max(13px,env(safe-area-inset-top)) 16px 13px;
   background:linear-gradient(to bottom,rgba(7,7,13,.97) 60%,transparent);
 }
-.hdr-left,.hdr-mid,.hdr-right { display:flex;align-items:center; }
-.hdr-left  { justify-content:flex-start; }
-.hdr-mid   { justify-content:center; }
-.hdr-right { justify-content:flex-end;gap:7px; }
-
+.hdr-left,.hdr-mid,.hdr-right{display:flex;align-items:center;}
+.hdr-left{justify-content:flex-start;}
+.hdr-mid{justify-content:center;}
+.hdr-right{justify-content:flex-end;gap:7px;}
 .logo {
   font-family:'Syne',sans-serif;font-size:22px;font-weight:800;letter-spacing:-1px;
   background:linear-gradient(135deg,var(--w1),var(--w2));
   -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
   white-space:nowrap;
 }
-/* Must repeat clip properties — WebKit ignores clip when background is overridden alone */
 body.how .logo {
   background:linear-gradient(135deg,var(--h1),var(--h2));
   -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
 }
-
 .toggle {
   display:flex;background:rgba(255,255,255,.06);
   border:1px solid var(--border);border-radius:50px;padding:3px;gap:2px;
@@ -53,22 +48,20 @@ body.how .logo {
   padding:6px 14px;border-radius:50px;border:none;cursor:pointer;
   background:transparent;color:var(--dim);transition:all .22s;white-space:nowrap;
 }
-.tbtn.on  { color:#fff; }
-.tbtn.won { background:linear-gradient(135deg,var(--w1),var(--w2));box-shadow:0 2px 12px rgba(102,126,234,.4); }
-.tbtn.hon { background:linear-gradient(135deg,var(--h1),var(--h2));box-shadow:0 2px 12px rgba(56,239,125,.25); }
-
+.tbtn.on{color:#fff;}
+.tbtn.won{background:linear-gradient(135deg,var(--w1),var(--w2));box-shadow:0 2px 12px rgba(102,126,234,.4);}
+.tbtn.hon{background:linear-gradient(135deg,var(--h1),var(--h2));box-shadow:0 2px 12px rgba(56,239,125,.25);}
 .pill {
   display:flex;align-items:center;gap:6px;padding:6px 13px;height:32px;
   background:rgba(255,255,255,.07);border:1px solid var(--border);border-radius:50px;
   color:#fff;cursor:pointer;font-size:12px;font-weight:500;
   transition:background .2s;white-space:nowrap;font-family:'DM Sans',sans-serif;flex-shrink:0;
 }
-.pill:hover { background:rgba(255,255,255,.13); }
-.about-btn { font-style:italic;font-weight:700;font-size:14px;padding:6px 11px; }
-.lang-wrap { position:relative; }
-.badge { font-size:10px;font-weight:700;padding:1px 5px;border-radius:20px;background:var(--w2);line-height:1.4; }
-body.how .badge { background:var(--h1); }
-
+.pill:hover{background:rgba(255,255,255,.13);}
+.about-btn{font-style:italic;font-weight:700;font-size:14px;padding:6px 11px;}
+.lang-wrap{position:relative;}
+.badge{font-size:10px;font-weight:700;padding:1px 5px;border-radius:20px;background:var(--w2);line-height:1.4;}
+body.how .badge{background:var(--h1);}
 .lang-dd {
   position:absolute;top:calc(100% + 8px);right:0;
   background:rgba(12,12,20,.98);border:1px solid var(--border);
@@ -77,71 +70,99 @@ body.how .badge { background:var(--h1); }
   box-shadow:0 20px 60px rgba(0,0,0,.7);z-index:400;
   scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.08) transparent;
 }
-.lang-dd.open { display:block; }
+.lang-dd.open{display:block;}
 .lopt {
   padding:9px 12px;cursor:pointer;border-radius:10px;
   display:flex;align-items:center;gap:9px;
   font-size:13px;color:rgba(255,255,255,.8);transition:background .15s;
 }
-.lopt:hover,.lopt.sel { background:rgba(255,255,255,.08); }
-
+.lopt:hover,.lopt.sel{background:rgba(255,255,255,.08);}
+.burger-btn {
+  display:none;align-items:center;justify-content:center;
+  width:36px;height:36px;border-radius:50%;
+  background:rgba(255,255,255,.07);border:1px solid var(--border);
+  cursor:pointer;flex-shrink:0;position:relative;transition:background .2s;
+}
+.burger-btn:hover{background:rgba(255,255,255,.13);}
+.burger-btn svg{width:18px;height:18px;display:block;}
+.burger-badge {
+  position:absolute;top:-3px;right:-3px;
+  font-size:9px;font-weight:700;padding:1px 4px;
+  border-radius:20px;background:var(--w2);line-height:1.4;display:none;
+}
+body.how .burger-badge{background:var(--h1);}
+.burger-menu {
+  position:fixed;top:0;left:0;right:0;z-index:299;
+  background:rgba(7,7,13,.98);backdrop-filter:blur(18px);
+  border-bottom:1px solid var(--border);
+  max-height:0;overflow:hidden;
+  transition:max-height .28s cubic-bezier(.4,0,.2,1);
+}
+.burger-menu.open{max-height:300px;}
+.burger-inner{padding:calc(max(13px,env(safe-area-inset-top)) + 58px) 16px 18px;}
+.burger-row {
+  display:flex;align-items:center;justify-content:space-between;
+  padding:12px 0;border-bottom:1px solid var(--border);
+}
+.burger-row:last-child{border-bottom:none;padding-bottom:0;}
+.burger-row-label{display:flex;align-items:center;gap:10px;color:rgba(255,255,255,.7);font-size:14px;}
+.burger-row-label span:first-child{font-size:18px;}
+.burger-action {
+  display:flex;align-items:center;gap:8px;padding:7px 14px;border-radius:50px;
+  background:rgba(255,255,255,.07);border:1px solid var(--border);
+  color:#fff;cursor:pointer;font-size:12px;font-weight:500;
+  font-family:'DM Sans',sans-serif;transition:background .2s;white-space:nowrap;
+}
+.burger-action:hover{background:rgba(255,255,255,.13);}
 .modal-overlay {
   position:fixed;inset:0;z-index:500;display:none;
   align-items:center;justify-content:center;
   background:rgba(0,0,0,.6);backdrop-filter:blur(6px);
 }
-.modal-overlay.open { display:flex; }
+.modal-overlay.open{display:flex;}
 .modal {
   width:min(420px,88vw);background:rgba(12,12,20,.98);
   border:1px solid var(--border);border-radius:24px;padding:32px;
   box-shadow:0 30px 80px rgba(0,0,0,.7);text-align:center;position:relative;
   animation:mshow .22s ease;
 }
-@keyframes mshow { from{opacity:0;transform:scale(.95)} to{opacity:1;transform:scale(1)} }
+@keyframes mshow{from{opacity:0;transform:scale(.95)}to{opacity:1;transform:scale(1)}}
 .modal-close {
   position:absolute;top:16px;right:18px;font-size:18px;cursor:pointer;
   background:none;border:none;color:var(--dim);transition:color .2s;
 }
-.modal-close:hover { color:#fff; }
+.modal-close:hover{color:#fff;}
 .modal-logo {
   font-family:'Syne',sans-serif;font-size:26px;font-weight:800;letter-spacing:-1px;
   background:linear-gradient(135deg,var(--w1),var(--w2));
   -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
   margin-bottom:14px;
 }
-.modal-body { font-size:14px;line-height:1.7;color:rgba(255,255,255,.72);margin-bottom:18px; }
-.modal-contact { font-size:12px;color:var(--dim); }
-.modal-contact a { color:#a5b4fc;text-decoration:none; }
-.modal-contact a:hover { text-decoration:underline; }
-
-/* Feed — touch-action lets browser handle pan natively without JS */
+.modal-body{font-size:14px;line-height:1.7;color:rgba(255,255,255,.72);margin-bottom:18px;}
+.modal-contact{font-size:12px;color:var(--dim);}
+.modal-contact a{color:#a5b4fc;text-decoration:none;}
+.modal-contact a:hover{text-decoration:underline;}
 .feed {
   height:100vh;overflow-y:scroll;scroll-snap-type:y mandatory;
   scrollbar-width:none;-ms-overflow-style:none;
-  touch-action:pan-y;
-  -webkit-overflow-scrolling:touch;
+  touch-action:pan-y;-webkit-overflow-scrolling:touch;
 }
-.feed::-webkit-scrollbar { display:none; }
-
+.feed::-webkit-scrollbar{display:none;}
 .card {
   height:100vh;scroll-snap-align:start;position:relative;
   display:flex;align-items:center;justify-content:center;
   background:#07070d;overflow:hidden;
 }
-.cbg { position:absolute;inset:0;z-index:0; }
-/* translateZ(0) ensures blur filter is GPU-rasterised */
-.cbg img { width:100%;height:100%;object-fit:cover;opacity:.45;filter:blur(28px) saturate(1.6);transform:scale(1.12) translateZ(0); }
-.cveil { position:absolute;inset:0;
+.cbg{position:absolute;inset:0;z-index:0;}
+.cbg img{width:100%;height:100%;object-fit:cover;opacity:.45;filter:blur(28px) saturate(1.6);transform:scale(1.12) translateZ(0);}
+.cveil{position:absolute;inset:0;
   background:rgba(7,7,13,.45),
     radial-gradient(ellipse at 30% 30%,rgba(102,126,234,.1) 0%,transparent 60%),
-    radial-gradient(ellipse at 75% 75%,rgba(118,75,162,.07) 0%,transparent 55%);
-}
-.card.how .cveil {
+    radial-gradient(ellipse at 75% 75%,rgba(118,75,162,.07) 0%,transparent 55%);}
+.card.how .cveil{
   background:rgba(7,7,13,.45),
     radial-gradient(ellipse at 30% 30%,rgba(17,153,142,.1) 0%,transparent 60%),
-    radial-gradient(ellipse at 75% 75%,rgba(56,239,125,.06) 0%,transparent 55%);
-}
-
+    radial-gradient(ellipse at 75% 75%,rgba(56,239,125,.06) 0%,transparent 55%);}
 .panel {
   position:relative;z-index:1;width:min(660px,90vw);max-height:74vh;padding:24px;
   background:var(--glass);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);
@@ -155,9 +176,9 @@ body.how .badge { background:var(--h1); }
   letter-spacing:1.1px;text-transform:uppercase;
   padding:3px 10px;border-radius:20px;margin-bottom:14px;width:fit-content;flex-shrink:0;
 }
-.chip.w { background:rgba(102,126,234,.16);color:#a5b4fc;border:1px solid rgba(102,126,234,.22); }
-.chip.h { background:rgba(17,153,142,.15);color:#6ee7b7;border:1px solid rgba(17,153,142,.22); }
-.art-img { width:100%;max-height:220px;object-fit:contain;border-radius:16px;margin-bottom:14px;flex-shrink:0;background:rgba(0,0,0,.25); }
+.chip.w{background:rgba(102,126,234,.16);color:#a5b4fc;border:1px solid rgba(102,126,234,.22);}
+.chip.h{background:rgba(17,153,142,.15);color:#6ee7b7;border:1px solid rgba(17,153,142,.22);}
+.art-img{width:100%;max-height:220px;object-fit:contain;border-radius:16px;margin-bottom:14px;flex-shrink:0;background:rgba(0,0,0,.25);}
 .art-title {
   font-family:'Syne',sans-serif;font-size:21px;font-weight:700;
   line-height:1.22;letter-spacing:-.4px;margin-bottom:10px;flex-shrink:0;
@@ -168,38 +189,34 @@ body.how .badge { background:var(--h1); }
   flex-shrink:1;min-height:0;margin-bottom:18px;
   overflow:hidden;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;
 }
-.acts { display:flex;gap:10px;flex-shrink:0;flex-wrap:nowrap;margin-top:auto; }
+.acts{display:flex;gap:10px;flex-shrink:0;flex-wrap:nowrap;margin-top:auto;}
 .act {
   display:flex;align-items:center;gap:8px;padding:14px 20px;border-radius:14px;
   border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.07);
   color:#fff;cursor:pointer;font-size:15px;font-weight:500;
-  transition:background .2s, opacity .1s;white-space:nowrap;font-family:'DM Sans',sans-serif;
+  transition:background .2s,opacity .1s;white-space:nowrap;font-family:'DM Sans',sans-serif;
 }
-.act:hover { background:rgba(255,255,255,.13); }
-.act:active { opacity:.75; }
-.act.liked { background:rgba(239,68,68,.15);border-color:rgba(239,68,68,.35); }
-.act.cta { flex:1;justify-content:center;border:none;font-weight:600;background:linear-gradient(135deg,var(--w1),var(--w2)); }
-.act.cta.hcta { background:linear-gradient(135deg,var(--h1),var(--h2)); }
-.act.cta:hover { filter:brightness(1.1); }
-
-.spin-wrap { height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px; }
-.spin { width:42px;height:42px;border:3px solid rgba(255,255,255,.07);border-top-color:var(--w1);border-radius:50%;animation:rot .85s linear infinite; }
-.spin.h { border-top-color:var(--h1); }
-.spin-lbl { font-family:'Syne',sans-serif;font-size:12px;font-weight:700;letter-spacing:.5px;color:var(--dim); }
-@keyframes rot { to{transform:rotate(360deg);} }
-
+.act:hover{background:rgba(255,255,255,.13);}
+.act:active{opacity:.75;}
+.act.liked{background:rgba(239,68,68,.15);border-color:rgba(239,68,68,.35);}
+.act.cta{flex:1;justify-content:center;border:none;font-weight:600;background:linear-gradient(135deg,var(--w1),var(--w2));}
+.act.cta.hcta{background:linear-gradient(135deg,var(--h1),var(--h2));}
+.act.cta:hover{filter:brightness(1.1);}
+.spin-wrap{height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;}
+.spin{width:42px;height:42px;border:3px solid rgba(255,255,255,.07);border-top-color:var(--w1);border-radius:50%;animation:rot .85s linear infinite;}
+.spin.h{border-top-color:var(--h1);}
+.spin-lbl{font-family:'Syne',sans-serif;font-size:12px;font-weight:700;letter-spacing:.5px;color:var(--dim);}
+@keyframes rot{to{transform:rotate(360deg);}}
 .hint {
   position:fixed;left:50%;z-index:100;
-  /* respect home indicator */
   bottom:max(26px,calc(env(safe-area-inset-bottom) + 12px));
   display:none;flex-direction:column;align-items:center;gap:6px;pointer-events:none;
   animation:hshow .4s .3s both,hbounce 2s .7s infinite;
 }
-@keyframes hshow { from{opacity:0} to{opacity:1} }
-@keyframes hbounce { 0%,100%{transform:translateX(-50%) translateY(0)} 50%{transform:translateX(-50%) translateY(-8px)} }
-.hint-txt { font-size:11px;color:var(--dim);letter-spacing:.4px; }
-.hint-arr { width:16px;height:16px;border-right:2px solid var(--dim);border-bottom:2px solid var(--dim);transform:rotate(45deg); }
-
+@keyframes hshow{from{opacity:0}to{opacity:1}}
+@keyframes hbounce{0%,100%{transform:translateX(-50%) translateY(0)}50%{transform:translateX(-50%) translateY(-8px)}}
+.hint-txt{font-size:11px;color:var(--dim);letter-spacing:.4px;}
+.hint-arr{width:16px;height:16px;border-right:2px solid var(--dim);border-bottom:2px solid var(--dim);transform:rotate(45deg);}
 .lp {
   position:fixed;top:0;right:-430px;width:420px;height:100vh;
   background:rgba(8,8,14,.97);backdrop-filter:blur(22px);
@@ -209,115 +226,55 @@ body.how .badge { background:var(--h1); }
   padding:max(84px,calc(env(safe-area-inset-top) + 70px)) 18px max(24px,env(safe-area-inset-bottom));
   scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.07) transparent;
 }
-.lp.open { right:0; }
-.lp-hdr { font-family:'Syne',sans-serif;font-size:21px;font-weight:800;margin-bottom:18px;display:flex;justify-content:space-between;align-items:center; }
-.lp-x { font-size:20px;cursor:pointer;background:none;border:none;color:var(--dim);transition:color .2s; }
-.lp-x:hover { color:#fff; }
-.li { background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:10px; }
-.li-src { font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;opacity:.5;margin-bottom:5px; }
-.li-ttl { font-family:'Syne',sans-serif;font-size:14px;font-weight:600;margin-bottom:5px;line-height:1.3; }
-.li-body { font-size:12px;color:var(--dim);line-height:1.5;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;margin-bottom:9px; }
-.li-acts { display:flex;gap:7px; }
-.li-btn { font-size:11px;padding:4px 11px;background:rgba(255,255,255,.07);border:1px solid var(--border);border-radius:8px;color:rgba(255,255,255,.8);cursor:pointer;transition:background .18s; }
-.li-btn:hover { background:rgba(255,255,255,.14); }
-.empty { text-align:center;padding:44px 20px;color:var(--dim); }
-.empty-ico { font-size:42px;margin-bottom:12px; }
-.empty-ttl { font-family:'Syne',sans-serif;font-size:16px;font-weight:700;color:rgba(255,255,255,.6);margin-bottom:6px; }
-.empty-txt { font-size:13px;line-height:1.6; }
-
-.heart { position:fixed;font-size:68px;pointer-events:none;z-index:999;transform:translate(-50%,-50%);animation:hpop .7s ease-out forwards; }
-@keyframes hpop {
-  0%  {transform:translate(-50%,-50%) scale(0);opacity:1;}
-  50% {transform:translate(-50%,-50%) scale(1.3);opacity:1;}
+.lp.open{right:0;}
+.lp-hdr{font-family:'Syne',sans-serif;font-size:21px;font-weight:800;margin-bottom:18px;display:flex;justify-content:space-between;align-items:center;}
+.lp-x{font-size:20px;cursor:pointer;background:none;border:none;color:var(--dim);transition:color .2s;}
+.lp-x:hover{color:#fff;}
+.li{background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:10px;}
+.li-src{font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;opacity:.5;margin-bottom:5px;}
+.li-ttl{font-family:'Syne',sans-serif;font-size:14px;font-weight:600;margin-bottom:5px;line-height:1.3;}
+.li-body{font-size:12px;color:var(--dim);line-height:1.5;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;margin-bottom:9px;}
+.li-acts{display:flex;gap:7px;}
+.li-btn{font-size:11px;padding:4px 11px;background:rgba(255,255,255,.07);border:1px solid var(--border);border-radius:8px;color:rgba(255,255,255,.8);cursor:pointer;transition:background .18s;}
+.li-btn:hover{background:rgba(255,255,255,.14);}
+.empty{text-align:center;padding:44px 20px;color:var(--dim);}
+.empty-ico{font-size:42px;margin-bottom:12px;}
+.empty-ttl{font-family:'Syne',sans-serif;font-size:16px;font-weight:700;color:rgba(255,255,255,.6);margin-bottom:6px;}
+.empty-txt{font-size:13px;line-height:1.6;}
+.heart{position:fixed;font-size:68px;pointer-events:none;z-index:999;transform:translate(-50%,-50%);animation:hpop .7s ease-out forwards;}
+@keyframes hpop{
+  0%{transform:translate(-50%,-50%) scale(0);opacity:1;}
+  50%{transform:translate(-50%,-50%) scale(1.3);opacity:1;}
   100%{transform:translate(-50%,-60%) scale(1);opacity:0;}
 }
-
 .toast {
   position:fixed;bottom:68px;left:50%;transform:translateX(-50%);
   background:rgba(20,20,30,.96);border:1px solid var(--border);
   color:#fff;padding:9px 18px;border-radius:50px;
   font-size:13px;z-index:9999;pointer-events:none;animation:tin .22s ease;
 }
-@keyframes tin { from{opacity:0;transform:translateX(-50%) translateY(8px)} to{opacity:1;transform:translateX(-50%) translateY(0)} }
-
-.err {
-  position:relative;z-index:1;width:min(440px,88vw);padding:32px;text-align:center;
-  background:var(--glass);backdrop-filter:blur(20px);
-  border-radius:24px;border:1px solid rgba(239,68,68,.22);
-}
-.err-ico { font-size:40px;margin-bottom:12px; }
-.err-ttl { font-family:'DM Sans',sans-serif;font-size:18px;font-weight:500;margin-bottom:8px; }
-.err-msg { font-size:13px;color:var(--dim);line-height:1.6;margin-bottom:20px; }
-.err-btn {
-  padding:10px 24px;border:none;border-radius:12px;cursor:pointer;
-  background:linear-gradient(135deg,var(--w1),var(--w2));
-  color:#fff;font-size:14px;font-weight:600;font-family:'DM Sans',sans-serif;
-}
-body.how .err-btn { background:linear-gradient(135deg,var(--h1),var(--h2)); }
-
-/* ── HAMBURGER ── */
-.burger-btn {
-  display:none;align-items:center;justify-content:center;
-  width:36px;height:36px;border-radius:50%;
-  background:rgba(255,255,255,.07);border:1px solid var(--border);
-  cursor:pointer;flex-shrink:0;position:relative;
-  transition:background .2s;
-}
-.burger-btn:hover { background:rgba(255,255,255,.13); }
-.burger-btn svg { width:18px;height:18px;display:block; }
-.burger-badge {
-  position:absolute;top:-3px;right:-3px;
-  font-size:9px;font-weight:700;padding:1px 4px;
-  border-radius:20px;background:var(--w2);line-height:1.4;
-  display:none;
-}
-body.how .burger-badge { background:var(--h1); }
-
-.burger-menu {
-  position:fixed;top:0;left:0;right:0;z-index:299;
-  background:rgba(7,7,13,.98);backdrop-filter:blur(18px);
-  border-bottom:1px solid var(--border);
-  padding:0 16px;
-  max-height:0;overflow:hidden;
-  transition:max-height .3s cubic-bezier(.4,0,.2,1), padding .3s;
-}
-.burger-menu.open {
-  max-height:280px;
-  padding:calc(max(13px,env(safe-area-inset-top)) + 58px) 16px 18px;
-}
-.burger-row {
-  display:flex;align-items:center;justify-content:space-between;
-  padding:12px 0;border-bottom:1px solid var(--border);
-  font-size:14px;font-weight:500;
-}
-.burger-row:last-child { border-bottom:none;padding-bottom:0; }
-.burger-row-label { display:flex;align-items:center;gap:10px;color:rgba(255,255,255,.7); }
-.burger-row-label span:first-child { font-size:18px; }
-.burger-row-action {
-  display:flex;align-items:center;gap:8px;
-  padding:7px 14px;border-radius:50px;
-  background:rgba(255,255,255,.07);border:1px solid var(--border);
-  color:#fff;cursor:pointer;font-size:12px;font-weight:500;
-  font-family:'DM Sans',sans-serif;transition:background .2s;white-space:nowrap;
-}
-.burger-row-action:hover { background:rgba(255,255,255,.13); }
-
-/* ── RESPONSIVE ── */
+@keyframes tin{from{opacity:0;transform:translateX(-50%) translateY(8px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
+.err{position:relative;z-index:1;width:min(440px,88vw);padding:32px;text-align:center;background:var(--glass);backdrop-filter:blur(20px);border-radius:24px;border:1px solid rgba(239,68,68,.22);}
+.err-ico{font-size:40px;margin-bottom:12px;}
+.err-ttl{font-family:'DM Sans',sans-serif;font-size:18px;font-weight:500;margin-bottom:8px;}
+.err-msg{font-size:13px;color:var(--dim);line-height:1.6;margin-bottom:20px;}
+.err-btn{padding:10px 24px;border:none;border-radius:12px;cursor:pointer;background:linear-gradient(135deg,var(--w1),var(--w2));color:#fff;font-size:14px;font-weight:600;font-family:'DM Sans',sans-serif;}
+body.how .err-btn{background:linear-gradient(135deg,var(--h1),var(--h2));}
 @media(max-width:580px){
-  .logo { font-size:19px; }
-  .tbtn { font-size:11px;padding:5px 10px; }
-  .panel { width:93vw;max-height:86vh;padding:18px;border-radius:22px; }
-  .art-title { font-size:19px; }
-  .lp { width:100%;right:-100%; }
-  .act { padding:12px 16px;font-size:14px; }
-  /* hide desktop right controls, show burger */
-  .hdr-right > *:not(.burger-btn) { display:none; }
-  .burger-btn { display:flex; }
+  .logo{font-size:19px;}
+  .tbtn{font-size:11px;padding:5px 10px;}
+  .panel{width:93vw;max-height:86vh;padding:18px;border-radius:22px;}
+  .art-title{font-size:19px;}
+  .lp{width:100%;right:-100%;}
+  .act{padding:12px 16px;font-size:14px;}
+  .hdr-right > .lang-wrap,
+  .hdr-right > #likesBtn,
+  .hdr-right > #aboutBtn{display:none;}
+  .burger-btn{display:flex;}
 }
 </style>
 </head>
 <body>
-
 <header class="hdr">
   <div class="hdr-left"><div class="logo">WikiScroll</div></div>
   <div class="hdr-mid">
@@ -336,75 +293,63 @@ body.how .burger-badge { background:var(--h1); }
       <span class="badge" id="badge" style="display:none">0</span>
     </button>
     <button class="pill about-btn" id="aboutBtn" title="About">ℹ</button>
-    <!-- Mobile hamburger -->
     <button class="burger-btn" id="burgerBtn" title="Menu">
       <span class="burger-badge" id="burgerBadge"></span>
       <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
         <line x1="2" y1="4.5" x2="16" y2="4.5"/>
-        <line x1="2" y1="9"   x2="16" y2="9"/>
+        <line x1="2" y1="9" x2="16" y2="9"/>
         <line x1="2" y1="13.5" x2="16" y2="13.5"/>
       </svg>
     </button>
   </div>
 </header>
-
-<!-- Mobile burger menu (hidden on desktop) -->
 <div class="burger-menu" id="burgerMenu">
-  <!-- Language -->
-  <div class="burger-row">
-    <div class="burger-row-label"><span>🌍</span><span id="burgerLangTxt">English</span></div>
-    <div class="lang-wrap">
-      <button class="burger-row-action" id="burgerLangBtn">Change ›</button>
-      <div class="lang-dd" id="burgerLangDd"></div>
+  <div class="burger-inner">
+    <div class="burger-row">
+      <div class="burger-row-label"><span>🌍</span><span id="burgerLangTxt">English</span></div>
+      <div class="lang-wrap">
+        <button class="burger-action" id="burgerLangBtn">Change</button>
+        <div class="lang-dd" id="burgerLangDd"></div>
+      </div>
+    </div>
+    <div class="burger-row">
+      <div class="burger-row-label"><span>❤️</span><span>Saved Articles</span></div>
+      <button class="burger-action" id="burgerLikesBtn">View <span class="badge" id="burgerBadge2" style="display:none">0</span></button>
+    </div>
+    <div class="burger-row">
+      <div class="burger-row-label"><span>ℹ️</span><span>About</span></div>
+      <button class="burger-action" id="burgerAboutBtn">Open</button>
     </div>
   </div>
-  <!-- Likes -->
-  <div class="burger-row">
-    <div class="burger-row-label"><span>❤️</span><span>Saved Articles</span></div>
-    <button class="burger-row-action" id="burgerLikesBtn">
-      View <span class="badge" id="burgerLikesBadge" style="display:none">0</span>
-    </button>
-  </div>
-  <!-- About -->
-  <div class="burger-row">
-    <div class="burger-row-label"><span>ℹ️</span><span>About WikiScroll</span></div>
-    <button class="burger-row-action" id="burgerAboutBtn">Open ›</button>
-  </div>
 </div>
-
 <div class="lp" id="lp">
   <div class="lp-hdr"><span>Saved Articles</span><button class="lp-x" id="lpClose">✕</button></div>
   <div id="likedList"></div>
 </div>
-
 <div class="feed" id="feed">
   <div class="spin-wrap" id="spinner">
     <div class="spin"></div>
     <div class="spin-lbl">Loading articles…</div>
   </div>
 </div>
-
 <div class="hint" id="hint">
   <div class="hint-txt">Scroll to discover</div>
   <div class="hint-arr"></div>
 </div>
-
 <div class="modal-overlay" id="aboutOverlay">
   <div class="modal">
     <button class="modal-close" id="modalClose">✕</button>
     <div class="modal-logo">WikiScroll</div>
     <div class="modal-body">
       An infinite scrolling interface for exploring random Wikipedia or Wikivoyage articles in multiple languages.<br><br>
-      Swipe or scroll to discover fascinating articles from Wikipedia or Wikivoyage!
+      Swipe or scroll to discover fascinating articles!
     </div>
-    <div class="modal-contact">Contact: <a href="/cdn-cgi/l/email-protection#375458594356544377405e5c5e445445585b5b1954585a"><span class="__cf_email__" data-cfemail="791a16170d181a0d390e1012100a1a0b161515571a1614">[email&#160;protected]</span></a></div>
+    <div class="modal-contact">Contact: <a href="mailto:contact@wikiscroll.com">contact@wikiscroll.com</a></div>
   </div>
 </div>
-
-<script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
+<script>
 'use strict';
-
-const LANGS = [
+const LANGS=[
   {c:'en',n:'English',f:'🇬🇧'},{c:'es',n:'Español',f:'🇪🇸'},
   {c:'fr',n:'Français',f:'🇫🇷'},{c:'de',n:'Deutsch',f:'🇩🇪'},
   {c:'it',n:'Italiano',f:'🇮🇹'},{c:'pt',n:'Português',f:'🇵🇹'},
@@ -413,182 +358,87 @@ const LANGS = [
   {c:'hi',n:'हिन्दी',f:'🇮🇳'},{c:'ko',n:'한국어',f:'🇰🇷'},
   {c:'nl',n:'Nederlands',f:'🇳🇱'},{c:'pl',n:'Polski',f:'🇵🇱'},
 ];
-
-// ── State ──────────────────────────────────────────────────────────────────
-let curMode = 'wiki', curLang = 'en';
-let articles = [];
-let liked    = new Map();
-let queue    = [];   // pre-fetched articles not yet rendered
-let filling  = false;
-let hinted   = false;
-
-// ── localStorage helpers (try/catch: throws in private browsing) ───────────
-function lsGet(k)    { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } }
-function lsSet(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} }
-
-function loadLiked() {
-  const saved = lsGet('ws_liked');
-  if (Array.isArray(saved)) {
-    saved.forEach(a => liked.set(a.id, a));
-    updateBadge();
+let curMode='wiki',curLang='en',articles=[],liked=new Map(),queue=[],filling=false,hinted=false;
+function lsGet(k){try{return JSON.parse(localStorage.getItem(k));}catch{return null;}}
+function lsSet(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch{}}
+function loadLiked(){const s=lsGet('ws_liked');if(Array.isArray(s)){s.forEach(a=>liked.set(a.id,a));updateBadge();}}
+function saveLiked(){lsSet('ws_liked',[...liked.values()]);}
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
+function toast(msg){const t=document.createElement('div');t.className='toast';t.textContent=msg;document.body.appendChild(t);setTimeout(()=>t.remove(),2200);}
+function fetchOne(url){
+  const ac=new AbortController(),id=setTimeout(()=>ac.abort(),8000);
+  return fetch(url,{signal:ac.signal}).then(r=>r.ok?r.json():null).catch(()=>null).finally(()=>clearTimeout(id));
+}
+function toArticle(d,prefix){
+  return{id:prefix+d.pageid,src:prefix==='w'?'wiki':'how',title:d.title,body:d.extract,img:d.thumbnail.source,url:d.content_urls?.desktop?.page||'#'};
+}
+async function fetchWiki(){
+  const url=`https://${curLang}.wikipedia.org/api/rest_v1/page/random/summary`;
+  const all=await Promise.all(Array.from({length:10},()=>fetchOne(url)));
+  return all.filter(d=>d?.thumbnail?.source&&d.extract?.length>=60).slice(0,5).map(d=>toArticle(d,'w'));
+}
+async function fetchVoyage(){
+  for(const lang of(curLang!=='en'?[curLang,'en']:['en'])){
+    const url=`https://${lang}.wikivoyage.org/api/rest_v1/page/random/summary`;
+    const all=await Promise.all(Array.from({length:10},()=>fetchOne(url)));
+    const good=all.filter(d=>d?.thumbnail?.source&&d.extract?.length>=40).slice(0,5).map(d=>toArticle(d,'v'));
+    if(good.length)return good;
   }
+  return[];
 }
-function saveLiked() {
-  lsSet('ws_liked', [...liked.values()]);
-}
-
-// ── Misc helpers ───────────────────────────────────────────────────────────
-function esc(s) {
-  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
-}
-
-function toast(msg) {
-  const t = document.createElement('div');
-  t.className = 'toast';
-  t.textContent = msg;
-  document.body.appendChild(t);
-  setTimeout(() => t.remove(), 2200);
-}
-
-// ── Network layer ──────────────────────────────────────────────────────────
-function fetchOne(url) {
-  const ac = new AbortController();
-  const id = setTimeout(() => ac.abort(), 8000);
-  return fetch(url, {signal: ac.signal})
-    .then(r => r.ok ? r.json() : null)
-    .catch(() => null)
-    .finally(() => clearTimeout(id));
-}
-
-function toArticle(d, prefix) {
-  return {
-    id:    prefix + d.pageid,
-    src:   prefix === 'w' ? 'wiki' : 'how',
-    title: d.title,
-    body:  d.extract,
-    img:   d.thumbnail.source,
-    url:   d.content_urls?.desktop?.page || '#',
-  };
-}
-
-async function fetchWiki() {
-  const url = `https://${curLang}.wikipedia.org/api/rest_v1/page/random/summary`;
-  const all = await Promise.all(Array.from({length: 10}, () => fetchOne(url)));
-  return all
-    .filter(d => d?.thumbnail?.source && d.extract?.length >= 60)
-    .slice(0, 5)
-    .map(d => toArticle(d, 'w'));
-}
-
-async function fetchVoyage() {
-  for (const lang of (curLang !== 'en' ? [curLang, 'en'] : ['en'])) {
-    const url = `https://${lang}.wikivoyage.org/api/rest_v1/page/random/summary`;
-    const all = await Promise.all(Array.from({length: 10}, () => fetchOne(url)));
-    const good = all
-      .filter(d => d?.thumbnail?.source && d.extract?.length >= 40)
-      .slice(0, 5)
-      .map(d => toArticle(d, 'v'));
-    if (good.length) return good;
-  }
-  return [];
-}
-
-// ── Prefetch queue ─────────────────────────────────────────────────────────
-// Always keeps 10+ articles prefetched so rendering is instant.
-// Preloads images for queued articles so they're in browser cache.
-const QUEUE_MIN = 8;
-
-async function fillQueue() {
-  if (filling) return;
-  filling = true;
-  try {
-    const fn = curMode === 'wiki' ? fetchWiki : fetchVoyage;
-    // Fire two batches in parallel for a faster fill
-    const [a, b] = await Promise.all([fn(), fn()]);
-    const fresh = [...a, ...b];
+const QUEUE_MIN=8;
+let sentinel=null;
+async function fillQueue(){
+  if(filling)return;filling=true;
+  try{
+    const fn=curMode==='wiki'?fetchWiki:fetchVoyage;
+    const[a,b]=await Promise.all([fn(),fn()]);
+    const fresh=[...a,...b];
     queue.push(...fresh);
-    // Preload images so they're in browser HTTP cache when cards render
-    fresh.forEach(article => {
-      if (article.img) {
-        const img = new Image();
-        img.src = article.img;
-      }
-    });
-  } finally {
-    filling = false;
-  }
+    fresh.forEach(art=>{if(art.img){const i=new Image();i.src=art.img;}});
+  }finally{filling=false;}
 }
-
-// ── Render from queue ──────────────────────────────────────────────────────
-let sentinel = null;
-
-function flushQueue(n = 5) {
-  const batch = queue.splice(0, n);
-  if (!batch.length) return;
+function flushQueue(n){
+  const batch=queue.splice(0,n||5);
+  if(!batch.length)return;
   articles.push(...batch);
   batch.forEach(renderCard);
-
-  // Show scroll hint once
-  if (!hinted && articles.length >= 2) {
-    hinted = true;
-    const hint = document.getElementById('hint');
-    hint.style.display = 'flex';
-    setTimeout(() => { hint.style.display = 'none'; }, 5500);
+  if(!hinted&&articles.length>=2){
+    hinted=true;const h=document.getElementById('hint');
+    h.style.display='flex';setTimeout(()=>{h.style.display='none';},5500);
   }
-
-  // Reattach sentinel to trigger next load
   attachSentinel();
-
-  // Keep queue topped up
-  if (queue.length < QUEUE_MIN) fillQueue();
+  if(queue.length<QUEUE_MIN)fillQueue();
 }
-
-// IntersectionObserver on the second-to-last card — fires 2 cards before end,
-// giving time to flush queue while the user is still reading.
-function attachSentinel() {
-  sentinel?.disconnect();
-  const feed  = document.getElementById('feed');
-  const cards = feed.querySelectorAll('.card');
-  if (cards.length < 2) return;
-  const target = cards[cards.length - 2];
-  sentinel = new IntersectionObserver(entries => {
-    if (entries[0].isIntersecting) {
-      sentinel.disconnect();
-      flushQueue(5);
-    }
-  }, {rootMargin: '0px 0px 200% 0px'});
-  sentinel.observe(target);
+function attachSentinel(){
+  sentinel&&sentinel.disconnect();
+  const cards=document.getElementById('feed').querySelectorAll('.card');
+  if(cards.length<2)return;
+  sentinel=new IntersectionObserver(entries=>{
+    if(entries[0].isIntersecting){sentinel.disconnect();flushQueue(5);}
+  },{rootMargin:'0px 0px 200% 0px'});
+  sentinel.observe(cards[cards.length-2]);
 }
-
-// ── Boot loader ────────────────────────────────────────────────────────────
-async function boot() {
-  try {
-    // Fill queue with two parallel batch fetches
+async function boot(){
+  try{
     await fillQueue();
     document.getElementById('spinner')?.remove();
-
-    if (!queue.length) { showError(); return; }
-
-    // Render first 5 cards immediately
+    if(!queue.length){showError();return;}
     flushQueue(5);
-  } catch(err) {
+  }catch(err){
     console.error(err);
     document.getElementById('spinner')?.remove();
     showError();
   }
 }
-
-// ── Render one card ────────────────────────────────────────────────────────
-function renderCard(a) {
-  const isHow   = a.src === 'how';
-  const isLiked = liked.has(a.id);
-  const img     = a.img ? `<img src="${esc(a.img)}" alt="" onerror="this.remove()">` : '';
-  const artImg  = a.img ? `<img src="${esc(a.img)}" alt="" class="art-img" onerror="this.remove()">` : '';
-
-  const card = document.createElement('div');
-  card.className = 'card' + (isHow ? ' how' : '');
-  card.dataset.id = a.id;
-  card.innerHTML = `
+function renderCard(a){
+  const isHow=a.src==='how',isLiked=liked.has(a.id);
+  const img=a.img?`<img src="${esc(a.img)}" alt="" onerror="this.remove()">`:'' ;
+  const artImg=a.img?`<img src="${esc(a.img)}" alt="" class="art-img" onerror="this.remove()">`:'' ;
+  const card=document.createElement('div');
+  card.className='card'+(isHow?' how':'');
+  card.dataset.id=a.id;
+  card.innerHTML=`
     <div class="cbg">${img}<div class="cveil"></div></div>
     <div class="panel">
       <div class="chip ${isHow?'h':'w'}">${isHow?'🗺️ Wikivoyage':'📖 Wikipedia'}</div>
@@ -601,272 +451,125 @@ function renderCard(a) {
         <button class="act cta${isHow?' hcta':''}">${isHow?'📋':'📖'} Read Full Article</button>
       </div>
     </div>`;
-
-  card.querySelector('.art-title').textContent = a.title;
-  card.querySelector('.art-body').textContent  = a.body;
-
-  const [likeBtn, shareBtn, readBtn] = card.querySelectorAll('.act');
-  likeBtn.addEventListener('click',  () => toggleLike(a.id));
-  shareBtn.addEventListener('click', () => doShare(a.url, a.title));
-  readBtn.addEventListener('click',  () => window.open(a.url, '_blank'));
-
+  card.querySelector('.art-title').textContent=a.title;
+  card.querySelector('.art-body').textContent=a.body;
+  const[likeBtn,shareBtn,readBtn]=card.querySelectorAll('.act');
+  likeBtn.addEventListener('click',()=>toggleLike(a.id));
+  shareBtn.addEventListener('click',()=>doShare(a.url,a.title));
+  readBtn.addEventListener('click',()=>window.open(a.url,'_blank'));
   document.getElementById('feed').appendChild(card);
 }
-
-function showError() {
-  const isHow = curMode === 'how';
-  const card  = document.createElement('div');
-  card.className = 'card';
-  card.innerHTML = `
-    <div class="cbg"><div class="cveil"></div></div>
-    <div class="err">
-      <div class="err-ico">${isHow?'🗺️':'📖'}</div>
-      <div class="err-ttl">Nothing loaded</div>
-      <div class="err-msg">${isHow?'Wikivoyage':'Wikipedia'} didn't respond. Check your connection and try again.</div>
-      <button class="err-btn">Try again</button>
-    </div>`;
-  card.querySelector('.err-btn').addEventListener('click', resetFeed);
+function showError(){
+  const isHow=curMode==='how';
+  const card=document.createElement('div');card.className='card';
+  card.innerHTML=`<div class="cbg"><div class="cveil"></div></div><div class="err"><div class="err-ico">${isHow?'🗺️':'📖'}</div><div class="err-ttl">Nothing loaded</div><div class="err-msg">${isHow?'Wikivoyage':'Wikipedia'} didn't respond. Check your connection and try again.</div><button class="err-btn">Try again</button></div>`;
+  card.querySelector('.err-btn').addEventListener('click',resetFeed);
   document.getElementById('feed').appendChild(card);
 }
-
-// ── Like / unlike ──────────────────────────────────────────────────────────
-function toggleLike(id) {
-  const a = articles.find(x => x.id === id);
-  if (!a) return;
-  liked.has(id) ? liked.delete(id) : liked.set(id, a);
-  saveLiked();
-  updateBadge();
-  const btn = document.getElementById('lb-' + id);
-  if (btn) {
-    const on = liked.has(id);
-    btn.className = 'act' + (on ? ' liked' : '');
-    btn.textContent = on ? '❤️ Liked' : '🤍 Like';
-  }
+function toggleLike(id){
+  const a=articles.find(x=>x.id===id);if(!a)return;
+  liked.has(id)?liked.delete(id):liked.set(id,a);
+  saveLiked();updateBadge();
+  const btn=document.getElementById('lb-'+id);
+  if(btn){const on=liked.has(id);btn.className='act'+(on?' liked':'');btn.textContent=on?'❤️ Liked':'🤍 Like';}
 }
-
-function removeLike(id) {
-  liked.delete(id);
-  saveLiked();
-  updateBadge();
-  const btn = document.getElementById('lb-' + id);
-  if (btn) { btn.className = 'act'; btn.textContent = '🤍 Like'; }
+function removeLike(id){
+  liked.delete(id);saveLiked();updateBadge();
+  const btn=document.getElementById('lb-'+id);
+  if(btn){btn.className='act';btn.textContent='🤍 Like';}
   renderLikedList();
 }
-
-function updateBadge() {
-  const n = liked.size;
-  // Desktop badge
-  const b = document.getElementById('badge');
-  b.textContent   = n;
-  b.style.display = n ? 'inline-block' : 'none';
-  // Mobile burger icon badge
-  const bb = document.getElementById('burgerBadge');
-  bb.textContent   = n;
-  bb.style.display = n ? 'inline-block' : 'none';
-  // Mobile menu badge
-  const lb = document.getElementById('burgerLikesBadge');
-  if (lb) { lb.textContent = n; lb.style.display = n ? 'inline-block' : 'none'; }
+function updateBadge(){
+  const n=liked.size;
+  ['badge','burgerBadge','burgerBadge2'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el){el.textContent=n;el.style.display=n?'inline-block':'none';}
+  });
 }
-
-// ── Likes panel ────────────────────────────────────────────────────────────
-function renderLikedList() {
-  const c = document.getElementById('likedList');
-  if (!liked.size) {
-    c.innerHTML = `<div class="empty">
-      <div class="empty-ico">🔖</div>
-      <div class="empty-ttl">Nothing saved yet</div>
-      <div class="empty-txt">Like articles while scrolling to save them here.</div>
-    </div>`;
-    return;
-  }
-  c.innerHTML = [...liked.values()].reverse().map(a => `
-    <div class="li">
-      <div class="li-src">${a.src==='wiki'?'📖 Wikipedia':'🗺️ Wikivoyage'}</div>
-      <div class="li-ttl">${esc(a.title)}</div>
-      <div class="li-body">${esc(a.body.slice(0,130))}</div>
-      <div class="li-acts">
-        <button class="li-btn" data-read="${esc(a.url)}">Read</button>
-        <button class="li-btn" data-share-url="${esc(a.url)}" data-share-title="${esc(a.title)}">Share</button>
-        <button class="li-btn" data-unlike="${esc(a.id)}">Remove</button>
-      </div>
-    </div>`).join('');
+function renderLikedList(){
+  const c=document.getElementById('likedList');
+  if(!liked.size){c.innerHTML='<div class="empty"><div class="empty-ico">🔖</div><div class="empty-ttl">Nothing saved yet</div><div class="empty-txt">Like articles while scrolling to save them here.</div></div>';return;}
+  c.innerHTML=[...liked.values()].reverse().map(a=>`<div class="li"><div class="li-src">${a.src==='wiki'?'📖 Wikipedia':'🗺️ Wikivoyage'}</div><div class="li-ttl">${esc(a.title)}</div><div class="li-body">${esc(a.body.slice(0,130))}</div><div class="li-acts"><button class="li-btn" data-read="${esc(a.url)}">Read</button><button class="li-btn" data-share-url="${esc(a.url)}" data-share-title="${esc(a.title)}">Share</button><button class="li-btn" data-unlike="${esc(a.id)}">Remove</button></div></div>`).join('');
 }
-
-document.getElementById('likedList').addEventListener('click', ev => {
-  const btn = ev.target.closest('.li-btn');
-  if (!btn) return;
-  if      (btn.dataset.read)      window.open(btn.dataset.read, '_blank');
-  else if (btn.dataset.unlike)    removeLike(btn.dataset.unlike);
-  else if (btn.dataset.shareUrl)  doShare(btn.dataset.shareUrl, btn.dataset.shareTitle);
+document.getElementById('likedList').addEventListener('click',ev=>{
+  const btn=ev.target.closest('.li-btn');if(!btn)return;
+  if(btn.dataset.read)window.open(btn.dataset.read,'_blank');
+  else if(btn.dataset.unlike)removeLike(btn.dataset.unlike);
+  else if(btn.dataset.shareUrl)doShare(btn.dataset.shareUrl,btn.dataset.shareTitle);
 });
-
-// ── Share ──────────────────────────────────────────────────────────────────
-function doShare(url, title) {
-  if (navigator.share) {
-    navigator.share({title, url}).catch(() => {});
-  } else if (navigator.clipboard) {
-    navigator.clipboard.writeText(url).then(() => toast('Link copied!')).catch(() => {});
-  }
+function doShare(url,title){
+  if(navigator.share)navigator.share({title,url}).catch(()=>{});
+  else if(navigator.clipboard)navigator.clipboard.writeText(url).then(()=>toast('Link copied!')).catch(()=>{});
 }
-
-// ── Reset feed ─────────────────────────────────────────────────────────────
-function resetFeed() {
-  sentinel?.disconnect();
-  articles = []; queue = []; hinted = false; filling = false;
-  document.getElementById('hint').style.display = 'none';
-  const isHow = curMode === 'how';
-  document.getElementById('feed').innerHTML = `
-    <div class="spin-wrap" id="spinner">
-      <div class="spin${isHow?' h':''}"></div>
-      <div class="spin-lbl">${isHow?'Loading destinations…':'Loading articles…'}</div>
-    </div>`;
+function resetFeed(){
+  sentinel&&sentinel.disconnect();
+  articles=[];queue=[];hinted=false;filling=false;
+  document.getElementById('hint').style.display='none';
+  const isHow=curMode==='how';
+  document.getElementById('feed').innerHTML=`<div class="spin-wrap" id="spinner"><div class="spin${isHow?' h':''}"></div><div class="spin-lbl">${isHow?'Loading destinations…':'Loading articles…'}</div></div>`;
   boot();
 }
-
-// ── Mode toggle ────────────────────────────────────────────────────────────
-function setMode(m) {
-  if (curMode === m) return;
-  curMode = m;
-  const isHow = m === 'how';
-  document.getElementById('wBtn').className = 'tbtn' + (isHow ? ''        : ' won on');
-  document.getElementById('hBtn').className = 'tbtn' + (isHow ? ' hon on' : '');
-  document.body.classList.toggle('how', isHow);
+function setMode(m){
+  if(curMode===m)return;curMode=m;
+  const isHow=m==='how';
+  document.getElementById('wBtn').className='tbtn'+(isHow?'':' won on');
+  document.getElementById('hBtn').className='tbtn'+(isHow?' hon on':'');
+  document.body.classList.toggle('how',isHow);
   resetFeed();
 }
-document.getElementById('wBtn').addEventListener('click', () => setMode('wiki'));
-document.getElementById('hBtn').addEventListener('click', () => setMode('how'));
-
-// ── Language dropdown ──────────────────────────────────────────────────────
-(function() {
-  // Shared helper — builds options into any dd element
-  function buildOpts(dd) {
-    dd.innerHTML = LANGS.map(l =>
-      `<div class="lopt${l.c===curLang?' sel':''}" data-c="${l.c}" data-n="${l.n}">${l.f} ${l.n}</div>`
-    ).join('');
+document.getElementById('wBtn').addEventListener('click',()=>setMode('wiki'));
+document.getElementById('hBtn').addEventListener('click',()=>setMode('how'));
+(function(){
+  const dd1=document.getElementById('langDd'),dd2=document.getElementById('burgerLangDd');
+  function buildOpts(dd){
+    dd.innerHTML=LANGS.map(l=>`<div class="lopt${l.c===curLang?' sel':''}" data-c="${l.c}" data-n="${l.n}">${l.f} ${l.n}</div>`).join('');
   }
-
-  function syncLangLabel() {
-    const lang = LANGS.find(l => l.c === curLang);
-    if (!lang) return;
-    document.getElementById('langTxt').textContent      = lang.n;
-    document.getElementById('burgerLangTxt').textContent = lang.n;
-  }
-
-  function applyLang(c, n, allDds) {
-    curLang = c;
-    syncLangLabel();
-    allDds.forEach(dd => {
-      dd.querySelectorAll('.lopt').forEach(o => o.classList.toggle('sel', o.dataset.c === curLang));
-      dd.classList.remove('open');
-    });
+  buildOpts(dd1);buildOpts(dd2);
+  function setLang(c){
+    curLang=c;
+    const lang=LANGS.find(l=>l.c===c);
+    if(lang){document.getElementById('langTxt').textContent=lang.n;document.getElementById('burgerLangTxt').textContent=lang.n;}
+    [dd1,dd2].forEach(dd=>{dd.querySelectorAll('.lopt').forEach(o=>o.classList.toggle('sel',o.dataset.c===curLang));dd.classList.remove('open');});
     resetFeed();
   }
-
-  const dd1 = document.getElementById('langDd');
-  const dd2 = document.getElementById('burgerLangDd');
-  buildOpts(dd1);
-  buildOpts(dd2);
-
-  // Desktop lang button
-  document.getElementById('langBtn').addEventListener('click', ev => {
-    ev.stopPropagation();
-    dd1.classList.toggle('open');
-    dd2.classList.remove('open');
-  });
-  dd1.addEventListener('click', ev => {
-    const o = ev.target.closest('.lopt');
-    if (o) applyLang(o.dataset.c, o.dataset.n, [dd1, dd2]);
-  });
-
-  // Mobile lang button (inside burger menu)
-  document.getElementById('burgerLangBtn').addEventListener('click', ev => {
-    ev.stopPropagation();
-    dd2.classList.toggle('open');
-    dd1.classList.remove('open');
-  });
-  dd2.addEventListener('click', ev => {
-    const o = ev.target.closest('.lopt');
-    if (o) { applyLang(o.dataset.c, o.dataset.n, [dd1, dd2]); closeBurger(); }
-  });
-
-  document.addEventListener('click', ev => {
-    if (!ev.target.closest('.lang-wrap')) { dd1.classList.remove('open'); dd2.classList.remove('open'); }
-  });
+  document.getElementById('langBtn').addEventListener('click',ev=>{ev.stopPropagation();dd1.classList.toggle('open');dd2.classList.remove('open');});
+  document.getElementById('burgerLangBtn').addEventListener('click',ev=>{ev.stopPropagation();dd2.classList.toggle('open');dd1.classList.remove('open');});
+  [dd1,dd2].forEach(dd=>{dd.addEventListener('click',ev=>{const o=ev.target.closest('.lopt');if(o){setLang(o.dataset.c);closeBurger();}});});
+  document.addEventListener('click',ev=>{if(!ev.target.closest('.lang-wrap')){dd1.classList.remove('open');dd2.classList.remove('open');}});
 })();
-
-// ── Burger menu ────────────────────────────────────────────────────────────
-function closeBurger() { document.getElementById('burgerMenu').classList.remove('open'); }
-
-document.getElementById('burgerBtn').addEventListener('click', ev => {
-  ev.stopPropagation();
-  document.getElementById('burgerMenu').classList.toggle('open');
+function closeBurger(){document.getElementById('burgerMenu').classList.remove('open');}
+document.getElementById('burgerBtn').addEventListener('click',ev=>{ev.stopPropagation();document.getElementById('burgerMenu').classList.toggle('open');});
+document.getElementById('burgerLikesBtn').addEventListener('click',()=>{closeBurger();document.getElementById('lp').classList.toggle('open');renderLikedList();});
+document.getElementById('burgerAboutBtn').addEventListener('click',()=>{closeBurger();document.getElementById('aboutOverlay').classList.toggle('open');});
+document.addEventListener('click',ev=>{if(!ev.target.closest('#burgerMenu')&&!ev.target.closest('#burgerBtn'))closeBurger();});
+document.getElementById('likesBtn').addEventListener('click',()=>{document.getElementById('lp').classList.toggle('open');renderLikedList();});
+document.getElementById('lpClose').addEventListener('click',()=>document.getElementById('lp').classList.remove('open'));
+document.getElementById('aboutBtn').addEventListener('click',()=>document.getElementById('aboutOverlay').classList.toggle('open'));
+document.getElementById('modalClose').addEventListener('click',()=>document.getElementById('aboutOverlay').classList.remove('open'));
+document.getElementById('aboutOverlay').addEventListener('click',function(ev){if(ev.target===this)this.classList.remove('open');});
+document.addEventListener('keydown',ev=>{
+  if(ev.key==='Escape'){document.getElementById('aboutOverlay').classList.remove('open');document.getElementById('lp').classList.remove('open');closeBurger();}
 });
-document.getElementById('burgerLikesBtn').addEventListener('click', () => {
-  closeBurger();
-  document.getElementById('lp').classList.toggle('open');
-  renderLikedList();
-});
-document.getElementById('burgerAboutBtn').addEventListener('click', () => {
-  closeBurger();
-  document.getElementById('aboutOverlay').classList.toggle('open');
-});
-// Close burger on tap outside
-document.addEventListener('click', ev => {
-  if (!ev.target.closest('#burgerMenu') && !ev.target.closest('#burgerBtn')) closeBurger();
-});
-
-// ── Header buttons ─────────────────────────────────────────────────────────
-document.getElementById('likesBtn').addEventListener('click', () => {
-  document.getElementById('lp').classList.toggle('open');
-  renderLikedList();
-});
-document.getElementById('lpClose').addEventListener('click', () => {
-  document.getElementById('lp').classList.remove('open');
-});
-document.getElementById('aboutBtn').addEventListener('click', () => {
-  document.getElementById('aboutOverlay').classList.toggle('open');
-});
-document.getElementById('modalClose').addEventListener('click', () => {
-  document.getElementById('aboutOverlay').classList.remove('open');
-});
-document.getElementById('aboutOverlay').addEventListener('click', function(ev) {
-  if (ev.target === this) this.classList.remove('open');
-});
-document.addEventListener('keydown', ev => {
-  if (ev.key === 'Escape') {
-    document.getElementById('aboutOverlay').classList.remove('open');
-    document.getElementById('lp').classList.remove('open');
-    closeBurger();
-  }
-});
-
-// ── Double-tap to like ─────────────────────────────────────────────────────
-(function() {
-  let lt = 0, lx = 0, ly = 0, zoomed = false;
-  const unzoom = () => setTimeout(() => { zoomed = false; }, 1200);
-
-  if (window.visualViewport) {
-    window.visualViewport.addEventListener('resize', () => {
-      if (window.visualViewport.scale > 1.05) { zoomed = true; lt = 0; unzoom(); }
-    });
-  }
-  document.addEventListener('touchstart', ev => {
-    if (ev.touches.length > 1) { zoomed = true; lt = 0; unzoom(); return; }
-    if (zoomed) { lt = 0; return; }
-    const card = ev.target.closest('.card');
-    if (!card || ev.target.closest('button,.acts,.cbg')) { lt = 0; return; }
-    const now = Date.now(), x = ev.touches[0].clientX, y = ev.touches[0].clientY;
-    if (now - lt < 340 && Math.hypot(x - lx, y - ly) < 40) {
+(function(){
+  let lt=0,lx=0,ly=0,zoomed=false;
+  const unzoom=()=>setTimeout(()=>{zoomed=false;},1200);
+  if(window.visualViewport){window.visualViewport.addEventListener('resize',()=>{if(window.visualViewport.scale>1.05){zoomed=true;lt=0;unzoom();}});}
+  document.addEventListener('touchstart',ev=>{
+    if(ev.touches.length>1){zoomed=true;lt=0;unzoom();return;}
+    if(zoomed){lt=0;return;}
+    const card=ev.target.closest('.card');
+    if(!card||ev.target.closest('button,.acts,.cbg')){lt=0;return;}
+    const now=Date.now(),x=ev.touches[0].clientX,y=ev.touches[0].clientY;
+    if(now-lt<340&&Math.hypot(x-lx,y-ly)<40){
       ev.preventDefault();
       toggleLike(card.dataset.id);
-      const h = document.createElement('div');
-      h.className = 'heart'; h.textContent = '❤️';
-      h.style.cssText = `left:${x}px;top:${y}px`;
-      document.body.appendChild(h);
-      setTimeout(() => h.remove(), 750);
-      lt = 0;
-    } else { lt = now; lx = x; ly = y; }
-  }, {passive: false});
+      const h=document.createElement('div');h.className='heart';h.textContent='❤️';h.style.cssText=`left:${x}px;top:${y}px`;
+      document.body.appendChild(h);setTimeout(()=>h.remove(),750);lt=0;
+    }else{lt=now;lx=x;ly=y;}
+  },{passive:false});
 })();
-
-// ── Boot
+loadLiked();
+boot();
+</script>
+</body>
+</html>

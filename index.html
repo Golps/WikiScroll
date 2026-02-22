@@ -255,14 +255,64 @@ body.how .badge { background:var(--h1); }
 }
 body.how .err-btn { background:linear-gradient(135deg,var(--h1),var(--h2)); }
 
+/* ── HAMBURGER ── */
+.burger-btn {
+  display:none;align-items:center;justify-content:center;
+  width:36px;height:36px;border-radius:50%;
+  background:rgba(255,255,255,.07);border:1px solid var(--border);
+  cursor:pointer;flex-shrink:0;position:relative;
+  transition:background .2s;
+}
+.burger-btn:hover { background:rgba(255,255,255,.13); }
+.burger-btn svg { width:18px;height:18px;display:block; }
+.burger-badge {
+  position:absolute;top:-3px;right:-3px;
+  font-size:9px;font-weight:700;padding:1px 4px;
+  border-radius:20px;background:var(--w2);line-height:1.4;
+  display:none;
+}
+body.how .burger-badge { background:var(--h1); }
+
+.burger-menu {
+  position:fixed;top:0;left:0;right:0;z-index:299;
+  background:rgba(7,7,13,.98);backdrop-filter:blur(18px);
+  border-bottom:1px solid var(--border);
+  padding:0 16px;
+  max-height:0;overflow:hidden;
+  transition:max-height .3s cubic-bezier(.4,0,.2,1), padding .3s;
+}
+.burger-menu.open {
+  max-height:280px;
+  padding:calc(max(13px,env(safe-area-inset-top)) + 58px) 16px 18px;
+}
+.burger-row {
+  display:flex;align-items:center;justify-content:space-between;
+  padding:12px 0;border-bottom:1px solid var(--border);
+  font-size:14px;font-weight:500;
+}
+.burger-row:last-child { border-bottom:none;padding-bottom:0; }
+.burger-row-label { display:flex;align-items:center;gap:10px;color:rgba(255,255,255,.7); }
+.burger-row-label span:first-child { font-size:18px; }
+.burger-row-action {
+  display:flex;align-items:center;gap:8px;
+  padding:7px 14px;border-radius:50px;
+  background:rgba(255,255,255,.07);border:1px solid var(--border);
+  color:#fff;cursor:pointer;font-size:12px;font-weight:500;
+  font-family:'DM Sans',sans-serif;transition:background .2s;white-space:nowrap;
+}
+.burger-row-action:hover { background:rgba(255,255,255,.13); }
+
+/* ── RESPONSIVE ── */
 @media(max-width:580px){
   .logo { font-size:19px; }
   .tbtn { font-size:11px;padding:5px 10px; }
-  .pill { font-size:11px;padding:5px 10px; }
   .panel { width:93vw;max-height:86vh;padding:18px;border-radius:22px; }
   .art-title { font-size:19px; }
   .lp { width:100%;right:-100%; }
   .act { padding:12px 16px;font-size:14px; }
+  /* hide desktop right controls, show burger */
+  .hdr-right > *:not(.burger-btn) { display:none; }
+  .burger-btn { display:flex; }
 }
 </style>
 </head>
@@ -286,8 +336,41 @@ body.how .err-btn { background:linear-gradient(135deg,var(--h1),var(--h2)); }
       <span class="badge" id="badge" style="display:none">0</span>
     </button>
     <button class="pill about-btn" id="aboutBtn" title="About">ℹ</button>
+    <!-- Mobile hamburger -->
+    <button class="burger-btn" id="burgerBtn" title="Menu">
+      <span class="burger-badge" id="burgerBadge"></span>
+      <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+        <line x1="2" y1="4.5" x2="16" y2="4.5"/>
+        <line x1="2" y1="9"   x2="16" y2="9"/>
+        <line x1="2" y1="13.5" x2="16" y2="13.5"/>
+      </svg>
+    </button>
   </div>
 </header>
+
+<!-- Mobile burger menu (hidden on desktop) -->
+<div class="burger-menu" id="burgerMenu">
+  <!-- Language -->
+  <div class="burger-row">
+    <div class="burger-row-label"><span>🌍</span><span id="burgerLangTxt">English</span></div>
+    <div class="lang-wrap">
+      <button class="burger-row-action" id="burgerLangBtn">Change ›</button>
+      <div class="lang-dd" id="burgerLangDd"></div>
+    </div>
+  </div>
+  <!-- Likes -->
+  <div class="burger-row">
+    <div class="burger-row-label"><span>❤️</span><span>Saved Articles</span></div>
+    <button class="burger-row-action" id="burgerLikesBtn">
+      View <span class="badge" id="burgerLikesBadge" style="display:none">0</span>
+    </button>
+  </div>
+  <!-- About -->
+  <div class="burger-row">
+    <div class="burger-row-label"><span>ℹ️</span><span>About WikiScroll</span></div>
+    <button class="burger-row-action" id="burgerAboutBtn">Open ›</button>
+  </div>
+</div>
 
 <div class="lp" id="lp">
   <div class="lp-hdr"><span>Saved Articles</span><button class="lp-x" id="lpClose">✕</button></div>
@@ -314,11 +397,11 @@ body.how .err-btn { background:linear-gradient(135deg,var(--h1),var(--h2)); }
       An infinite scrolling interface for exploring random Wikipedia or Wikivoyage articles in multiple languages.<br><br>
       Swipe or scroll to discover fascinating articles from Wikipedia or Wikivoyage!
     </div>
-    <div class="modal-contact">Contact: <a href="mailto:contact@wikiscroll.com">contact@wikiscroll.com</a></div>
+    <div class="modal-contact">Contact: <a href="/cdn-cgi/l/email-protection#375458594356544377405e5c5e445445585b5b1954585a"><span class="__cf_email__" data-cfemail="791a16170d181a0d390e1012100a1a0b161515571a1614">[email&#160;protected]</span></a></div>
   </div>
 </div>
 
-<script>
+<script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
 'use strict';
 
 const LANGS = [
@@ -571,9 +654,18 @@ function removeLike(id) {
 }
 
 function updateBadge() {
+  const n = liked.size;
+  // Desktop badge
   const b = document.getElementById('badge');
-  b.textContent   = liked.size;
-  b.style.display = liked.size ? 'inline-block' : 'none';
+  b.textContent   = n;
+  b.style.display = n ? 'inline-block' : 'none';
+  // Mobile burger icon badge
+  const bb = document.getElementById('burgerBadge');
+  bb.textContent   = n;
+  bb.style.display = n ? 'inline-block' : 'none';
+  // Mobile menu badge
+  const lb = document.getElementById('burgerLikesBadge');
+  if (lb) { lb.textContent = n; lb.style.display = n ? 'inline-block' : 'none'; }
 }
 
 // ── Likes panel ────────────────────────────────────────────────────────────
@@ -646,30 +738,82 @@ document.getElementById('hBtn').addEventListener('click', () => setMode('how'));
 
 // ── Language dropdown ──────────────────────────────────────────────────────
 (function() {
-  const dd  = document.getElementById('langDd');
-  const lbl = document.getElementById('langTxt');
+  // Shared helper — builds options into any dd element
+  function buildOpts(dd) {
+    dd.innerHTML = LANGS.map(l =>
+      `<div class="lopt${l.c===curLang?' sel':''}" data-c="${l.c}" data-n="${l.n}">${l.f} ${l.n}</div>`
+    ).join('');
+  }
 
-  dd.innerHTML = LANGS.map(l =>
-    `<div class="lopt${l.c===curLang?' sel':''}" data-c="${l.c}" data-n="${l.n}">${l.f} ${l.n}</div>`
-  ).join('');
+  function syncLangLabel() {
+    const lang = LANGS.find(l => l.c === curLang);
+    if (!lang) return;
+    document.getElementById('langTxt').textContent      = lang.n;
+    document.getElementById('burgerLangTxt').textContent = lang.n;
+  }
 
+  function applyLang(c, n, allDds) {
+    curLang = c;
+    syncLangLabel();
+    allDds.forEach(dd => {
+      dd.querySelectorAll('.lopt').forEach(o => o.classList.toggle('sel', o.dataset.c === curLang));
+      dd.classList.remove('open');
+    });
+    resetFeed();
+  }
+
+  const dd1 = document.getElementById('langDd');
+  const dd2 = document.getElementById('burgerLangDd');
+  buildOpts(dd1);
+  buildOpts(dd2);
+
+  // Desktop lang button
   document.getElementById('langBtn').addEventListener('click', ev => {
     ev.stopPropagation();
-    dd.classList.toggle('open');
+    dd1.classList.toggle('open');
+    dd2.classList.remove('open');
   });
-  dd.addEventListener('click', ev => {
+  dd1.addEventListener('click', ev => {
     const o = ev.target.closest('.lopt');
-    if (!o) return;
-    curLang = o.dataset.c;
-    lbl.textContent = o.dataset.n;
-    dd.querySelectorAll('.lopt').forEach(x => x.classList.toggle('sel', x.dataset.c === curLang));
-    dd.classList.remove('open');
-    resetFeed();
+    if (o) applyLang(o.dataset.c, o.dataset.n, [dd1, dd2]);
   });
+
+  // Mobile lang button (inside burger menu)
+  document.getElementById('burgerLangBtn').addEventListener('click', ev => {
+    ev.stopPropagation();
+    dd2.classList.toggle('open');
+    dd1.classList.remove('open');
+  });
+  dd2.addEventListener('click', ev => {
+    const o = ev.target.closest('.lopt');
+    if (o) { applyLang(o.dataset.c, o.dataset.n, [dd1, dd2]); closeBurger(); }
+  });
+
   document.addEventListener('click', ev => {
-    if (!ev.target.closest('.lang-wrap')) dd.classList.remove('open');
+    if (!ev.target.closest('.lang-wrap')) { dd1.classList.remove('open'); dd2.classList.remove('open'); }
   });
 })();
+
+// ── Burger menu ────────────────────────────────────────────────────────────
+function closeBurger() { document.getElementById('burgerMenu').classList.remove('open'); }
+
+document.getElementById('burgerBtn').addEventListener('click', ev => {
+  ev.stopPropagation();
+  document.getElementById('burgerMenu').classList.toggle('open');
+});
+document.getElementById('burgerLikesBtn').addEventListener('click', () => {
+  closeBurger();
+  document.getElementById('lp').classList.toggle('open');
+  renderLikedList();
+});
+document.getElementById('burgerAboutBtn').addEventListener('click', () => {
+  closeBurger();
+  document.getElementById('aboutOverlay').classList.toggle('open');
+});
+// Close burger on tap outside
+document.addEventListener('click', ev => {
+  if (!ev.target.closest('#burgerMenu') && !ev.target.closest('#burgerBtn')) closeBurger();
+});
 
 // ── Header buttons ─────────────────────────────────────────────────────────
 document.getElementById('likesBtn').addEventListener('click', () => {
@@ -692,6 +836,7 @@ document.addEventListener('keydown', ev => {
   if (ev.key === 'Escape') {
     document.getElementById('aboutOverlay').classList.remove('open');
     document.getElementById('lp').classList.remove('open');
+    closeBurger();
   }
 });
 
@@ -724,9 +869,4 @@ document.addEventListener('keydown', ev => {
   }, {passive: false});
 })();
 
-// ── Boot ───────────────────────────────────────────────────────────────────
-loadLiked();
-boot();
-</script>
-</body>
-</html>
+// ── Boot

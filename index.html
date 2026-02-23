@@ -8,9 +8,9 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet">
 <style>
-:root {
-  --w1:#667eea; --w2:#764ba2;
-  --h1:#11998e; --h2:#38ef7d;
+:root{
+  --w1:#667eea;--w2:#764ba2;
+  --h1:#11998e;--h2:#38ef7d;
   --glass:rgba(10,10,18,.87);
   --border:rgba(255,255,255,.09);
   --dim:rgba(255,255,255,.48);
@@ -18,7 +18,9 @@
 *{margin:0;padding:0;box-sizing:border-box;}
 html,body{height:100%;overflow:hidden;overscroll-behavior:none;}
 body{font-family:'DM Sans',sans-serif;background:#07070d;color:#fff;}
-.hdr {
+
+/* ── HEADER ── */
+.hdr{
   position:fixed;top:0;left:0;right:0;z-index:300;
   display:grid;grid-template-columns:1fr auto 1fr;
   align-items:center;gap:8px;
@@ -29,21 +31,24 @@ body{font-family:'DM Sans',sans-serif;background:#07070d;color:#fff;}
 .hdr-left{justify-content:flex-start;}
 .hdr-mid{justify-content:center;}
 .hdr-right{justify-content:flex-end;gap:7px;}
-.logo {
+
+.logo{
   font-family:'Syne',sans-serif;font-size:22px;font-weight:800;letter-spacing:-1px;
   background:linear-gradient(135deg,var(--w1),var(--w2));
   -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
   white-space:nowrap;
 }
-body.how .logo {
+body.how .logo{
   background:linear-gradient(135deg,var(--h1),var(--h2));
   -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
 }
-.toggle {
+
+/* ── TOGGLE ── */
+.toggle{
   display:flex;background:rgba(255,255,255,.06);
   border:1px solid var(--border);border-radius:50px;padding:3px;gap:2px;
 }
-.tbtn {
+.tbtn{
   font-family:'Syne',sans-serif;font-size:12px;font-weight:700;
   padding:6px 14px;border-radius:50px;border:none;cursor:pointer;
   background:transparent;color:var(--dim);transition:all .22s;white-space:nowrap;
@@ -51,7 +56,9 @@ body.how .logo {
 .tbtn.on{color:#fff;}
 .tbtn.won{background:linear-gradient(135deg,var(--w1),var(--w2));box-shadow:0 2px 12px rgba(102,126,234,.4);}
 .tbtn.hon{background:linear-gradient(135deg,var(--h1),var(--h2));box-shadow:0 2px 12px rgba(56,239,125,.25);}
-.pill {
+
+/* ── PILLS ── */
+.pill{
   display:flex;align-items:center;gap:6px;padding:6px 13px;height:32px;
   background:rgba(255,255,255,.07);border:1px solid var(--border);border-radius:50px;
   color:#fff;cursor:pointer;font-size:12px;font-weight:500;
@@ -59,10 +66,13 @@ body.how .logo {
 }
 .pill:hover{background:rgba(255,255,255,.13);}
 .about-btn{font-style:italic;font-weight:700;font-size:14px;padding:6px 11px;}
-.lang-wrap{position:relative;}
 .badge{font-size:10px;font-weight:700;padding:1px 5px;border-radius:20px;background:var(--w2);line-height:1.4;}
 body.how .badge{background:var(--h1);}
-.lang-dd {
+.topic-badge{background:var(--w1);}
+
+/* ── DESKTOP LANG DROPDOWN ── */
+.lang-wrap{position:relative;}
+.lang-dd{
   position:absolute;top:calc(100% + 8px);right:0;
   background:rgba(12,12,20,.98);border:1px solid var(--border);
   border-radius:16px;padding:6px;min-width:185px;
@@ -71,13 +81,15 @@ body.how .badge{background:var(--h1);}
   scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.08) transparent;
 }
 .lang-dd.open{display:block;}
-.lopt {
+.lopt{
   padding:9px 12px;cursor:pointer;border-radius:10px;
   display:flex;align-items:center;gap:9px;
   font-size:13px;color:rgba(255,255,255,.8);transition:background .15s;
 }
 .lopt:hover,.lopt.sel{background:rgba(255,255,255,.08);}
-.burger-btn {
+
+/* ── HAMBURGER ── */
+.burger-btn{
   display:none;align-items:center;justify-content:center;
   width:36px;height:36px;border-radius:50%;
   background:rgba(255,255,255,.07);border:1px solid var(--border);
@@ -85,54 +97,136 @@ body.how .badge{background:var(--h1);}
 }
 .burger-btn:hover{background:rgba(255,255,255,.13);}
 .burger-btn svg{width:18px;height:18px;display:block;}
-.burger-badge {
-  position:absolute;top:-3px;right:-3px;
-  font-size:9px;font-weight:700;padding:1px 4px;
-  border-radius:20px;background:var(--w2);line-height:1.4;display:none;
+.burger-dot{
+  position:absolute;top:-3px;right:-3px;width:8px;height:8px;
+  border-radius:50%;background:var(--w1);display:none;
 }
-body.how .burger-badge{background:var(--h1);}
-.burger-menu {
+body.how .burger-dot{background:var(--h1);}
+
+/* ── BURGER MENU ── */
+.burger-menu{
   position:fixed;top:0;left:0;right:0;z-index:299;
-  background:rgba(7,7,13,.98);backdrop-filter:blur(18px);
+  background:rgba(7,7,13,.99);backdrop-filter:blur(20px);
   border-bottom:1px solid var(--border);
   max-height:0;overflow:hidden;
-  transition:max-height .28s cubic-bezier(.4,0,.2,1);
+  transition:max-height .3s cubic-bezier(.4,0,.2,1);
 }
-.burger-menu.open{max-height:300px;}
-.burger-inner{padding:calc(max(13px,env(safe-area-inset-top)) + 58px) 16px 18px;}
-.burger-row {
+.burger-menu.open{max-height:700px;}
+.burger-inner{
+  padding:calc(max(13px,env(safe-area-inset-top)) + 60px) 18px calc(18px + env(safe-area-inset-bottom));
+}
+.burger-row{
   display:flex;align-items:center;justify-content:space-between;
-  padding:12px 0;border-bottom:1px solid var(--border);
+  padding:13px 0;border-bottom:1px solid var(--border);
 }
 .burger-row:last-child{border-bottom:none;padding-bottom:0;}
-.burger-row-label{display:flex;align-items:center;gap:10px;color:rgba(255,255,255,.7);font-size:14px;}
-.burger-row-label span:first-child{font-size:18px;}
-.burger-action {
-  display:flex;align-items:center;gap:8px;padding:7px 14px;border-radius:50px;
+.burger-row-label{display:flex;align-items:center;gap:10px;color:rgba(255,255,255,.75);font-size:14px;font-weight:500;}
+.burger-row-label .ico{font-size:18px;line-height:1;}
+.burger-action{
+  display:flex;align-items:center;gap:7px;padding:7px 14px;border-radius:50px;
   background:rgba(255,255,255,.07);border:1px solid var(--border);
   color:#fff;cursor:pointer;font-size:12px;font-weight:500;
   font-family:'DM Sans',sans-serif;transition:background .2s;white-space:nowrap;
 }
 .burger-action:hover{background:rgba(255,255,255,.13);}
-.modal-overlay {
+.burger-action.active{background:rgba(102,126,234,.18);border-color:rgba(102,126,234,.35);color:#a5b4fc;}
+
+/* ── INLINE LANGUAGE GRID (mobile burger) ── */
+.burger-lang-grid{
+  display:grid;grid-template-columns:1fr 1fr;gap:7px;
+  max-height:0;overflow:hidden;
+  transition:max-height .25s ease, padding .25s ease;
+  padding:0;
+}
+.burger-lang-grid.open{max-height:320px;padding:10px 0 4px;}
+.blopt{
+  display:flex;align-items:center;gap:8px;padding:10px 12px;
+  border-radius:12px;background:rgba(255,255,255,.05);
+  border:1px solid var(--border);color:rgba(255,255,255,.8);
+  cursor:pointer;font-size:13px;transition:background .15s, border-color .15s;
+}
+.blopt:hover{background:rgba(255,255,255,.1);}
+.blopt.sel{
+  background:rgba(102,126,234,.15);
+  border-color:rgba(102,126,234,.35);color:#c4ccf5;
+}
+
+/* ── INLINE TOPIC CHIPS (mobile burger) ── */
+.burger-topics{
+  max-height:0;overflow:hidden;
+  transition:max-height .25s ease, padding .25s ease;
+  padding:0;
+}
+.burger-topics.open{max-height:300px;padding:10px 0 4px;}
+.burger-topic-grid{display:flex;flex-wrap:wrap;gap:7px;}
+.btopic{
+  display:flex;align-items:center;gap:6px;padding:8px 13px;
+  border-radius:50px;background:rgba(255,255,255,.05);
+  border:1px solid var(--border);color:rgba(255,255,255,.75);
+  cursor:pointer;font-size:12px;font-weight:500;
+  transition:background .15s,border-color .15s;
+}
+.btopic:hover{background:rgba(255,255,255,.1);}
+.btopic.on{background:rgba(102,126,234,.18);border-color:rgba(102,126,234,.4);color:#a5b4fc;}
+
+/* ── TOPIC BOTTOM SHEET (desktop) ── */
+.sheet-overlay{
+  position:fixed;inset:0;z-index:480;background:rgba(0,0,0,.5);
+  display:none;backdrop-filter:blur(4px);
+}
+.sheet-overlay.open{display:block;}
+.topic-sheet{
+  position:fixed;bottom:-100%;left:0;right:0;z-index:490;
+  background:rgba(8,8,14,.98);backdrop-filter:blur(24px);
+  border-top:1px solid var(--border);border-radius:24px 24px 0 0;
+  padding:0 24px calc(24px + env(safe-area-inset-bottom));
+  transition:bottom .32s cubic-bezier(.4,0,.2,1);
+  max-height:55vh;overflow-y:auto;
+}
+.topic-sheet.open{bottom:0;}
+.sheet-handle{width:36px;height:4px;background:rgba(255,255,255,.14);border-radius:2px;margin:16px auto 20px;}
+.sheet-title{font-family:'Syne',sans-serif;font-size:18px;font-weight:800;margin-bottom:6px;}
+.sheet-sub{font-size:13px;color:var(--dim);margin-bottom:20px;line-height:1.5;}
+.topic-grid{display:flex;flex-wrap:wrap;gap:10px;}
+.topic-chip{
+  display:flex;align-items:center;gap:8px;padding:11px 18px;
+  border-radius:50px;border:1px solid var(--border);
+  background:rgba(255,255,255,.06);color:rgba(255,255,255,.8);
+  cursor:pointer;font-size:14px;font-weight:500;
+  transition:all .18s;
+}
+.topic-chip:hover{background:rgba(255,255,255,.11);}
+.topic-chip.on{
+  background:rgba(102,126,234,.2);border-color:rgba(102,126,234,.45);
+  color:#b8c2f8;
+}
+.sheet-reset{
+  margin-top:18px;padding:10px 22px;border-radius:50px;border:1px solid var(--border);
+  background:transparent;color:var(--dim);cursor:pointer;font-size:13px;
+  font-family:'DM Sans',sans-serif;transition:all .18s;
+}
+.sheet-reset:hover{background:rgba(255,255,255,.07);color:#fff;}
+
+/* ── MODAL ── */
+.modal-overlay{
   position:fixed;inset:0;z-index:500;display:none;
   align-items:center;justify-content:center;
   background:rgba(0,0,0,.6);backdrop-filter:blur(6px);
 }
 .modal-overlay.open{display:flex;}
-.modal {
+.modal{
   width:min(420px,88vw);background:rgba(12,12,20,.98);
   border:1px solid var(--border);border-radius:24px;padding:32px;
   box-shadow:0 30px 80px rgba(0,0,0,.7);text-align:center;position:relative;
   animation:mshow .22s ease;
 }
 @keyframes mshow{from{opacity:0;transform:scale(.95)}to{opacity:1;transform:scale(1)}}
-.modal-close {
+.modal-close{
   position:absolute;top:16px;right:18px;font-size:18px;cursor:pointer;
   background:none;border:none;color:var(--dim);transition:color .2s;
 }
 .modal-close:hover{color:#fff;}
-.modal-logo {
+.modal-logo{
   font-family:'Syne',sans-serif;font-size:26px;font-weight:800;letter-spacing:-1px;
   background:linear-gradient(135deg,var(--w1),var(--w2));
   -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
@@ -142,35 +236,40 @@ body.how .burger-badge{background:var(--h1);}
 .modal-contact{font-size:12px;color:var(--dim);}
 .modal-contact a{color:#a5b4fc;text-decoration:none;}
 .modal-contact a:hover{text-decoration:underline;}
-.feed {
+
+/* ── FEED ── */
+.feed{
   height:100vh;overflow-y:scroll;scroll-snap-type:y mandatory;
   scrollbar-width:none;-ms-overflow-style:none;
   touch-action:pan-y;-webkit-overflow-scrolling:touch;
 }
 .feed::-webkit-scrollbar{display:none;}
-.card {
+.card{
   height:100vh;scroll-snap-align:start;position:relative;
   display:flex;align-items:center;justify-content:center;
   background:#07070d;overflow:hidden;
 }
 .cbg{position:absolute;inset:0;z-index:0;}
 .cbg img{width:100%;height:100%;object-fit:cover;opacity:.45;filter:blur(28px) saturate(1.6);transform:scale(1.12) translateZ(0);}
-.cveil{position:absolute;inset:0;
+.cveil{
+  position:absolute;inset:0;
   background:rgba(7,7,13,.45),
     radial-gradient(ellipse at 30% 30%,rgba(102,126,234,.1) 0%,transparent 60%),
-    radial-gradient(ellipse at 75% 75%,rgba(118,75,162,.07) 0%,transparent 55%);}
+    radial-gradient(ellipse at 75% 75%,rgba(118,75,162,.07) 0%,transparent 55%);
+}
 .card.how .cveil{
   background:rgba(7,7,13,.45),
     radial-gradient(ellipse at 30% 30%,rgba(17,153,142,.1) 0%,transparent 60%),
-    radial-gradient(ellipse at 75% 75%,rgba(56,239,125,.06) 0%,transparent 55%);}
-.panel {
+    radial-gradient(ellipse at 75% 75%,rgba(56,239,125,.06) 0%,transparent 55%);
+}
+.panel{
   position:relative;z-index:1;width:min(660px,90vw);max-height:74vh;padding:24px;
   background:var(--glass);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);
   border-radius:26px;border:1px solid var(--border);
   box-shadow:0 30px 80px rgba(0,0,0,.6),inset 0 1px 0 rgba(255,255,255,.05);
   display:flex;flex-direction:column;overflow:hidden;
 }
-.chip {
+.chip{
   display:inline-flex;align-items:center;gap:5px;
   font-family:'Syne',sans-serif;font-size:10px;font-weight:700;
   letter-spacing:1.1px;text-transform:uppercase;
@@ -179,18 +278,18 @@ body.how .burger-badge{background:var(--h1);}
 .chip.w{background:rgba(102,126,234,.16);color:#a5b4fc;border:1px solid rgba(102,126,234,.22);}
 .chip.h{background:rgba(17,153,142,.15);color:#6ee7b7;border:1px solid rgba(17,153,142,.22);}
 .art-img{width:100%;max-height:220px;object-fit:contain;border-radius:16px;margin-bottom:14px;flex-shrink:0;background:rgba(0,0,0,.25);}
-.art-title {
+.art-title{
   font-family:'Syne',sans-serif;font-size:21px;font-weight:700;
   line-height:1.22;letter-spacing:-.4px;margin-bottom:10px;flex-shrink:0;
   overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;
 }
-.art-body {
+.art-body{
   font-size:14px;line-height:1.65;color:rgba(255,255,255,.73);
   flex-shrink:1;min-height:0;margin-bottom:18px;
   overflow:hidden;display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;
 }
 .acts{display:flex;gap:10px;flex-shrink:0;flex-wrap:nowrap;margin-top:auto;}
-.act {
+.act{
   display:flex;align-items:center;gap:8px;padding:14px 20px;border-radius:14px;
   border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.07);
   color:#fff;cursor:pointer;font-size:15px;font-weight:500;
@@ -202,12 +301,16 @@ body.how .burger-badge{background:var(--h1);}
 .act.cta{flex:1;justify-content:center;border:none;font-weight:600;background:linear-gradient(135deg,var(--w1),var(--w2));}
 .act.cta.hcta{background:linear-gradient(135deg,var(--h1),var(--h2));}
 .act.cta:hover{filter:brightness(1.1);}
+
+/* ── SPINNER ── */
 .spin-wrap{height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;}
 .spin{width:42px;height:42px;border:3px solid rgba(255,255,255,.07);border-top-color:var(--w1);border-radius:50%;animation:rot .85s linear infinite;}
 .spin.h{border-top-color:var(--h1);}
 .spin-lbl{font-family:'Syne',sans-serif;font-size:12px;font-weight:700;letter-spacing:.5px;color:var(--dim);}
 @keyframes rot{to{transform:rotate(360deg);}}
-.hint {
+
+/* ── HINT ── */
+.hint{
   position:fixed;left:50%;z-index:100;
   bottom:max(26px,calc(env(safe-area-inset-bottom) + 12px));
   display:none;flex-direction:column;align-items:center;gap:6px;pointer-events:none;
@@ -217,7 +320,9 @@ body.how .burger-badge{background:var(--h1);}
 @keyframes hbounce{0%,100%{transform:translateX(-50%) translateY(0)}50%{transform:translateX(-50%) translateY(-8px)}}
 .hint-txt{font-size:11px;color:var(--dim);letter-spacing:.4px;}
 .hint-arr{width:16px;height:16px;border-right:2px solid var(--dim);border-bottom:2px solid var(--dim);transform:rotate(45deg);}
-.lp {
+
+/* ── LIKES PANEL ── */
+.lp{
   position:fixed;top:0;right:-430px;width:420px;height:100vh;
   background:rgba(8,8,14,.97);backdrop-filter:blur(22px);
   border-left:1px solid var(--border);z-index:400;
@@ -241,13 +346,15 @@ body.how .burger-badge{background:var(--h1);}
 .empty-ico{font-size:42px;margin-bottom:12px;}
 .empty-ttl{font-family:'Syne',sans-serif;font-size:16px;font-weight:700;color:rgba(255,255,255,.6);margin-bottom:6px;}
 .empty-txt{font-size:13px;line-height:1.6;}
+
+/* ── MISC ── */
 .heart{position:fixed;font-size:68px;pointer-events:none;z-index:999;transform:translate(-50%,-50%);animation:hpop .7s ease-out forwards;}
 @keyframes hpop{
   0%{transform:translate(-50%,-50%) scale(0);opacity:1;}
   50%{transform:translate(-50%,-50%) scale(1.3);opacity:1;}
   100%{transform:translate(-50%,-60%) scale(1);opacity:0;}
 }
-.toast {
+.toast{
   position:fixed;bottom:68px;left:50%;transform:translateX(-50%);
   background:rgba(20,20,30,.96);border:1px solid var(--border);
   color:#fff;padding:9px 18px;border-radius:50px;
@@ -260,21 +367,27 @@ body.how .burger-badge{background:var(--h1);}
 .err-msg{font-size:13px;color:var(--dim);line-height:1.6;margin-bottom:20px;}
 .err-btn{padding:10px 24px;border:none;border-radius:12px;cursor:pointer;background:linear-gradient(135deg,var(--w1),var(--w2));color:#fff;font-size:14px;font-weight:600;font-family:'DM Sans',sans-serif;}
 body.how .err-btn{background:linear-gradient(135deg,var(--h1),var(--h2));}
-@media(max-width:580px){
+
+/* ── RESPONSIVE ── */
+@media(max-width:600px){
   .logo{font-size:19px;}
   .tbtn{font-size:11px;padding:5px 10px;}
   .panel{width:93vw;max-height:86vh;padding:18px;border-radius:22px;}
   .art-title{font-size:19px;}
   .lp{width:100%;right:-100%;}
   .act{padding:12px 16px;font-size:14px;}
+  /* hide desktop controls, show burger */
   .hdr-right > .lang-wrap,
   .hdr-right > #likesBtn,
+  .hdr-right > #topicsBtn,
   .hdr-right > #aboutBtn{display:none;}
   .burger-btn{display:flex;}
 }
 </style>
 </head>
 <body>
+
+<!-- HEADER -->
 <header class="hdr">
   <div class="hdr-left"><div class="logo">WikiScroll</div></div>
   <div class="hdr-mid">
@@ -292,9 +405,14 @@ body.how .err-btn{background:linear-gradient(135deg,var(--h1),var(--h2));}
       <span>❤️</span><span>Likes</span>
       <span class="badge" id="badge" style="display:none">0</span>
     </button>
+    <button class="pill" id="topicsBtn">
+      <span>🎯</span><span>Topics</span>
+      <span class="badge topic-badge" id="topicBadge" style="display:none">0</span>
+    </button>
     <button class="pill about-btn" id="aboutBtn" title="About">ℹ</button>
+    <!-- Mobile hamburger -->
     <button class="burger-btn" id="burgerBtn" title="Menu">
-      <span class="burger-badge" id="burgerBadge"></span>
+      <span class="burger-dot" id="burgerDot"></span>
       <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
         <line x1="2" y1="4.5" x2="16" y2="4.5"/>
         <line x1="2" y1="9" x2="16" y2="9"/>
@@ -303,39 +421,75 @@ body.how .err-btn{background:linear-gradient(135deg,var(--h1),var(--h2));}
     </button>
   </div>
 </header>
+
+<!-- MOBILE BURGER MENU -->
 <div class="burger-menu" id="burgerMenu">
   <div class="burger-inner">
+
+    <!-- Language row + inline grid -->
     <div class="burger-row">
-      <div class="burger-row-label"><span>🌍</span><span id="burgerLangTxt">English</span></div>
-      <div class="lang-wrap">
-        <button class="burger-action" id="burgerLangBtn">Change</button>
-        <div class="lang-dd" id="burgerLangDd"></div>
-      </div>
+      <div class="burger-row-label"><span class="ico">🌍</span><span id="burgerLangTxt">English</span></div>
+      <button class="burger-action" id="burgerLangBtn">Change ›</button>
     </div>
+    <div class="burger-lang-grid" id="burgerLangGrid"></div>
+
+    <!-- Topics row + inline chips -->
     <div class="burger-row">
-      <div class="burger-row-label"><span>❤️</span><span>Saved Articles</span></div>
-      <button class="burger-action" id="burgerLikesBtn">View <span class="badge" id="burgerBadge2" style="display:none">0</span></button>
+      <div class="burger-row-label"><span class="ico">🎯</span><span>Topics</span></div>
+      <button class="burger-action" id="burgerTopicsBtn">Filter ›</button>
     </div>
+    <div class="burger-topics" id="burgerTopics">
+      <div class="burger-topic-grid" id="burgerTopicGrid"></div>
+    </div>
+
+    <!-- Likes -->
     <div class="burger-row">
-      <div class="burger-row-label"><span>ℹ️</span><span>About</span></div>
-      <button class="burger-action" id="burgerAboutBtn">Open</button>
+      <div class="burger-row-label"><span class="ico">❤️</span><span>Saved Articles</span></div>
+      <button class="burger-action" id="burgerLikesBtn">
+        View <span class="badge" id="burgerBadge" style="display:none">0</span>
+      </button>
     </div>
+
+    <!-- About -->
+    <div class="burger-row">
+      <div class="burger-row-label"><span class="ico">ℹ️</span><span>About</span></div>
+      <button class="burger-action" id="burgerAboutBtn">Open ›</button>
+    </div>
+
   </div>
 </div>
+
+<!-- TOPIC BOTTOM SHEET (desktop) -->
+<div class="sheet-overlay" id="sheetOverlay"></div>
+<div class="topic-sheet" id="topicSheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-title">Topics</div>
+  <div class="sheet-sub">Select one or more topics to bias your feed. Leave all off for fully random.</div>
+  <div class="topic-grid" id="topicGrid"></div>
+  <button class="sheet-reset" id="sheetReset">Clear all topics</button>
+</div>
+
+<!-- LIKES PANEL -->
 <div class="lp" id="lp">
   <div class="lp-hdr"><span>Saved Articles</span><button class="lp-x" id="lpClose">✕</button></div>
   <div id="likedList"></div>
 </div>
+
+<!-- FEED -->
 <div class="feed" id="feed">
   <div class="spin-wrap" id="spinner">
     <div class="spin"></div>
     <div class="spin-lbl">Loading articles…</div>
   </div>
 </div>
+
+<!-- SCROLL HINT -->
 <div class="hint" id="hint">
   <div class="hint-txt">Scroll to discover</div>
   <div class="hint-arr"></div>
 </div>
+
+<!-- ABOUT MODAL -->
 <div class="modal-overlay" id="aboutOverlay">
   <div class="modal">
     <button class="modal-close" id="modalClose">✕</button>
@@ -347,9 +501,12 @@ body.how .err-btn{background:linear-gradient(135deg,var(--h1),var(--h2));}
     <div class="modal-contact">Contact: <a href="mailto:contact@wikiscroll.com">contact@wikiscroll.com</a></div>
   </div>
 </div>
+
 <script>
 'use strict';
-const LANGS=[
+
+// ── CONSTANTS ──────────────────────────────────────────────────────────────
+const LANGS = [
   {c:'en',n:'English',f:'🇬🇧'},{c:'es',n:'Español',f:'🇪🇸'},
   {c:'fr',n:'Français',f:'🇫🇷'},{c:'de',n:'Deutsch',f:'🇩🇪'},
   {c:'it',n:'Italiano',f:'🇮🇹'},{c:'pt',n:'Português',f:'🇵🇹'},
@@ -358,217 +515,723 @@ const LANGS=[
   {c:'hi',n:'हिन्दी',f:'🇮🇳'},{c:'ko',n:'한국어',f:'🇰🇷'},
   {c:'nl',n:'Nederlands',f:'🇳🇱'},{c:'pl',n:'Polski',f:'🇵🇱'},
 ];
-let curMode='wiki',curLang='en',articles=[],liked=new Map(),queue=[],filling=false,hinted=false;
-function lsGet(k){try{return JSON.parse(localStorage.getItem(k));}catch{return null;}}
-function lsSet(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch{}}
-function loadLiked(){const s=lsGet('ws_liked');if(Array.isArray(s)){s.forEach(a=>liked.set(a.id,a));updateBadge();}}
-function saveLiked(){lsSet('ws_liked',[...liked.values()]);}
-function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
-function toast(msg){const t=document.createElement('div');t.className='toast';t.textContent=msg;document.body.appendChild(t);setTimeout(()=>t.remove(),2200);}
-function fetchOne(url){
-  const ac=new AbortController(),id=setTimeout(()=>ac.abort(),8000);
-  return fetch(url,{signal:ac.signal}).then(r=>r.ok?r.json():null).catch(()=>null).finally(()=>clearTimeout(id));
+
+// ── TOPIC DEFINITIONS ──────────────────────────────────────────────────────
+// cats: verified leaf-level Wikipedia categories (gcmtype=page returns real articles)
+// valid: extract must match this regex — hard content gate, not just category membership
+// vCats: Wikivoyage-specific destination categories for this topic (shown in how mode)
+const TOPICS = [
+  {
+    id:'food', label:'Food', emoji:'🍽️',
+    cats:[
+      'Category:Cheeses','Category:Cocktails','Category:Soups','Category:Breads',
+      'Category:Noodle dishes','Category:Rice dishes','Category:Chocolate',
+      'Category:Coffee','Category:Tea','Category:Sushi','Category:Stews',
+      'Category:Salads','Category:Cakes','Category:Cookies','Category:Pies',
+      'Category:Sauces','Category:Fermented foods','Category:Street food',
+    ],
+    valid:/\b(dish|food|cuisine|ingredient|flavor|flavour|taste|cooked|eaten|recipe|meal|snack|drink|beverage|served|baked|fried|grilled|brewed|fermented|cheese|bread|pasta|meat|vegetable|fruit|spice|herb|sauce|soup|dessert|sweet|savoury|savory)\b/i,
+    vCats:['Category:Food and drink','Category:Restaurants'],
+  },
+  {
+    id:'science', label:'Science', emoji:'🔬',
+    cats:[
+      'Category:Chemical elements','Category:Constellations','Category:Exoplanets',
+      'Category:Minerals','Category:Mammals','Category:Birds','Category:Insects',
+      'Category:Fish','Category:Reptiles','Category:Amphibians','Category:Spiders',
+      'Category:Viruses','Category:Bacteria','Category:Fungi','Category:Mosses',
+      'Category:Orchids','Category:Subatomic particles','Category:Comets','Category:Asteroids',
+    ],
+    valid:/\b(species|genus|family|order|class|element|compound|molecule|atom|particle|planet|star|galaxy|nebula|cell|protein|dna|rna|organism|native to|found in|named after|discovered|described by|scientific name|latin name|biology|chemistry|physics|astronomy|ecology|habitat|distribution)\b/i,
+    vCats:['Category:Natural attractions','Category:National parks'],
+  },
+  {
+    id:'history', label:'History', emoji:'🏛️',
+    cats:[
+      'Category:Battles of World War II','Category:Battles of World War I',
+      'Category:Battles of the Napoleonic Wars','Category:Battles of the American Civil War',
+      'Category:Ancient Rome','Category:Ancient Egypt','Category:Ancient Greece',
+      'Category:Medieval castles','Category:Viking Age','Category:Crusades',
+      'Category:Byzantine Empire','Category:Ottoman Empire','Category:Mughal Empire',
+      'Category:Aztec','Category:Inca Empire','Category:Cold War',
+    ],
+    valid:/\b(battle|war|siege|empire|kingdom|dynasty|ruled|conquered|revolt|revolution|treaty|medieval|ancient|century|\bbc\b|\bad\b|reign|fought|defeated|founded|established|occupation|invasion|rebellion|republic|pharaoh|emperor|general|army|navy|troops)\b/i,
+    vCats:['Category:Historical sites','Category:Castles','Category:UNESCO World Heritage Sites'],
+  },
+  {
+    id:'geo', label:'Geography', emoji:'🌍',
+    cats:[
+      'Category:Islands of the Pacific Ocean','Category:Islands of the Atlantic Ocean',
+      'Category:Islands of the Indian Ocean','Category:Active volcanoes',
+      'Category:Mountain ranges','Category:Waterfalls','Category:Glaciers',
+      'Category:Deserts','Category:Caves','Category:Canyons','Category:Lagoons',
+      'Category:Atolls','Category:Peninsulas','Category:Straits','Category:Bays',
+      'Category:Rivers of Africa','Category:Rivers of Asia','Category:Rivers of South America',
+    ],
+    valid:/\b(island|volcano|mountain|lake|river|ocean|sea|coast|peninsula|valley|glacier|desert|forest|national park|range|peak|summit|elevation|metres|meters|feet|kilometres|km|miles|located|situated|geography|terrain|climate|landscape|inlet|bay|strait|atoll|lagoon|cave|canyon|waterfall)\b/i,
+    vCats:['Category:Islands','Category:National parks','Category:Natural attractions','Category:Mountains'],
+  },
+  {
+    id:'arts', label:'Arts', emoji:'🎨',
+    cats:[
+      'Category:Baroque paintings','Category:Renaissance paintings','Category:Impressionist paintings',
+      'Category:Operas','Category:Symphonies','Category:String quartets',
+      'Category:Gothic cathedrals','Category:Art Nouveau architecture',
+      'Category:Neoclassical architecture','Category:Modernist architecture',
+      'Category:Ancient Greek sculptures','Category:Ballet',
+      'Category:Silent films','Category:Jazz standards',
+    ],
+    valid:/\b(painting|sculpture|architecture|composer|symphony|opera|ballet|novel|poem|film|director|musician|artist|gallery|museum|style|movement|genre|performed|written|painted|composed|concerto|sonata|fresco|mosaic|cathedral|palace|artwork|canvas|oil paint|watercolour|watercolor)\b/i,
+    vCats:['Category:Museums','Category:Theatres','Category:Art galleries'],
+  },
+  {
+    id:'tech', label:'Technology', emoji:'💻',
+    cats:[
+      'Category:Inventions by country','Category:Computing','Category:Aviation',
+      'Category:Spacecraft','Category:Rockets','Category:Bridges','Category:Tunnels',
+      'Category:Locomotives','Category:Motorcycles','Category:Cameras',
+      'Category:Telescopes','Category:Particle accelerators',
+      'Category:Nuclear reactors','Category:Radio telescopes','Category:Submarines',
+    ],
+    valid:/\b(invented|invention|patent|engineer|machine|computer|software|hardware|technology|device|system|design|developed|processor|algorithm|network|digital|electric|mechanical|built|manufactured|aircraft|spacecraft|rocket|engine|motor|circuit|semiconductor|satellite|telescope|bridge|tunnel|locomotive)\b/i,
+    vCats:['Category:Airports','Category:Bridges'],
+  },
+  {
+    id:'people', label:'People', emoji:'👤',
+    cats:[
+      'Category:16th-century scientists','Category:17th-century scientists','Category:18th-century scientists',
+      'Category:19th-century scientists','Category:20th-century scientists',
+      'Category:Renaissance humanists','Category:Enlightenment philosophers',
+      'Category:Explorers of Africa','Category:Explorers of Asia','Category:Explorers of the Americas',
+      'Category:Women scientists','Category:Nobel laureates in Physics',
+      'Category:Nobel laureates in Chemistry','Category:Nobel laureates in Medicine',
+    ],
+    valid:/\b(born|died|nationality|known for|notable|scientist|artist|philosopher|explorer|writer|inventor|leader|served as|worked as|educated|studied|mathematician|physician|biologist|chemist|physicist|astronomer|naturalist|theologian|statesman|admiral|general|discoverer)\b/i,
+    vCats:[],
+  },
+  {
+    id:'sports', label:'Sports', emoji:'⚽',
+    cats:[
+      'Category:Athletics (track and field)','Category:Swimming','Category:Gymnastics',
+      'Category:Cycling','Category:Rowing','Category:Fencing','Category:Archery',
+      'Category:Weightlifting','Category:Wrestling','Category:Judo','Category:Karate',
+      'Category:Equestrian sports','Category:Sailing','Category:Shooting sports',
+      'Category:Bobsleigh','Category:Skiing','Category:Ice skating',
+    ],
+    valid:/\b(sport|game|team|player|championship|tournament|league|match|athlete|olympic|medal|race|competition|played|competed|won|defeated|ranked|season|record|event|discipline|gold|silver|bronze|competing|coach|club|federation|world cup|grand prix)\b/i,
+    vCats:['Category:Sports venues','Category:Stadiums'],
+  },
+];
+
+// Per-topic map for fast lookup
+const TOPIC_MAP = Object.fromEntries(TOPICS.map(t => [t.id, t]));
+
+// Title patterns that always indicate a non-article page — reject before any other check
+const BAD_TITLE_RE = /^(list of|lists of|timeline|history of|geography of|demographics|economy of|culture of|politics of|education in|deaths in|events of|index of|outline of|glossary|bibliography|filmography|discography|category:|talk:|wikipedia:)/i;
+
+// ── STATE ──────────────────────────────────────────────────────────────────
+let curMode = 'wiki', curLang = 'en';
+let curTopics = new Set(); // empty = all / unfiltered
+let articles = [], liked = new Map(), queue = [];
+let filling = false, hinted = false, sentinel = null;
+
+// ── LOCALSTORAGE ───────────────────────────────────────────────────────────
+function lsGet(k)    { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } }
+function lsSet(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} }
+
+function loadPersistedState() {
+  const saved = lsGet('ws_liked');
+  if (Array.isArray(saved)) { saved.forEach(a => liked.set(a.id, a)); updateBadge(); }
+  const topics = lsGet('ws_topics');
+  if (Array.isArray(topics)) { curTopics = new Set(topics); updateTopicBadge(); }
 }
-function toArticle(d,prefix){
-  return{id:prefix+d.pageid,src:prefix==='w'?'wiki':'how',title:d.title,body:d.extract,img:d.thumbnail.source,url:d.content_urls?.desktop?.page||'#'};
+function saveLiked()  { lsSet('ws_liked',   [...liked.values()]); }
+function saveTopics() { lsSet('ws_topics',  [...curTopics]); }
+
+// ── HELPERS ────────────────────────────────────────────────────────────────
+function esc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
-async function fetchWiki(){
-  const url=`https://${curLang}.wikipedia.org/api/rest_v1/page/random/summary`;
-  const all=await Promise.all(Array.from({length:10},()=>fetchOne(url)));
-  return all.filter(d=>d?.thumbnail?.source&&d.extract?.length>=60).slice(0,5).map(d=>toArticle(d,'w'));
+function stripHtml(s) { return String(s||'').replace(/<[^>]+>/g,''); }
+function toast(msg) {
+  const t = document.createElement('div');
+  t.className = 'toast'; t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 2200);
 }
-async function fetchVoyage(){
-  for(const lang of(curLang!=='en'?[curLang,'en']:['en'])){
-    const url=`https://${lang}.wikivoyage.org/api/rest_v1/page/random/summary`;
-    const all=await Promise.all(Array.from({length:10},()=>fetchOne(url)));
-    const good=all.filter(d=>d?.thumbnail?.source&&d.extract?.length>=40).slice(0,5).map(d=>toArticle(d,'v'));
-    if(good.length)return good;
+function rand(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+
+// ── NETWORK ────────────────────────────────────────────────────────────────
+function fetchOne(url) {
+  const ac = new AbortController();
+  const id = setTimeout(() => ac.abort(), 8000);
+  return fetch(url, {signal: ac.signal})
+    .then(r => r.ok ? r.json() : null)
+    .catch(() => null)
+    .finally(() => clearTimeout(id));
+}
+
+function toArticle(d, prefix) {
+  return {
+    id:    prefix + d.pageid,
+    src:   prefix === 'w' ? 'wiki' : 'how',
+    title: d.title,
+    body:  d.extract,
+    img:   d.thumbnail.source,
+    url:   d.content_urls?.desktop?.page || '#',
+  };
+}
+
+// ── ARTICLE VALIDATORS ────────────────────────────────────────────────────
+// Shared pre-flight: rejects meta-pages, lists, disambiguations
+function isValidTitle(title) {
+  return title && !BAD_TITLE_RE.test(title.trim());
+}
+
+// Validates a Wikipedia page object passes both title and topic content gates
+function isValidWikiPage(p, topicDef) {
+  if (!p?.thumbnail?.source) return false;
+  const text = stripHtml(p.extract || '');
+  if (text.length < 80) return false;
+  if (!isValidTitle(p.title)) return false;
+  // If a topic validator exists, the extract must match it
+  if (topicDef?.valid && !topicDef.valid.test(text.slice(0, 600))) return false;
+  return true;
+}
+
+// Maps a raw MediaWiki page object → article record
+function wikiPageToArticle(p) {
+  return {
+    id:    'w' + p.pageid,
+    src:   'wiki',
+    title: p.title,
+    body:  stripHtml(p.extract || ''),
+    img:   p.thumbnail.source,
+    url:   `https://en.wikipedia.org/wiki/${encodeURIComponent(p.title.replace(/ /g,'_'))}`,
+  };
+}
+
+// Pure random Wikipedia — for unfiltered mode
+async function fetchWiki() {
+  const url = `https://${curLang}.wikipedia.org/api/rest_v1/page/random/summary`;
+  const all = await Promise.all(Array.from({length:12}, () => fetchOne(url)));
+  return all
+    .filter(d => d?.thumbnail?.source && d.extract?.length >= 80 && isValidTitle(d.title))
+    .slice(0, 5)
+    .map(d => toArticle(d, 'w'));
+}
+
+// Topic-filtered Wikipedia — picks a random active topic, random leaf category,
+// fetches up to 30 candidates, validates each against the topic's content regex.
+// Falls back to pure random only if zero valid articles come back.
+async function fetchWikiByTopic() {
+  const topicArr = [...curTopics];
+  const topicDef = TOPIC_MAP[rand(topicArr)];
+  if (!topicDef) return fetchWiki();
+
+  // Try up to 2 different categories from this topic before giving up
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const cat = rand(topicDef.cats);
+    // gcmlimit=30 → larger candidate pool so the validator has enough to filter
+    const url = [
+      'https://en.wikipedia.org/w/api.php',
+      '?action=query',
+      '&generator=categorymembers',
+      `&gcmtitle=${encodeURIComponent(cat)}`,
+      '&gcmlimit=30',
+      '&gcmtype=page',          // pages only — no sub-categories
+      '&gcmnamespace=0',        // article namespace only
+      '&prop=pageimages%7Cextracts',
+      '&exintro=1',
+      '&exchars=800',           // enough text for the validator regex
+      '&piprop=thumbnail',
+      '&pithumbsize=500',
+      '&pilimit=30',
+      '&format=json',
+      '&origin=*',
+    ].join('');
+
+    const data = await fetchOne(url);
+    if (!data?.query?.pages) continue;
+
+    const valid = Object.values(data.query.pages)
+      .filter(p => isValidWikiPage(p, topicDef))
+      .sort(() => Math.random() - 0.5)
+      .slice(0, 5)
+      .map(wikiPageToArticle);
+
+    if (valid.length >= 2) return valid;
   }
-  return[];
+
+  // Both category attempts too sparse → fall back to pure random
+  return fetchWiki();
 }
-const QUEUE_MIN=8;
-let sentinel=null;
-async function fillQueue(){
-  if(filling)return;filling=true;
-  try{
-    const fn=curMode==='wiki'?fetchWiki:fetchVoyage;
-    const[a,b]=await Promise.all([fn(),fn()]);
-    const fresh=[...a,...b];
+
+// ── WIKIVOYAGE DESTINATION VALIDATOR ──────────────────────────────────────
+// Requires the extract to describe a PLACE — not a phrasebook, guide, or itinerary.
+// Stricter than before: first 500 chars must contain a geographic place indicator
+// AND not trigger any non-destination patterns.
+const GEO_RE      = /\b(city|town|village|municipality|district|region|province|state|country|island|archipelago|coast|peninsula|valley|mountain|lake|river|national park|nature reserve|capital|port|suburb|commune|department|prefecture|ward|borough|settlement|population|located in|situated in|lies in|part of)\b/i;
+const NONPLACE_RE = /\b(phrasebook|itinerary|travel topic|travel guide|travel warning|getting around|getting there|visa|currency|budget|accommodation|hostel|hotel tip|what to see|local cuisine|safety|scam)\b/i;
+
+// Wikivoyage destination fetcher — topics are handled via Wikivoyage's own
+// destination-type categories when a relevant topic is active.
+async function fetchVoyage() {
+  const langs = curLang !== 'en' ? [curLang, 'en'] : ['en'];
+
+  for (const lang of langs) {
+    // When a topic with vCats is active, try category-based fetch first
+    let topicVCats = [];
+    if (curTopics.size) {
+      for (const tid of curTopics) {
+        const t = TOPIC_MAP[tid];
+        if (t?.vCats?.length) topicVCats.push(...t.vCats);
+      }
+    }
+
+    if (topicVCats.length) {
+      const cat = rand(topicVCats);
+      const url = [
+        `https://en.wikivoyage.org/w/api.php`,
+        '?action=query',
+        '&generator=categorymembers',
+        `&gcmtitle=${encodeURIComponent(cat)}`,
+        '&gcmlimit=25',
+        '&gcmtype=page',
+        '&gcmnamespace=0',
+        '&prop=pageimages%7Cextracts',
+        '&exintro=1',
+        '&exchars=600',
+        '&piprop=thumbnail',
+        '&pithumbsize=500',
+        '&pilimit=25',
+        '&format=json',
+        '&origin=*',
+      ].join('');
+
+      const data = await fetchOne(url);
+      if (data?.query?.pages) {
+        const valid = Object.values(data.query.pages)
+          .filter(p => {
+            if (!p?.thumbnail?.source) return false;
+            const text = stripHtml(p.extract || '');
+            if (text.length < 40) return false;
+            if (!isValidTitle(p.title)) return false;
+            const sample = text.slice(0, 500);
+            return GEO_RE.test(sample) && !NONPLACE_RE.test(sample);
+          })
+          .sort(() => Math.random() - 0.5)
+          .slice(0, 5)
+          .map(p => ({
+            id:    'v' + p.pageid,
+            src:   'how',
+            title: p.title,
+            body:  stripHtml(p.extract || ''),
+            img:   p.thumbnail.source,
+            url:   `https://en.wikivoyage.org/wiki/${encodeURIComponent(p.title.replace(/ /g,'_'))}`,
+          }));
+        if (valid.length >= 2) return valid;
+      }
+    }
+
+    // Random fallback — fetch 16 candidates, validate strictly
+    const url = `https://${lang}.wikivoyage.org/api/rest_v1/page/random/summary`;
+    const all  = await Promise.all(Array.from({length:16}, () => fetchOne(url)));
+    const good = all
+      .filter(d => {
+        if (!d?.thumbnail?.source || !d.extract || d.extract.length < 40) return false;
+        if (!isValidTitle(d.title)) return false;
+        const sample = d.extract.slice(0, 500);
+        return GEO_RE.test(sample) && !NONPLACE_RE.test(sample);
+      })
+      .slice(0, 5)
+      .map(d => toArticle(d, 'v'));
+    if (good.length) return good;
+  }
+
+  return [];
+}
+
+// ── PREFETCH QUEUE ─────────────────────────────────────────────────────────
+const QUEUE_MIN = 8;
+
+async function fillQueue() {
+  if (filling) return;
+  filling = true;
+  try {
+    // fetchVoyage handles topic-based Wikivoyage routing internally
+    // fetchWikiByTopic handles the curTopics.size check internally
+    const fn = curMode === 'wiki'
+      ? (curTopics.size ? fetchWikiByTopic : fetchWiki)
+      : fetchVoyage;
+    const [a, b] = await Promise.all([fn(), fn()]);
+    const fresh  = [...a, ...b];
     queue.push(...fresh);
-    fresh.forEach(art=>{if(art.img){const i=new Image();i.src=art.img;}});
-  }finally{filling=false;}
+    // Preload images into browser cache
+    fresh.forEach(art => { if (art.img) { const i = new Image(); i.src = art.img; } });
+  } finally { filling = false; }
 }
-function flushQueue(n){
-  const batch=queue.splice(0,n||5);
-  if(!batch.length)return;
+
+function flushQueue(n) {
+  const batch = queue.splice(0, n || 5);
+  if (!batch.length) return;
   articles.push(...batch);
   batch.forEach(renderCard);
-  if(!hinted&&articles.length>=2){
-    hinted=true;const h=document.getElementById('hint');
-    h.style.display='flex';setTimeout(()=>{h.style.display='none';},5500);
+  if (!hinted && articles.length >= 2) {
+    hinted = true;
+    const h = document.getElementById('hint');
+    h.style.display = 'flex';
+    setTimeout(() => { h.style.display = 'none'; }, 5500);
   }
   attachSentinel();
-  if(queue.length<QUEUE_MIN)fillQueue();
+  if (queue.length < QUEUE_MIN) fillQueue();
 }
-function attachSentinel(){
-  sentinel&&sentinel.disconnect();
-  const cards=document.getElementById('feed').querySelectorAll('.card');
-  if(cards.length<2)return;
-  sentinel=new IntersectionObserver(entries=>{
-    if(entries[0].isIntersecting){sentinel.disconnect();flushQueue(5);}
-  },{rootMargin:'0px 0px 200% 0px'});
-  sentinel.observe(cards[cards.length-2]);
+
+function attachSentinel() {
+  sentinel?.disconnect();
+  const cards = document.getElementById('feed').querySelectorAll('.card');
+  if (cards.length < 2) return;
+  sentinel = new IntersectionObserver(entries => {
+    if (entries[0].isIntersecting) { sentinel.disconnect(); flushQueue(5); }
+  }, {rootMargin: '0px 0px 200% 0px'});
+  sentinel.observe(cards[cards.length - 2]);
 }
-async function boot(){
-  try{
+
+// ── BOOT ───────────────────────────────────────────────────────────────────
+async function boot() {
+  try {
     await fillQueue();
     document.getElementById('spinner')?.remove();
-    if(!queue.length){showError();return;}
+    if (!queue.length) { showError(); return; }
     flushQueue(5);
-  }catch(err){
-    console.error(err);
+  } catch(e) {
+    console.error(e);
     document.getElementById('spinner')?.remove();
     showError();
   }
 }
-function renderCard(a){
-  const isHow=a.src==='how',isLiked=liked.has(a.id);
-  const img=a.img?`<img src="${esc(a.img)}" alt="" onerror="this.remove()">`:'' ;
-  const artImg=a.img?`<img src="${esc(a.img)}" alt="" class="art-img" onerror="this.remove()">`:'' ;
-  const card=document.createElement('div');
-  card.className='card'+(isHow?' how':'');
-  card.dataset.id=a.id;
-  card.innerHTML=`
+
+function resetFeed() {
+  sentinel?.disconnect();
+  articles = []; queue = []; hinted = false; filling = false;
+  document.getElementById('hint').style.display = 'none';
+  const isHow = curMode === 'how';
+  document.getElementById('feed').innerHTML =
+    `<div class="spin-wrap" id="spinner"><div class="spin${isHow?' h':''}"></div><div class="spin-lbl">${isHow ? 'Loading destinations…' : 'Loading articles…'}</div></div>`;
+  boot();
+}
+
+// ── RENDER ─────────────────────────────────────────────────────────────────
+function renderCard(a) {
+  const isHow   = a.src === 'how', isLiked = liked.has(a.id);
+  const img     = a.img ? `<img src="${esc(a.img)}" alt="" onerror="this.remove()">` : '';
+  const artImg  = a.img ? `<img src="${esc(a.img)}" alt="" class="art-img" onerror="this.remove()">` : '';
+  const card    = document.createElement('div');
+  card.className = 'card' + (isHow ? ' how' : '');
+  card.dataset.id = a.id;
+  card.innerHTML = `
     <div class="cbg">${img}<div class="cveil"></div></div>
     <div class="panel">
-      <div class="chip ${isHow?'h':'w'}">${isHow?'🗺️ Wikivoyage':'📖 Wikipedia'}</div>
+      <div class="chip ${isHow?'h':'w'}">${isHow ? '🗺️ Wikivoyage' : '📖 Wikipedia'}</div>
       ${artImg}
       <h2 class="art-title"></h2>
       <p class="art-body"></p>
       <div class="acts">
-        <button class="act${isLiked?' liked':''}" id="lb-${esc(a.id)}">${isLiked?'❤️ Liked':'🤍 Like'}</button>
+        <button class="act${isLiked?' liked':''}" id="lb-${esc(a.id)}">${isLiked ? '❤️ Liked' : '🤍 Like'}</button>
         <button class="act">📤 Share</button>
-        <button class="act cta${isHow?' hcta':''}">${isHow?'📋':'📖'} Read Full Article</button>
+        <button class="act cta${isHow?' hcta':''}">${isHow ? '📋' : '📖'} Read Full Article</button>
       </div>
     </div>`;
-  card.querySelector('.art-title').textContent=a.title;
-  card.querySelector('.art-body').textContent=a.body;
-  const[likeBtn,shareBtn,readBtn]=card.querySelectorAll('.act');
-  likeBtn.addEventListener('click',()=>toggleLike(a.id));
-  shareBtn.addEventListener('click',()=>doShare(a.url,a.title));
-  readBtn.addEventListener('click',()=>window.open(a.url,'_blank'));
+  card.querySelector('.art-title').textContent = a.title;
+  card.querySelector('.art-body').textContent  = a.body;
+  const [likeBtn, shareBtn, readBtn] = card.querySelectorAll('.act');
+  likeBtn.addEventListener('click',  () => toggleLike(a.id));
+  shareBtn.addEventListener('click', () => doShare(a.url, a.title));
+  readBtn.addEventListener('click',  () => window.open(a.url, '_blank'));
   document.getElementById('feed').appendChild(card);
 }
-function showError(){
-  const isHow=curMode==='how';
-  const card=document.createElement('div');card.className='card';
-  card.innerHTML=`<div class="cbg"><div class="cveil"></div></div><div class="err"><div class="err-ico">${isHow?'🗺️':'📖'}</div><div class="err-ttl">Nothing loaded</div><div class="err-msg">${isHow?'Wikivoyage':'Wikipedia'} didn't respond. Check your connection and try again.</div><button class="err-btn">Try again</button></div>`;
-  card.querySelector('.err-btn').addEventListener('click',resetFeed);
+
+function showError() {
+  const isHow = curMode === 'how';
+  const card = document.createElement('div');
+  card.className = 'card';
+  card.innerHTML = `
+    <div class="cbg"><div class="cveil"></div></div>
+    <div class="err">
+      <div class="err-ico">${isHow ? '🗺️' : '📖'}</div>
+      <div class="err-ttl">Nothing loaded</div>
+      <div class="err-msg">${isHow ? 'Wikivoyage' : 'Wikipedia'} didn't respond. Check your connection and try again.</div>
+      <button class="err-btn">Try again</button>
+    </div>`;
+  card.querySelector('.err-btn').addEventListener('click', resetFeed);
   document.getElementById('feed').appendChild(card);
 }
-function toggleLike(id){
-  const a=articles.find(x=>x.id===id);if(!a)return;
-  liked.has(id)?liked.delete(id):liked.set(id,a);
-  saveLiked();updateBadge();
-  const btn=document.getElementById('lb-'+id);
-  if(btn){const on=liked.has(id);btn.className='act'+(on?' liked':'');btn.textContent=on?'❤️ Liked':'🤍 Like';}
+
+// ── LIKES ──────────────────────────────────────────────────────────────────
+function toggleLike(id) {
+  const a = articles.find(x => x.id === id);
+  if (!a) return;
+  liked.has(id) ? liked.delete(id) : liked.set(id, a);
+  saveLiked(); updateBadge();
+  const btn = document.getElementById('lb-' + id);
+  if (btn) { const on = liked.has(id); btn.className = 'act' + (on ? ' liked' : ''); btn.textContent = on ? '❤️ Liked' : '🤍 Like'; }
 }
-function removeLike(id){
-  liked.delete(id);saveLiked();updateBadge();
-  const btn=document.getElementById('lb-'+id);
-  if(btn){btn.className='act';btn.textContent='🤍 Like';}
+function removeLike(id) {
+  liked.delete(id); saveLiked(); updateBadge();
+  const btn = document.getElementById('lb-' + id);
+  if (btn) { btn.className = 'act'; btn.textContent = '🤍 Like'; }
   renderLikedList();
 }
-function updateBadge(){
-  const n=liked.size;
-  ['badge','burgerBadge','burgerBadge2'].forEach(id=>{
-    const el=document.getElementById(id);
-    if(el){el.textContent=n;el.style.display=n?'inline-block':'none';}
+function updateBadge() {
+  const n = liked.size;
+  ['badge','burgerBadge'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) { el.textContent = n; el.style.display = n ? 'inline-block' : 'none'; }
   });
+  // burger dot: show if any likes
+  const dot = document.getElementById('burgerDot');
+  if (dot) dot.style.display = (n || curTopics.size) ? 'block' : 'none';
 }
-function renderLikedList(){
-  const c=document.getElementById('likedList');
-  if(!liked.size){c.innerHTML='<div class="empty"><div class="empty-ico">🔖</div><div class="empty-ttl">Nothing saved yet</div><div class="empty-txt">Like articles while scrolling to save them here.</div></div>';return;}
-  c.innerHTML=[...liked.values()].reverse().map(a=>`<div class="li"><div class="li-src">${a.src==='wiki'?'📖 Wikipedia':'🗺️ Wikivoyage'}</div><div class="li-ttl">${esc(a.title)}</div><div class="li-body">${esc(a.body.slice(0,130))}</div><div class="li-acts"><button class="li-btn" data-read="${esc(a.url)}">Read</button><button class="li-btn" data-share-url="${esc(a.url)}" data-share-title="${esc(a.title)}">Share</button><button class="li-btn" data-unlike="${esc(a.id)}">Remove</button></div></div>`).join('');
+function updateTopicBadge() {
+  const n = curTopics.size;
+  const tb = document.getElementById('topicBadge');
+  if (tb) { tb.textContent = n; tb.style.display = n ? 'inline-block' : 'none'; }
+  // sync burger Topics button style
+  const btn = document.getElementById('burgerTopicsBtn');
+  if (btn) btn.className = 'burger-action' + (n ? ' active' : '');
+  // sync desktop Topics button style
+  const dtb = document.getElementById('topicsBtn');
+  if (dtb) dtb.style.background = n ? 'rgba(102,126,234,.18)' : '';
+  // burger dot
+  const dot = document.getElementById('burgerDot');
+  if (dot) dot.style.display = (liked.size || n) ? 'block' : 'none';
 }
-document.getElementById('likedList').addEventListener('click',ev=>{
-  const btn=ev.target.closest('.li-btn');if(!btn)return;
-  if(btn.dataset.read)window.open(btn.dataset.read,'_blank');
-  else if(btn.dataset.unlike)removeLike(btn.dataset.unlike);
-  else if(btn.dataset.shareUrl)doShare(btn.dataset.shareUrl,btn.dataset.shareTitle);
+
+function renderLikedList() {
+  const c = document.getElementById('likedList');
+  if (!liked.size) {
+    c.innerHTML = `<div class="empty"><div class="empty-ico">🔖</div><div class="empty-ttl">Nothing saved yet</div><div class="empty-txt">Like articles while scrolling to save them here.</div></div>`;
+    return;
+  }
+  c.innerHTML = [...liked.values()].reverse().map(a => `
+    <div class="li">
+      <div class="li-src">${a.src === 'wiki' ? '📖 Wikipedia' : '🗺️ Wikivoyage'}</div>
+      <div class="li-ttl">${esc(a.title)}</div>
+      <div class="li-body">${esc(a.body.slice(0, 130))}</div>
+      <div class="li-acts">
+        <button class="li-btn" data-read="${esc(a.url)}">Read</button>
+        <button class="li-btn" data-share-url="${esc(a.url)}" data-share-title="${esc(a.title)}">Share</button>
+        <button class="li-btn" data-unlike="${esc(a.id)}">Remove</button>
+      </div>
+    </div>`).join('');
+}
+document.getElementById('likedList').addEventListener('click', ev => {
+  const btn = ev.target.closest('.li-btn');
+  if (!btn) return;
+  if      (btn.dataset.read)     window.open(btn.dataset.read, '_blank');
+  else if (btn.dataset.unlike)   removeLike(btn.dataset.unlike);
+  else if (btn.dataset.shareUrl) doShare(btn.dataset.shareUrl, btn.dataset.shareTitle);
 });
-function doShare(url,title){
-  if(navigator.share)navigator.share({title,url}).catch(()=>{});
-  else if(navigator.clipboard)navigator.clipboard.writeText(url).then(()=>toast('Link copied!')).catch(()=>{});
+
+// ── SHARE ──────────────────────────────────────────────────────────────────
+function doShare(url, title) {
+  if (navigator.share) navigator.share({title, url}).catch(() => {});
+  else if (navigator.clipboard) navigator.clipboard.writeText(url).then(() => toast('Link copied!')).catch(() => {});
 }
-function resetFeed(){
-  sentinel&&sentinel.disconnect();
-  articles=[];queue=[];hinted=false;filling=false;
-  document.getElementById('hint').style.display='none';
-  const isHow=curMode==='how';
-  document.getElementById('feed').innerHTML=`<div class="spin-wrap" id="spinner"><div class="spin${isHow?' h':''}"></div><div class="spin-lbl">${isHow?'Loading destinations…':'Loading articles…'}</div></div>`;
-  boot();
+
+// ── TOPICS ─────────────────────────────────────────────────────────────────
+function buildTopicChips(container, chipClass) {
+  container.innerHTML = TOPICS.map(t =>
+    `<button class="${chipClass}${curTopics.has(t.id) ? ' on' : ''}" data-tid="${t.id}">${t.emoji} ${t.label}</button>`
+  ).join('');
 }
-function setMode(m){
-  if(curMode===m)return;curMode=m;
-  const isHow=m==='how';
-  document.getElementById('wBtn').className='tbtn'+(isHow?'':' won on');
-  document.getElementById('hBtn').className='tbtn'+(isHow?' hon on':'');
-  document.body.classList.toggle('how',isHow);
+
+function toggleTopic(id) {
+  curTopics.has(id) ? curTopics.delete(id) : curTopics.add(id);
+  saveTopics(); updateTopicBadge();
+  // sync all chip UIs
+  document.querySelectorAll('[data-tid]').forEach(el => {
+    el.classList.toggle('on', curTopics.has(el.dataset.tid));
+  });
   resetFeed();
 }
-document.getElementById('wBtn').addEventListener('click',()=>setMode('wiki'));
-document.getElementById('hBtn').addEventListener('click',()=>setMode('how'));
-(function(){
-  const dd1=document.getElementById('langDd'),dd2=document.getElementById('burgerLangDd');
-  function buildOpts(dd){
-    dd.innerHTML=LANGS.map(l=>`<div class="lopt${l.c===curLang?' sel':''}" data-c="${l.c}" data-n="${l.n}">${l.f} ${l.n}</div>`).join('');
-  }
-  buildOpts(dd1);buildOpts(dd2);
-  function setLang(c){
-    curLang=c;
-    const lang=LANGS.find(l=>l.c===c);
-    if(lang){document.getElementById('langTxt').textContent=lang.n;document.getElementById('burgerLangTxt').textContent=lang.n;}
-    [dd1,dd2].forEach(dd=>{dd.querySelectorAll('.lopt').forEach(o=>o.classList.toggle('sel',o.dataset.c===curLang));dd.classList.remove('open');});
-    resetFeed();
-  }
-  document.getElementById('langBtn').addEventListener('click',ev=>{ev.stopPropagation();dd1.classList.toggle('open');dd2.classList.remove('open');});
-  document.getElementById('burgerLangBtn').addEventListener('click',ev=>{ev.stopPropagation();dd2.classList.toggle('open');dd1.classList.remove('open');});
-  [dd1,dd2].forEach(dd=>{dd.addEventListener('click',ev=>{const o=ev.target.closest('.lopt');if(o){setLang(o.dataset.c);closeBurger();}});});
-  document.addEventListener('click',ev=>{if(!ev.target.closest('.lang-wrap')){dd1.classList.remove('open');dd2.classList.remove('open');}});
-})();
-function closeBurger(){document.getElementById('burgerMenu').classList.remove('open');}
-document.getElementById('burgerBtn').addEventListener('click',ev=>{ev.stopPropagation();document.getElementById('burgerMenu').classList.toggle('open');});
-document.getElementById('burgerLikesBtn').addEventListener('click',()=>{closeBurger();document.getElementById('lp').classList.toggle('open');renderLikedList();});
-document.getElementById('burgerAboutBtn').addEventListener('click',()=>{closeBurger();document.getElementById('aboutOverlay').classList.toggle('open');});
-document.addEventListener('click',ev=>{if(!ev.target.closest('#burgerMenu')&&!ev.target.closest('#burgerBtn'))closeBurger();});
-document.getElementById('likesBtn').addEventListener('click',()=>{document.getElementById('lp').classList.toggle('open');renderLikedList();});
-document.getElementById('lpClose').addEventListener('click',()=>document.getElementById('lp').classList.remove('open'));
-document.getElementById('aboutBtn').addEventListener('click',()=>document.getElementById('aboutOverlay').classList.toggle('open'));
-document.getElementById('modalClose').addEventListener('click',()=>document.getElementById('aboutOverlay').classList.remove('open'));
-document.getElementById('aboutOverlay').addEventListener('click',function(ev){if(ev.target===this)this.classList.remove('open');});
-document.addEventListener('keydown',ev=>{
-  if(ev.key==='Escape'){document.getElementById('aboutOverlay').classList.remove('open');document.getElementById('lp').classList.remove('open');closeBurger();}
+
+// Build desktop topic sheet chips
+buildTopicChips(document.getElementById('topicGrid'), 'topic-chip');
+document.getElementById('topicGrid').addEventListener('click', ev => {
+  const chip = ev.target.closest('.topic-chip');
+  if (chip) toggleTopic(chip.dataset.tid);
 });
-(function(){
-  let lt=0,lx=0,ly=0,zoomed=false;
-  const unzoom=()=>setTimeout(()=>{zoomed=false;},1200);
-  if(window.visualViewport){window.visualViewport.addEventListener('resize',()=>{if(window.visualViewport.scale>1.05){zoomed=true;lt=0;unzoom();}});}
-  document.addEventListener('touchstart',ev=>{
-    if(ev.touches.length>1){zoomed=true;lt=0;unzoom();return;}
-    if(zoomed){lt=0;return;}
-    const card=ev.target.closest('.card');
-    if(!card||ev.target.closest('button,.acts,.cbg')){lt=0;return;}
-    const now=Date.now(),x=ev.touches[0].clientX,y=ev.touches[0].clientY;
-    if(now-lt<340&&Math.hypot(x-lx,y-ly)<40){
+document.getElementById('sheetReset').addEventListener('click', () => {
+  curTopics.clear(); saveTopics(); updateTopicBadge();
+  document.querySelectorAll('[data-tid]').forEach(el => el.classList.remove('on'));
+  resetFeed();
+});
+
+// Build mobile topic chips
+buildTopicChips(document.getElementById('burgerTopicGrid'), 'btopic');
+document.getElementById('burgerTopicGrid').addEventListener('click', ev => {
+  const chip = ev.target.closest('.btopic');
+  if (chip) toggleTopic(chip.dataset.tid);
+});
+
+// Open/close topic sheet (desktop)
+function openTopicSheet()  { document.getElementById('topicSheet').classList.add('open');    document.getElementById('sheetOverlay').classList.add('open'); }
+function closeTopicSheet() { document.getElementById('topicSheet').classList.remove('open'); document.getElementById('sheetOverlay').classList.remove('open'); }
+document.getElementById('topicsBtn').addEventListener('click',    openTopicSheet);
+document.getElementById('sheetOverlay').addEventListener('click', closeTopicSheet);
+
+// ── LANGUAGE ───────────────────────────────────────────────────────────────
+// Desktop dropdown
+const desktopLangDd = document.getElementById('langDd');
+desktopLangDd.innerHTML = LANGS.map(l =>
+  `<div class="lopt${l.c === curLang ? ' sel' : ''}" data-c="${l.c}">${l.f} ${l.n}</div>`
+).join('');
+document.getElementById('langBtn').addEventListener('click', ev => {
+  ev.stopPropagation();
+  desktopLangDd.classList.toggle('open');
+});
+desktopLangDd.addEventListener('click', ev => {
+  const o = ev.target.closest('.lopt');
+  if (!o) return;
+  setLang(o.dataset.c);
+  desktopLangDd.classList.remove('open');
+});
+document.addEventListener('click', ev => {
+  if (!ev.target.closest('.lang-wrap')) desktopLangDd.classList.remove('open');
+});
+
+// Mobile inline language grid
+const burgerLangGrid = document.getElementById('burgerLangGrid');
+burgerLangGrid.innerHTML = LANGS.map(l =>
+  `<button class="blopt${l.c === curLang ? ' sel' : ''}" data-c="${l.c}">${l.f} ${l.n}</button>`
+).join('');
+burgerLangGrid.addEventListener('click', ev => {
+  const o = ev.target.closest('.blopt');
+  if (!o) return;
+  setLang(o.dataset.c);
+  burgerLangGrid.classList.remove('open');
+  document.getElementById('burgerLangBtn').textContent = 'Change ›';
+});
+
+function setLang(c) {
+  curLang = c;
+  const lang = LANGS.find(l => l.c === c);
+  if (lang) {
+    document.getElementById('langTxt').textContent      = lang.n;
+    document.getElementById('burgerLangTxt').textContent = lang.n;
+  }
+  // Update sel class on both UIs
+  desktopLangDd.querySelectorAll('.lopt').forEach(o => o.classList.toggle('sel', o.dataset.c === curLang));
+  burgerLangGrid.querySelectorAll('.blopt').forEach(o => o.classList.toggle('sel', o.dataset.c === curLang));
+  resetFeed();
+}
+
+// Toggle mobile language grid inline
+document.getElementById('burgerLangBtn').addEventListener('click', ev => {
+  ev.stopPropagation();
+  const isOpen = burgerLangGrid.classList.toggle('open');
+  ev.currentTarget.textContent = isOpen ? 'Close ✕' : 'Change ›';
+});
+
+// ── MODE TOGGLE ─────────────────────────────────────────────────────────────
+function setMode(m) {
+  if (curMode === m) return;
+  curMode = m;
+  const isHow = m === 'how';
+  document.getElementById('wBtn').className = 'tbtn' + (isHow ? ''        : ' won on');
+  document.getElementById('hBtn').className = 'tbtn' + (isHow ? ' hon on' : '');
+  document.body.classList.toggle('how', isHow);
+  resetFeed();
+}
+document.getElementById('wBtn').addEventListener('click', () => setMode('wiki'));
+document.getElementById('hBtn').addEventListener('click', () => setMode('how'));
+
+// ── BURGER MENU ─────────────────────────────────────────────────────────────
+function closeBurger() {
+  document.getElementById('burgerMenu').classList.remove('open');
+  // collapse sub-sections
+  burgerLangGrid.classList.remove('open');
+  document.getElementById('burgerLangBtn').textContent = 'Change ›';
+  document.getElementById('burgerTopics').classList.remove('open');
+  document.getElementById('burgerTopicsBtn').textContent = 'Filter ›';
+}
+document.getElementById('burgerBtn').addEventListener('click', ev => {
+  ev.stopPropagation();
+  document.getElementById('burgerMenu').classList.toggle('open');
+});
+document.getElementById('burgerTopicsBtn').addEventListener('click', ev => {
+  ev.stopPropagation();
+  const isOpen = document.getElementById('burgerTopics').classList.toggle('open');
+  ev.currentTarget.textContent = isOpen ? 'Close ✕' : 'Filter ›';
+});
+document.getElementById('burgerLikesBtn').addEventListener('click', () => {
+  closeBurger();
+  document.getElementById('lp').classList.toggle('open');
+  renderLikedList();
+});
+document.getElementById('burgerAboutBtn').addEventListener('click', () => {
+  closeBurger();
+  document.getElementById('aboutOverlay').classList.toggle('open');
+});
+document.addEventListener('click', ev => {
+  if (!ev.target.closest('#burgerMenu') && !ev.target.closest('#burgerBtn')) closeBurger();
+});
+
+// ── HEADER BUTTONS (desktop) ────────────────────────────────────────────────
+document.getElementById('likesBtn').addEventListener('click', () => {
+  document.getElementById('lp').classList.toggle('open'); renderLikedList();
+});
+document.getElementById('lpClose').addEventListener('click', () => {
+  document.getElementById('lp').classList.remove('open');
+});
+document.getElementById('aboutBtn').addEventListener('click', () => {
+  document.getElementById('aboutOverlay').classList.toggle('open');
+});
+document.getElementById('modalClose').addEventListener('click', () => {
+  document.getElementById('aboutOverlay').classList.remove('open');
+});
+document.getElementById('aboutOverlay').addEventListener('click', function(ev) {
+  if (ev.target === this) this.classList.remove('open');
+});
+document.addEventListener('keydown', ev => {
+  if (ev.key !== 'Escape') return;
+  document.getElementById('aboutOverlay').classList.remove('open');
+  document.getElementById('lp').classList.remove('open');
+  closeBurger();
+  closeTopicSheet();
+});
+
+// ── DOUBLE-TAP TO LIKE ──────────────────────────────────────────────────────
+(function() {
+  let lt = 0, lx = 0, ly = 0, zoomed = false;
+  const unzoom = () => setTimeout(() => { zoomed = false; }, 1200);
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', () => {
+      if (window.visualViewport.scale > 1.05) { zoomed = true; lt = 0; unzoom(); }
+    });
+  }
+  document.addEventListener('touchstart', ev => {
+    if (ev.touches.length > 1) { zoomed = true; lt = 0; unzoom(); return; }
+    if (zoomed) { lt = 0; return; }
+    const card = ev.target.closest('.card');
+    if (!card || ev.target.closest('button,.acts,.cbg')) { lt = 0; return; }
+    const now = Date.now(), x = ev.touches[0].clientX, y = ev.touches[0].clientY;
+    if (now - lt < 340 && Math.hypot(x - lx, y - ly) < 40) {
       ev.preventDefault();
       toggleLike(card.dataset.id);
-      const h=document.createElement('div');h.className='heart';h.textContent='❤️';h.style.cssText=`left:${x}px;top:${y}px`;
-      document.body.appendChild(h);setTimeout(()=>h.remove(),750);lt=0;
-    }else{lt=now;lx=x;ly=y;}
-  },{passive:false});
+      const h = document.createElement('div');
+      h.className = 'heart'; h.textContent = '❤️';
+      h.style.cssText = `left:${x}px;top:${y}px`;
+      document.body.appendChild(h);
+      setTimeout(() => h.remove(), 750);
+      lt = 0;
+    } else { lt = now; lx = x; ly = y; }
+  }, {passive: false});
 })();
-loadLiked();
+
+// ── INIT ────────────────────────────────────────────────────────────────────
+loadPersistedState();
 boot();
 </script>
 </body>

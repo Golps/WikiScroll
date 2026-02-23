@@ -31,7 +31,6 @@ body{font-family:'DM Sans',sans-serif;background:#07070d;color:#fff;}
 .hdr-left{justify-content:flex-start;}
 .hdr-mid{justify-content:center;}
 .hdr-right{justify-content:flex-end;gap:7px;}
-
 .logo{
   font-family:'Syne',sans-serif;font-size:22px;font-weight:800;letter-spacing:-1px;
   background:linear-gradient(135deg,var(--w1),var(--w2));
@@ -57,7 +56,7 @@ body.how .logo{
 .tbtn.won{background:linear-gradient(135deg,var(--w1),var(--w2));box-shadow:0 2px 12px rgba(102,126,234,.4);}
 .tbtn.hon{background:linear-gradient(135deg,var(--h1),var(--h2));box-shadow:0 2px 12px rgba(56,239,125,.25);}
 
-/* ── PILLS ── */
+/* ── PILLS / BADGES ── */
 .pill{
   display:flex;align-items:center;gap:6px;padding:6px 13px;height:32px;
   background:rgba(255,255,255,.07);border:1px solid var(--border);border-radius:50px;
@@ -88,7 +87,7 @@ body.how .badge{background:var(--h1);}
 }
 .lopt:hover,.lopt.sel{background:rgba(255,255,255,.08);}
 
-/* ── HAMBURGER ── */
+/* ── HAMBURGER BTN ── */
 .burger-btn{
   display:none;align-items:center;justify-content:center;
   width:36px;height:36px;border-radius:50%;
@@ -122,6 +121,7 @@ body.how .burger-dot{background:var(--h1);}
 .burger-row:last-child{border-bottom:none;padding-bottom:0;}
 .burger-row-label{display:flex;align-items:center;gap:10px;color:rgba(255,255,255,.75);font-size:14px;font-weight:500;}
 .burger-row-label .ico{font-size:18px;line-height:1;}
+.burger-row-sub{font-size:11px;color:var(--dim);font-weight:400;margin-top:2px;}
 .burger-action{
   display:flex;align-items:center;gap:7px;padding:7px 14px;border-radius:50px;
   background:rgba(255,255,255,.07);border:1px solid var(--border);
@@ -131,33 +131,28 @@ body.how .burger-dot{background:var(--h1);}
 .burger-action:hover{background:rgba(255,255,255,.13);}
 .burger-action.active{background:rgba(102,126,234,.18);border-color:rgba(102,126,234,.35);color:#a5b4fc;}
 
-/* ── INLINE LANGUAGE GRID (mobile burger) ── */
+/* ── INLINE LANG GRID (mobile) ── */
 .burger-lang-grid{
   display:grid;grid-template-columns:1fr 1fr;gap:7px;
   max-height:0;overflow:hidden;
-  transition:max-height .25s ease, padding .25s ease;
-  padding:0;
+  transition:max-height .25s ease,padding .25s ease;padding:0;
 }
-.burger-lang-grid.open{max-height:320px;padding:10px 0 4px;}
+.burger-lang-grid.open{max-height:340px;padding:10px 0 4px;}
 .blopt{
   display:flex;align-items:center;gap:8px;padding:10px 12px;
   border-radius:12px;background:rgba(255,255,255,.05);
   border:1px solid var(--border);color:rgba(255,255,255,.8);
-  cursor:pointer;font-size:13px;transition:background .15s, border-color .15s;
+  cursor:pointer;font-size:13px;transition:background .15s,border-color .15s;
 }
 .blopt:hover{background:rgba(255,255,255,.1);}
-.blopt.sel{
-  background:rgba(102,126,234,.15);
-  border-color:rgba(102,126,234,.35);color:#c4ccf5;
-}
+.blopt.sel{background:rgba(102,126,234,.15);border-color:rgba(102,126,234,.35);color:#c4ccf5;}
 
-/* ── INLINE TOPIC CHIPS (mobile burger) ── */
+/* ── INLINE TOPIC CHIPS (mobile) ── */
 .burger-topics{
   max-height:0;overflow:hidden;
-  transition:max-height .25s ease, padding .25s ease;
-  padding:0;
+  transition:max-height .25s ease,padding .25s ease;padding:0;
 }
-.burger-topics.open{max-height:300px;padding:10px 0 4px;}
+.burger-topics.open{max-height:280px;padding:10px 0 4px;}
 .burger-topic-grid{display:flex;flex-wrap:wrap;gap:7px;}
 .btopic{
   display:flex;align-items:center;gap:6px;padding:8px 13px;
@@ -169,7 +164,23 @@ body.how .burger-dot{background:var(--h1);}
 .btopic:hover{background:rgba(255,255,255,.1);}
 .btopic.on{background:rgba(102,126,234,.18);border-color:rgba(102,126,234,.4);color:#a5b4fc;}
 
-/* ── TOPIC BOTTOM SHEET (desktop) ── */
+/* ── TOGGLE SWITCH ── */
+.toggle-sw{
+  width:44px;height:24px;border-radius:12px;border:none;
+  background:rgba(255,255,255,.15);cursor:pointer;position:relative;
+  transition:background .2s;flex-shrink:0;
+}
+.toggle-sw::after{
+  content:'';position:absolute;top:2px;left:2px;
+  width:20px;height:20px;border-radius:50%;
+  background:#fff;transition:transform .2s;
+  box-shadow:0 1px 4px rgba(0,0,0,.3);
+}
+.toggle-sw.on{background:var(--w1);}
+body.how .toggle-sw.on{background:var(--h1);}
+.toggle-sw.on::after{transform:translateX(20px);}
+
+/* ── TOPIC SHEET ── */
 .sheet-overlay{
   position:fixed;inset:0;z-index:480;background:rgba(0,0,0,.5);
   display:none;backdrop-filter:blur(4px);
@@ -192,14 +203,10 @@ body.how .burger-dot{background:var(--h1);}
   display:flex;align-items:center;gap:8px;padding:11px 18px;
   border-radius:50px;border:1px solid var(--border);
   background:rgba(255,255,255,.06);color:rgba(255,255,255,.8);
-  cursor:pointer;font-size:14px;font-weight:500;
-  transition:all .18s;
+  cursor:pointer;font-size:14px;font-weight:500;transition:all .18s;
 }
 .topic-chip:hover{background:rgba(255,255,255,.11);}
-.topic-chip.on{
-  background:rgba(102,126,234,.2);border-color:rgba(102,126,234,.45);
-  color:#b8c2f8;
-}
+.topic-chip.on{background:rgba(102,126,234,.2);border-color:rgba(102,126,234,.45);color:#b8c2f8;}
 .sheet-reset{
   margin-top:18px;padding:10px 22px;border-radius:50px;border:1px solid var(--border);
   background:transparent;color:var(--dim);cursor:pointer;font-size:13px;
@@ -235,9 +242,8 @@ body.how .burger-dot{background:var(--h1);}
 .modal-body{font-size:14px;line-height:1.7;color:rgba(255,255,255,.72);margin-bottom:18px;}
 .modal-contact{font-size:12px;color:var(--dim);}
 .modal-contact a{color:#a5b4fc;text-decoration:none;}
-.modal-contact a:hover{text-decoration:underline;}
 
-/* ── FEED ── */
+/* ── FEED / CARDS ── */
 .feed{
   height:100vh;overflow-y:scroll;scroll-snap-type:y mandatory;
   scrollbar-width:none;-ms-overflow-style:none;
@@ -247,7 +253,7 @@ body.how .burger-dot{background:var(--h1);}
 .card{
   height:100vh;scroll-snap-align:start;position:relative;
   display:flex;align-items:center;justify-content:center;
-  background:#07070d;overflow:hidden;
+  background:#07070d;overflow:hidden;will-change:transform;
 }
 .cbg{position:absolute;inset:0;z-index:0;}
 .cbg img{width:100%;height:100%;object-fit:cover;opacity:.45;filter:blur(28px) saturate(1.6);transform:scale(1.12) translateZ(0);}
@@ -262,6 +268,31 @@ body.how .burger-dot{background:var(--h1);}
     radial-gradient(ellipse at 30% 30%,rgba(17,153,142,.1) 0%,transparent 60%),
     radial-gradient(ellipse at 75% 75%,rgba(56,239,125,.06) 0%,transparent 55%);
 }
+
+/* ── SWIPE INDICATORS ── */
+.swipe-ind{
+  position:absolute;z-index:2;top:50%;transform:translateY(-50%);
+  font-family:'Syne',sans-serif;font-weight:800;font-size:20px;letter-spacing:.5px;
+  padding:10px 18px;border-radius:14px;border:3px solid;
+  opacity:0;pointer-events:none;transition:opacity .06s;
+  text-shadow:0 2px 8px rgba(0,0,0,.5);
+}
+.like-ind{left:22px;color:#4ade80;border-color:#4ade80;transform:translateY(-50%) rotate(-14deg);}
+.skip-ind{right:22px;color:#f87171;border-color:#f87171;transform:translateY(-50%) rotate(14deg);}
+
+/* ── OTD BADGE ── */
+.otd-badge{
+  position:absolute;z-index:2;
+  top:max(68px,calc(env(safe-area-inset-top) + 56px));
+  left:50%;transform:translateX(-50%);
+  display:flex;align-items:center;gap:6px;white-space:nowrap;
+  padding:5px 14px;border-radius:50px;
+  background:rgba(251,191,36,.14);border:1px solid rgba(251,191,36,.38);
+  color:#fcd34d;font-family:'Syne',sans-serif;font-size:11px;font-weight:700;
+  letter-spacing:.8px;pointer-events:none;
+}
+
+/* ── PANEL ── */
 .panel{
   position:relative;z-index:1;width:min(660px,90vw);max-height:74vh;padding:24px;
   background:var(--glass);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);
@@ -326,8 +357,7 @@ body.how .burger-dot{background:var(--h1);}
   position:fixed;top:0;right:-430px;width:420px;height:100vh;
   background:rgba(8,8,14,.97);backdrop-filter:blur(22px);
   border-left:1px solid var(--border);z-index:400;
-  transition:right .32s cubic-bezier(.4,0,.2,1);
-  overflow-y:auto;
+  transition:right .32s cubic-bezier(.4,0,.2,1);overflow-y:auto;
   padding:max(84px,calc(env(safe-area-inset-top) + 70px)) 18px max(24px,env(safe-area-inset-bottom));
   scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.07) transparent;
 }
@@ -336,7 +366,8 @@ body.how .burger-dot{background:var(--h1);}
 .lp-x{font-size:20px;cursor:pointer;background:none;border:none;color:var(--dim);transition:color .2s;}
 .lp-x:hover{color:#fff;}
 .li{background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:10px;}
-.li-src{font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;opacity:.5;margin-bottom:5px;}
+.li-src{font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;opacity:.5;margin-bottom:4px;}
+.li-offline{font-size:10px;color:#4ade80;opacity:.7;margin-bottom:4px;display:flex;align-items:center;gap:4px;}
 .li-ttl{font-family:'Syne',sans-serif;font-size:14px;font-weight:600;margin-bottom:5px;line-height:1.3;}
 .li-body{font-size:12px;color:var(--dim);line-height:1.5;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;margin-bottom:9px;}
 .li-acts{display:flex;gap:7px;}
@@ -347,13 +378,64 @@ body.how .burger-dot{background:var(--h1);}
 .empty-ttl{font-family:'Syne',sans-serif;font-size:16px;font-weight:700;color:rgba(255,255,255,.6);margin-bottom:6px;}
 .empty-txt{font-size:13px;line-height:1.6;}
 
+/* ── AMBIENT MODE ── */
+.ambient-overlay{
+  position:fixed;inset:0;z-index:700;
+  display:none;flex-direction:column;align-items:center;justify-content:center;
+}
+.ambient-overlay.open{display:flex;animation:ambIn .65s cubic-bezier(.4,0,.2,1) forwards;}
+.ambient-overlay.closing{animation:ambOut .4s ease forwards;}
+@keyframes ambIn{from{background:rgba(0,0,0,0)}to{background:rgba(0,0,0,.88)}}
+@keyframes ambOut{from{background:rgba(0,0,0,.88);opacity:1}to{background:rgba(0,0,0,0);opacity:0}}
+.ambient-bg{
+  position:absolute;inset:-40px;z-index:0;
+  background-size:cover;background-position:center;
+  filter:blur(48px) saturate(1.5) brightness(.4);
+  transform:scale(1.08) translateZ(0);
+  animation:ambBgIn .9s cubic-bezier(.4,0,.2,1) forwards;
+}
+@keyframes ambBgIn{from{opacity:0;filter:blur(10px) saturate(1) brightness(.2)}to{opacity:1;filter:blur(48px) saturate(1.5) brightness(.4)}}
+.ambient-content{
+  position:relative;z-index:1;text-align:center;
+  padding:40px 32px;max-width:min(620px,90vw);
+  animation:ambContentIn .8s .18s cubic-bezier(.4,0,.2,1) both;
+  pointer-events:none;
+}
+@keyframes ambContentIn{from{opacity:0;transform:translateY(28px)}to{opacity:1;transform:translateY(0)}}
+.ambient-label{
+  font-family:'Syne',sans-serif;font-size:11px;font-weight:700;
+  letter-spacing:2.5px;text-transform:uppercase;color:rgba(255,255,255,.35);margin-bottom:28px;
+}
+.ambient-title{
+  font-family:'Syne',sans-serif;
+  font-size:clamp(28px,5.5vw,56px);
+  font-weight:800;line-height:1.08;letter-spacing:-1.5px;
+  color:#fff;margin-bottom:24px;
+  text-shadow:0 4px 40px rgba(0,0,0,.6);
+}
+.ambient-excerpt{
+  font-size:15px;line-height:1.75;color:rgba(255,255,255,.52);
+  display:-webkit-box;-webkit-line-clamp:5;-webkit-box-orient:vertical;overflow:hidden;
+}
+.ambient-close{
+  position:absolute;top:max(20px,env(safe-area-inset-top));right:20px;z-index:2;
+  width:44px;height:44px;border-radius:50%;
+  background:rgba(255,255,255,.09);border:1px solid rgba(255,255,255,.12);
+  cursor:pointer;color:#fff;font-size:18px;
+  display:flex;align-items:center;justify-content:center;
+  transition:background .2s;
+}
+.ambient-close:hover{background:rgba(255,255,255,.18);}
+.ambient-hint{
+  position:absolute;bottom:max(28px,env(safe-area-inset-bottom));
+  font-size:11px;color:rgba(255,255,255,.28);letter-spacing:.5px;
+  animation:ambHintIn 1s 1.8s both;pointer-events:none;z-index:1;
+}
+@keyframes ambHintIn{from{opacity:0}to{opacity:1}}
+
 /* ── MISC ── */
 .heart{position:fixed;font-size:68px;pointer-events:none;z-index:999;transform:translate(-50%,-50%);animation:hpop .7s ease-out forwards;}
-@keyframes hpop{
-  0%{transform:translate(-50%,-50%) scale(0);opacity:1;}
-  50%{transform:translate(-50%,-50%) scale(1.3);opacity:1;}
-  100%{transform:translate(-50%,-60%) scale(1);opacity:0;}
-}
+@keyframes hpop{0%{transform:translate(-50%,-50%) scale(0);opacity:1}50%{transform:translate(-50%,-50%) scale(1.3);opacity:1}100%{transform:translate(-50%,-60%) scale(1);opacity:0}}
 .toast{
   position:fixed;bottom:68px;left:50%;transform:translateX(-50%);
   background:rgba(20,20,30,.96);border:1px solid var(--border);
@@ -363,7 +445,7 @@ body.how .burger-dot{background:var(--h1);}
 @keyframes tin{from{opacity:0;transform:translateX(-50%) translateY(8px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
 .err{position:relative;z-index:1;width:min(440px,88vw);padding:32px;text-align:center;background:var(--glass);backdrop-filter:blur(20px);border-radius:24px;border:1px solid rgba(239,68,68,.22);}
 .err-ico{font-size:40px;margin-bottom:12px;}
-.err-ttl{font-family:'DM Sans',sans-serif;font-size:18px;font-weight:500;margin-bottom:8px;}
+.err-ttl{font-size:18px;font-weight:500;margin-bottom:8px;}
 .err-msg{font-size:13px;color:var(--dim);line-height:1.6;margin-bottom:20px;}
 .err-btn{padding:10px 24px;border:none;border-radius:12px;cursor:pointer;background:linear-gradient(135deg,var(--w1),var(--w2));color:#fff;font-size:14px;font-weight:600;font-family:'DM Sans',sans-serif;}
 body.how .err-btn{background:linear-gradient(135deg,var(--h1),var(--h2));}
@@ -377,7 +459,6 @@ body.how .err-btn{background:linear-gradient(135deg,var(--h1),var(--h2));}
   .art-title{font-size:19px;}
   .lp{width:100%;right:-100%;}
   .act{padding:12px 16px;font-size:14px;}
-  /* hide desktop controls, show burger */
   .hdr-right > .lang-wrap,
   .hdr-right > #likesBtn,
   .hdr-right > #topicsBtn,
@@ -411,7 +492,6 @@ body.how .err-btn{background:linear-gradient(135deg,var(--h1),var(--h2));}
       <span class="badge topic-badge" id="topicBadge" style="display:none">0</span>
     </button>
     <button class="pill about-btn" id="aboutBtn" title="About">ℹ</button>
-    <!-- Mobile hamburger -->
     <button class="burger-btn" id="burgerBtn" title="Menu">
       <span class="burger-dot" id="burgerDot"></span>
       <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
@@ -426,15 +506,11 @@ body.how .err-btn{background:linear-gradient(135deg,var(--h1),var(--h2));}
 <!-- MOBILE BURGER MENU -->
 <div class="burger-menu" id="burgerMenu">
   <div class="burger-inner">
-
-    <!-- Language row + inline grid -->
     <div class="burger-row">
       <div class="burger-row-label"><span class="ico">🌍</span><span id="burgerLangTxt">English</span></div>
       <button class="burger-action" id="burgerLangBtn">Change ›</button>
     </div>
     <div class="burger-lang-grid" id="burgerLangGrid"></div>
-
-    <!-- Topics row + inline chips -->
     <div class="burger-row">
       <div class="burger-row-label"><span class="ico">🎯</span><span>Topics</span></div>
       <button class="burger-action" id="burgerTopicsBtn">Filter ›</button>
@@ -442,30 +518,32 @@ body.how .err-btn{background:linear-gradient(135deg,var(--h1),var(--h2));}
     <div class="burger-topics" id="burgerTopics">
       <div class="burger-topic-grid" id="burgerTopicGrid"></div>
     </div>
-
-    <!-- Likes -->
+    <div class="burger-row">
+      <div class="burger-row-label">
+        <span class="ico">👆</span>
+        <div><div>Swipe Gestures</div><div class="burger-row-sub">Left to skip · Right to like</div></div>
+      </div>
+      <button class="toggle-sw on" id="swipeToggle" role="switch" aria-label="Toggle swipe gestures"></button>
+    </div>
     <div class="burger-row">
       <div class="burger-row-label"><span class="ico">❤️</span><span>Saved Articles</span></div>
       <button class="burger-action" id="burgerLikesBtn">
         View <span class="badge" id="burgerBadge" style="display:none">0</span>
       </button>
     </div>
-
-    <!-- About -->
     <div class="burger-row">
       <div class="burger-row-label"><span class="ico">ℹ️</span><span>About</span></div>
       <button class="burger-action" id="burgerAboutBtn">Open ›</button>
     </div>
-
   </div>
 </div>
 
-<!-- TOPIC BOTTOM SHEET (desktop) -->
+<!-- TOPIC SHEET -->
 <div class="sheet-overlay" id="sheetOverlay"></div>
 <div class="topic-sheet" id="topicSheet">
   <div class="sheet-handle"></div>
   <div class="sheet-title">Topics</div>
-  <div class="sheet-sub">Select one or more topics to bias your feed. Leave all off for fully random.</div>
+  <div class="sheet-sub">Select topics to bias your feed. Leave all off for fully random.</div>
   <div class="topic-grid" id="topicGrid"></div>
   <button class="sheet-reset" id="sheetReset">Clear all topics</button>
 </div>
@@ -484,7 +562,7 @@ body.how .err-btn{background:linear-gradient(135deg,var(--h1),var(--h2));}
   </div>
 </div>
 
-<!-- SCROLL HINT -->
+<!-- HINT -->
 <div class="hint" id="hint">
   <div class="hint-txt">Scroll to discover</div>
   <div class="hint-arr"></div>
@@ -496,14 +574,26 @@ body.how .err-btn{background:linear-gradient(135deg,var(--h1),var(--h2));}
     <button class="modal-close" id="modalClose">✕</button>
     <div class="modal-logo">WikiScroll</div>
     <div class="modal-body">
-      An infinite scrolling interface for exploring random Wikipedia or Wikivoyage articles in multiple languages.<br><br>
-      Swipe or scroll to discover fascinating articles!
+      Infinite scrolling through Wikipedia and Wikivoyage in multiple languages.<br><br>
+      Swipe right to like · Left to skip · Long-press for Ambient Mode.
     </div>
-    <div class="modal-contact">Contact: <a href="/cdn-cgi/l/email-protection#65060a0b1104061125120c0e0c1606170a09094b060a08"><span class="__cf_email__" data-cfemail="bbd8d4d5cfdad8cffbccd2d0d2c8d8c9d4d7d795d8d4d6">[email&#160;protected]</span></a></div>
+    <div class="modal-contact">contact [at] wikiscroll.com</div>
   </div>
 </div>
 
-<script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
+<!-- AMBIENT OVERLAY -->
+<div class="ambient-overlay" id="ambientOverlay">
+  <div class="ambient-bg" id="ambientBg"></div>
+  <div class="ambient-content">
+    <div class="ambient-label">✦ Ambient Mode</div>
+    <div class="ambient-title" id="ambientTitle"></div>
+    <div class="ambient-excerpt" id="ambientExcerpt"></div>
+  </div>
+  <button class="ambient-close" id="ambientClose">✕</button>
+  <div class="ambient-hint">Tap anywhere to exit</div>
+</div>
+
+<script>
 'use strict';
 
 // ── CONSTANTS ──────────────────────────────────────────────────────────────
@@ -517,364 +607,218 @@ const LANGS = [
   {c:'nl',n:'Nederlands',f:'🇳🇱'},{c:'pl',n:'Polski',f:'🇵🇱'},
 ];
 
-// ── TOPIC DEFINITIONS ──────────────────────────────────────────────────────
-// cats: verified leaf-level Wikipedia categories (gcmtype=page returns real articles)
-// valid: extract must match this regex — hard content gate, not just category membership
-// vCats: Wikivoyage-specific destination categories for this topic (shown in how mode)
 const TOPICS = [
   {
-    id:'food', label:'Food', emoji:'🍽️',
-    cats:[
-      'Category:Cheeses','Category:Cocktails','Category:Soups','Category:Breads',
-      'Category:Noodle dishes','Category:Rice dishes','Category:Chocolate',
-      'Category:Coffee','Category:Tea','Category:Sushi','Category:Stews',
-      'Category:Salads','Category:Cakes','Category:Cookies','Category:Pies',
-      'Category:Sauces','Category:Fermented foods','Category:Street food',
-    ],
+    id:'food',label:'Food',emoji:'🍽️',
+    cats:['Category:Cheeses','Category:Cocktails','Category:Soups','Category:Breads','Category:Noodle dishes','Category:Rice dishes','Category:Chocolate','Category:Coffee','Category:Tea','Category:Sushi','Category:Stews','Category:Salads','Category:Cakes','Category:Cookies','Category:Pies','Category:Sauces','Category:Fermented foods','Category:Street food'],
     valid:/\b(dish|food|cuisine|ingredient|flavor|flavour|taste|cooked|eaten|recipe|meal|snack|drink|beverage|served|baked|fried|grilled|brewed|fermented|cheese|bread|pasta|meat|vegetable|fruit|spice|herb|sauce|soup|dessert|sweet|savoury|savory)\b/i,
     vCats:['Category:Food and drink','Category:Restaurants'],
   },
   {
-    id:'science', label:'Science', emoji:'🔬',
-    cats:[
-      'Category:Chemical elements','Category:Constellations','Category:Exoplanets',
-      'Category:Minerals','Category:Mammals','Category:Birds','Category:Insects',
-      'Category:Fish','Category:Reptiles','Category:Amphibians','Category:Spiders',
-      'Category:Viruses','Category:Bacteria','Category:Fungi','Category:Mosses',
-      'Category:Orchids','Category:Subatomic particles','Category:Comets','Category:Asteroids',
-    ],
-    valid:/\b(species|genus|family|order|class|element|compound|molecule|atom|particle|planet|star|galaxy|nebula|cell|protein|dna|rna|organism|native to|found in|named after|discovered|described by|scientific name|latin name|biology|chemistry|physics|astronomy|ecology|habitat|distribution)\b/i,
+    id:'science',label:'Science',emoji:'🔬',
+    cats:['Category:Chemical elements','Category:Constellations','Category:Exoplanets','Category:Minerals','Category:Mammals','Category:Birds','Category:Insects','Category:Fish','Category:Reptiles','Category:Amphibians','Category:Spiders','Category:Viruses','Category:Bacteria','Category:Fungi','Category:Mosses','Category:Orchids','Category:Subatomic particles','Category:Comets','Category:Asteroids'],
+    valid:/\b(species|genus|family|order|class|element|compound|molecule|atom|particle|planet|star|galaxy|nebula|cell|protein|dna|rna|organism|native to|found in|named after|discovered|described by|scientific name|biology|chemistry|physics|astronomy|ecology|habitat|distribution)\b/i,
     vCats:['Category:Natural attractions','Category:National parks'],
   },
   {
-    id:'history', label:'History', emoji:'🏛️',
-    cats:[
-      'Category:Battles of World War II','Category:Battles of World War I',
-      'Category:Battles of the Napoleonic Wars','Category:Battles of the American Civil War',
-      'Category:Ancient Rome','Category:Ancient Egypt','Category:Ancient Greece',
-      'Category:Medieval castles','Category:Viking Age','Category:Crusades',
-      'Category:Byzantine Empire','Category:Ottoman Empire','Category:Mughal Empire',
-      'Category:Aztec','Category:Inca Empire','Category:Cold War',
-    ],
+    id:'history',label:'History',emoji:'🏛️',
+    cats:['Category:Battles of World War II','Category:Battles of World War I','Category:Battles of the Napoleonic Wars','Category:Battles of the American Civil War','Category:Ancient Rome','Category:Ancient Egypt','Category:Ancient Greece','Category:Medieval castles','Category:Viking Age','Category:Crusades','Category:Byzantine Empire','Category:Ottoman Empire','Category:Mughal Empire','Category:Aztec','Category:Inca Empire','Category:Cold War'],
     valid:/\b(battle|war|siege|empire|kingdom|dynasty|ruled|conquered|revolt|revolution|treaty|medieval|ancient|century|\bbc\b|\bad\b|reign|fought|defeated|founded|established|occupation|invasion|rebellion|republic|pharaoh|emperor|general|army|navy|troops)\b/i,
     vCats:['Category:Historical sites','Category:Castles','Category:UNESCO World Heritage Sites'],
   },
   {
-    id:'geo', label:'Geography', emoji:'🌍',
-    cats:[
-      'Category:Islands of the Pacific Ocean','Category:Islands of the Atlantic Ocean',
-      'Category:Islands of the Indian Ocean','Category:Active volcanoes',
-      'Category:Mountain ranges','Category:Waterfalls','Category:Glaciers',
-      'Category:Deserts','Category:Caves','Category:Canyons','Category:Lagoons',
-      'Category:Atolls','Category:Peninsulas','Category:Straits','Category:Bays',
-      'Category:Rivers of Africa','Category:Rivers of Asia','Category:Rivers of South America',
-    ],
+    id:'geo',label:'Geography',emoji:'🌍',
+    cats:['Category:Islands of the Pacific Ocean','Category:Islands of the Atlantic Ocean','Category:Islands of the Indian Ocean','Category:Active volcanoes','Category:Mountain ranges','Category:Waterfalls','Category:Glaciers','Category:Deserts','Category:Caves','Category:Canyons','Category:Lagoons','Category:Atolls','Category:Peninsulas','Category:Straits','Category:Bays','Category:Rivers of Africa','Category:Rivers of Asia','Category:Rivers of South America'],
     valid:/\b(island|volcano|mountain|lake|river|ocean|sea|coast|peninsula|valley|glacier|desert|forest|national park|range|peak|summit|elevation|metres|meters|feet|kilometres|km|miles|located|situated|geography|terrain|climate|landscape|inlet|bay|strait|atoll|lagoon|cave|canyon|waterfall)\b/i,
     vCats:['Category:Islands','Category:National parks','Category:Natural attractions','Category:Mountains'],
   },
   {
-    id:'arts', label:'Arts', emoji:'🎨',
-    cats:[
-      'Category:Baroque paintings','Category:Renaissance paintings','Category:Impressionist paintings',
-      'Category:Operas','Category:Symphonies','Category:String quartets',
-      'Category:Gothic cathedrals','Category:Art Nouveau architecture',
-      'Category:Neoclassical architecture','Category:Modernist architecture',
-      'Category:Ancient Greek sculptures','Category:Ballet',
-      'Category:Silent films','Category:Jazz standards',
-    ],
+    id:'arts',label:'Arts',emoji:'🎨',
+    cats:['Category:Baroque paintings','Category:Renaissance paintings','Category:Impressionist paintings','Category:Operas','Category:Symphonies','Category:String quartets','Category:Gothic cathedrals','Category:Art Nouveau architecture','Category:Neoclassical architecture','Category:Modernist architecture','Category:Ancient Greek sculptures','Category:Ballet','Category:Silent films','Category:Jazz standards'],
     valid:/\b(painting|sculpture|architecture|composer|symphony|opera|ballet|novel|poem|film|director|musician|artist|gallery|museum|style|movement|genre|performed|written|painted|composed|concerto|sonata|fresco|mosaic|cathedral|palace|artwork|canvas|oil paint|watercolour|watercolor)\b/i,
     vCats:['Category:Museums','Category:Theatres','Category:Art galleries'],
   },
   {
-    id:'tech', label:'Technology', emoji:'💻',
-    cats:[
-      'Category:Inventions by country','Category:Computing','Category:Aviation',
-      'Category:Spacecraft','Category:Rockets','Category:Bridges','Category:Tunnels',
-      'Category:Locomotives','Category:Motorcycles','Category:Cameras',
-      'Category:Telescopes','Category:Particle accelerators',
-      'Category:Nuclear reactors','Category:Radio telescopes','Category:Submarines',
-    ],
+    id:'tech',label:'Technology',emoji:'💻',
+    cats:['Category:Inventions by country','Category:Computing','Category:Aviation','Category:Spacecraft','Category:Rockets','Category:Bridges','Category:Tunnels','Category:Locomotives','Category:Motorcycles','Category:Cameras','Category:Telescopes','Category:Particle accelerators','Category:Nuclear reactors','Category:Radio telescopes','Category:Submarines'],
     valid:/\b(invented|invention|patent|engineer|machine|computer|software|hardware|technology|device|system|design|developed|processor|algorithm|network|digital|electric|mechanical|built|manufactured|aircraft|spacecraft|rocket|engine|motor|circuit|semiconductor|satellite|telescope|bridge|tunnel|locomotive)\b/i,
     vCats:['Category:Airports','Category:Bridges'],
   },
   {
-    id:'people', label:'People', emoji:'👤',
-    cats:[
-      'Category:16th-century scientists','Category:17th-century scientists','Category:18th-century scientists',
-      'Category:19th-century scientists','Category:20th-century scientists',
-      'Category:Renaissance humanists','Category:Enlightenment philosophers',
-      'Category:Explorers of Africa','Category:Explorers of Asia','Category:Explorers of the Americas',
-      'Category:Women scientists','Category:Nobel laureates in Physics',
-      'Category:Nobel laureates in Chemistry','Category:Nobel laureates in Medicine',
-    ],
+    id:'people',label:'People',emoji:'👤',
+    cats:['Category:16th-century scientists','Category:17th-century scientists','Category:18th-century scientists','Category:19th-century scientists','Category:20th-century scientists','Category:Renaissance humanists','Category:Enlightenment philosophers','Category:Explorers of Africa','Category:Explorers of Asia','Category:Explorers of the Americas','Category:Women scientists','Category:Nobel laureates in Physics','Category:Nobel laureates in Chemistry','Category:Nobel laureates in Medicine'],
     valid:/\b(born|died|nationality|known for|notable|scientist|artist|philosopher|explorer|writer|inventor|leader|served as|worked as|educated|studied|mathematician|physician|biologist|chemist|physicist|astronomer|naturalist|theologian|statesman|admiral|general|discoverer)\b/i,
     vCats:[],
   },
   {
-    id:'sports', label:'Sports', emoji:'⚽',
-    cats:[
-      'Category:Athletics (track and field)','Category:Swimming','Category:Gymnastics',
-      'Category:Cycling','Category:Rowing','Category:Fencing','Category:Archery',
-      'Category:Weightlifting','Category:Wrestling','Category:Judo','Category:Karate',
-      'Category:Equestrian sports','Category:Sailing','Category:Shooting sports',
-      'Category:Bobsleigh','Category:Skiing','Category:Ice skating',
-    ],
+    id:'sports',label:'Sports',emoji:'⚽',
+    cats:['Category:Athletics (track and field)','Category:Swimming','Category:Gymnastics','Category:Cycling','Category:Rowing','Category:Fencing','Category:Archery','Category:Weightlifting','Category:Wrestling','Category:Judo','Category:Karate','Category:Equestrian sports','Category:Sailing','Category:Shooting sports','Category:Bobsleigh','Category:Skiing','Category:Ice skating'],
     valid:/\b(sport|game|team|player|championship|tournament|league|match|athlete|olympic|medal|race|competition|played|competed|won|defeated|ranked|season|record|event|discipline|gold|silver|bronze|competing|coach|club|federation|world cup|grand prix)\b/i,
     vCats:['Category:Sports venues','Category:Stadiums'],
   },
 ];
 
-// Per-topic map for fast lookup
-const TOPIC_MAP = Object.fromEntries(TOPICS.map(t => [t.id, t]));
-
-// Title patterns that always indicate a non-article page — reject before any other check
-const BAD_TITLE_RE = /^(list of|lists of|timeline|history of|geography of|demographics|economy of|culture of|politics of|education in|deaths in|events of|index of|outline of|glossary|bibliography|filmography|discography|category:|talk:|wikipedia:)/i;
+const TOPIC_MAP     = Object.fromEntries(TOPICS.map(t => [t.id, t]));
+const BAD_TITLE_RE  = /^(list of|lists of|timeline|history of|geography of|demographics|economy of|culture of|politics of|education in|deaths in|events of|index of|outline of|glossary|bibliography|filmography|discography|category:|talk:|wikipedia:)/i;
+const GEO_RE        = /\b(city|town|village|municipality|district|region|province|state|country|island|archipelago|coast|peninsula|valley|mountain|lake|river|national park|nature reserve|capital|port|suburb|commune|department|prefecture|ward|borough|settlement|population|located in|situated in|lies in|part of)\b/i;
+const NONPLACE_RE   = /\b(phrasebook|itinerary|travel topic|travel guide|travel warning|getting around|getting there|visa|currency|budget|accommodation|hostel|hotel tip|what to see|local cuisine|safety|scam)\b/i;
 
 // ── STATE ──────────────────────────────────────────────────────────────────
 let curMode = 'wiki', curLang = 'en';
-let curTopics = new Set(); // empty = all / unfiltered
+let curTopics = new Set();
+let swipeEnabled = true;
 let articles = [], liked = new Map(), queue = [];
 let filling = false, hinted = false, sentinel = null;
+const otdIds = new Set();
 
 // ── LOCALSTORAGE ───────────────────────────────────────────────────────────
 function lsGet(k)    { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } }
 function lsSet(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} }
 
 function loadPersistedState() {
-  const saved = lsGet('ws_liked');
-  if (Array.isArray(saved)) { saved.forEach(a => liked.set(a.id, a)); updateBadge(); }
-  const topics = lsGet('ws_topics');
-  if (Array.isArray(topics)) { curTopics = new Set(topics); updateTopicBadge(); }
+  const savedLikes = lsGet('ws_liked');
+  if (Array.isArray(savedLikes)) { savedLikes.forEach(a => liked.set(a.id, a)); updateBadge(); }
+  const savedTopics = lsGet('ws_topics');
+  if (Array.isArray(savedTopics)) { curTopics = new Set(savedTopics); updateTopicBadge(); }
+  const settings = lsGet('ws_settings') || {};
+  swipeEnabled = settings.swipe !== false;
+  syncSwipeToggle();
 }
-function saveLiked()  { lsSet('ws_liked',   [...liked.values()]); }
-function saveTopics() { lsSet('ws_topics',  [...curTopics]); }
+function saveLiked()    { lsSet('ws_liked',    [...liked.values()]); }
+function saveTopics()   { lsSet('ws_topics',   [...curTopics]); }
+function saveSettings() { lsSet('ws_settings', { swipe: swipeEnabled }); }
+
+// ── INDEXEDDB (offline cache for liked articles) ───────────────────────────
+const IDB = (() => {
+  let db = null;
+  const open = () => new Promise((res, rej) => {
+    if (db) return res(db);
+    const req = indexedDB.open('wikiscroll', 1);
+    req.onupgradeneeded = e => e.target.result.createObjectStore('articles', {keyPath:'id'});
+    req.onsuccess = e => { db = e.target.result; res(db); };
+    req.onerror   = () => rej();
+  });
+  const tx = async (mode, fn) => {
+    try { const d = await open(); fn(d.transaction('articles', mode).objectStore('articles')); } catch {}
+  };
+  return {
+    put:    a  => tx('readwrite', s => s.put(a)),
+    delete: id => tx('readwrite', s => s.delete(id)),
+    getAll: () => new Promise(async res => {
+      try {
+        const d = await open();
+        const req = d.transaction('articles','readonly').objectStore('articles').getAll();
+        req.onsuccess = () => res(req.result || []);
+        req.onerror   = () => res([]);
+      } catch { res([]); }
+    }),
+  };
+})();
 
 // ── HELPERS ────────────────────────────────────────────────────────────────
-function esc(s) {
-  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
-}
+function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
 function stripHtml(s) { return String(s||'').replace(/<[^>]+>/g,''); }
 function toast(msg) {
   const t = document.createElement('div');
   t.className = 'toast'; t.textContent = msg;
-  document.body.appendChild(t);
-  setTimeout(() => t.remove(), 2200);
+  document.body.appendChild(t); setTimeout(() => t.remove(), 2200);
 }
 function rand(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
 
 // ── NETWORK ────────────────────────────────────────────────────────────────
 function fetchOne(url) {
-  const ac = new AbortController();
-  const id = setTimeout(() => ac.abort(), 8000);
-  return fetch(url, {signal: ac.signal})
-    .then(r => r.ok ? r.json() : null)
-    .catch(() => null)
-    .finally(() => clearTimeout(id));
+  const ac = new AbortController(), id = setTimeout(() => ac.abort(), 8000);
+  return fetch(url, {signal:ac.signal}).then(r => r.ok ? r.json() : null).catch(() => null).finally(() => clearTimeout(id));
 }
-
 function toArticle(d, prefix) {
-  return {
-    id:    prefix + d.pageid,
-    src:   prefix === 'w' ? 'wiki' : 'how',
-    title: d.title,
-    body:  d.extract,
-    img:   d.thumbnail.source,
-    url:   d.content_urls?.desktop?.page || '#',
-  };
+  return { id: prefix+d.pageid, src: prefix==='w'?'wiki':'how', title: d.title, body: d.extract, img: d.thumbnail.source, url: d.content_urls?.desktop?.page||'#' };
 }
 
 // ── ARTICLE VALIDATORS ────────────────────────────────────────────────────
-// Shared pre-flight: rejects meta-pages, lists, disambiguations
-function isValidTitle(title) {
-  return title && !BAD_TITLE_RE.test(title.trim());
-}
-
-// Validates a Wikipedia page object passes both title and topic content gates
-function isValidWikiPage(p, topicDef) {
+function isValidTitle(t) { return t && !BAD_TITLE_RE.test(t.trim()); }
+function isValidWikiPage(p, td) {
   if (!p?.thumbnail?.source) return false;
-  const text = stripHtml(p.extract || '');
-  if (text.length < 80) return false;
-  if (!isValidTitle(p.title)) return false;
-  // If a topic validator exists, the extract must match it
-  if (topicDef?.valid && !topicDef.valid.test(text.slice(0, 600))) return false;
+  const text = stripHtml(p.extract||'');
+  if (text.length < 80 || !isValidTitle(p.title)) return false;
+  if (td?.valid && !td.valid.test(text.slice(0,600))) return false;
   return true;
 }
-
-// Maps a raw MediaWiki page object → article record
 function wikiPageToArticle(p) {
-  return {
-    id:    'w' + p.pageid,
-    src:   'wiki',
-    title: p.title,
-    body:  stripHtml(p.extract || ''),
-    img:   p.thumbnail.source,
-    url:   `https://en.wikipedia.org/wiki/${encodeURIComponent(p.title.replace(/ /g,'_'))}`,
-  };
+  return { id:'w'+p.pageid, src:'wiki', title:p.title, body:stripHtml(p.extract||''), img:p.thumbnail.source, url:`https://en.wikipedia.org/wiki/${encodeURIComponent(p.title.replace(/ /g,'_'))}` };
 }
 
-// Pure random Wikipedia — for unfiltered mode
+// ── FETCH FUNCTIONS ────────────────────────────────────────────────────────
 async function fetchWiki() {
   const url = `https://${curLang}.wikipedia.org/api/rest_v1/page/random/summary`;
   const all = await Promise.all(Array.from({length:12}, () => fetchOne(url)));
-  return all
-    .filter(d => d?.thumbnail?.source && d.extract?.length >= 80 && isValidTitle(d.title))
-    .slice(0, 5)
-    .map(d => toArticle(d, 'w'));
+  return all.filter(d => d?.thumbnail?.source && d.extract?.length >= 80 && isValidTitle(d.title)).slice(0,5).map(d => toArticle(d,'w'));
 }
 
-// Topic-filtered Wikipedia — picks a random active topic, random leaf category,
-// fetches up to 30 candidates, validates each against the topic's content regex.
-// Falls back to pure random only if zero valid articles come back.
 async function fetchWikiByTopic() {
-  const topicArr = [...curTopics];
-  const topicDef = TOPIC_MAP[rand(topicArr)];
-  if (!topicDef) return fetchWiki();
-
-  // Try up to 2 different categories from this topic before giving up
-  for (let attempt = 0; attempt < 2; attempt++) {
-    const cat = rand(topicDef.cats);
-    // gcmlimit=30 → larger candidate pool so the validator has enough to filter
-    const url = [
-      'https://en.wikipedia.org/w/api.php',
-      '?action=query',
-      '&generator=categorymembers',
-      `&gcmtitle=${encodeURIComponent(cat)}`,
-      '&gcmlimit=30',
-      '&gcmtype=page',          // pages only — no sub-categories
-      '&gcmnamespace=0',        // article namespace only
-      '&prop=pageimages%7Cextracts',
-      '&exintro=1',
-      '&exchars=800',           // enough text for the validator regex
-      '&piprop=thumbnail',
-      '&pithumbsize=500',
-      '&pilimit=30',
-      '&format=json',
-      '&origin=*',
-    ].join('');
-
+  const td = TOPIC_MAP[rand([...curTopics])];
+  if (!td) return fetchWiki();
+  for (let i=0; i<2; i++) {
+    const cat = rand(td.cats);
+    const url = ['https://en.wikipedia.org/w/api.php','?action=query','&generator=categorymembers',`&gcmtitle=${encodeURIComponent(cat)}`,'&gcmlimit=30','&gcmtype=page','&gcmnamespace=0','&prop=pageimages%7Cextracts','&exintro=1','&exchars=800','&piprop=thumbnail','&pithumbsize=500','&pilimit=30','&format=json','&origin=*'].join('');
     const data = await fetchOne(url);
     if (!data?.query?.pages) continue;
-
-    const valid = Object.values(data.query.pages)
-      .filter(p => isValidWikiPage(p, topicDef))
-      .sort(() => Math.random() - 0.5)
-      .slice(0, 5)
-      .map(wikiPageToArticle);
-
+    const valid = Object.values(data.query.pages).filter(p => isValidWikiPage(p,td)).sort(() => Math.random()-.5).slice(0,5).map(wikiPageToArticle);
     if (valid.length >= 2) return valid;
   }
-
-  // Both category attempts too sparse → fall back to pure random
   return fetchWiki();
 }
 
-// ── WIKIVOYAGE DESTINATION VALIDATOR ──────────────────────────────────────
-// Requires the extract to describe a PLACE — not a phrasebook, guide, or itinerary.
-// Stricter than before: first 500 chars must contain a geographic place indicator
-// AND not trigger any non-destination patterns.
-const GEO_RE      = /\b(city|town|village|municipality|district|region|province|state|country|island|archipelago|coast|peninsula|valley|mountain|lake|river|national park|nature reserve|capital|port|suburb|commune|department|prefecture|ward|borough|settlement|population|located in|situated in|lies in|part of)\b/i;
-const NONPLACE_RE = /\b(phrasebook|itinerary|travel topic|travel guide|travel warning|getting around|getting there|visa|currency|budget|accommodation|hostel|hotel tip|what to see|local cuisine|safety|scam)\b/i;
-
-// Wikivoyage destination fetcher — topics are handled via Wikivoyage's own
-// destination-type categories when a relevant topic is active.
 async function fetchVoyage() {
-  const langs = curLang !== 'en' ? [curLang, 'en'] : ['en'];
-
+  const langs = curLang !== 'en' ? [curLang,'en'] : ['en'];
   for (const lang of langs) {
-    // When a topic with vCats is active, try category-based fetch first
-    let topicVCats = [];
+    // Topic-based Wikivoyage category fetch
     if (curTopics.size) {
-      for (const tid of curTopics) {
-        const t = TOPIC_MAP[tid];
-        if (t?.vCats?.length) topicVCats.push(...t.vCats);
-      }
-    }
-
-    if (topicVCats.length) {
-      const cat = rand(topicVCats);
-      const url = [
-        `https://en.wikivoyage.org/w/api.php`,
-        '?action=query',
-        '&generator=categorymembers',
-        `&gcmtitle=${encodeURIComponent(cat)}`,
-        '&gcmlimit=25',
-        '&gcmtype=page',
-        '&gcmnamespace=0',
-        '&prop=pageimages%7Cextracts',
-        '&exintro=1',
-        '&exchars=600',
-        '&piprop=thumbnail',
-        '&pithumbsize=500',
-        '&pilimit=25',
-        '&format=json',
-        '&origin=*',
-      ].join('');
-
-      const data = await fetchOne(url);
-      if (data?.query?.pages) {
-        const valid = Object.values(data.query.pages)
-          .filter(p => {
-            if (!p?.thumbnail?.source) return false;
-            const text = stripHtml(p.extract || '');
-            if (text.length < 40) return false;
-            if (!isValidTitle(p.title)) return false;
-            const sample = text.slice(0, 500);
-            return GEO_RE.test(sample) && !NONPLACE_RE.test(sample);
-          })
-          .sort(() => Math.random() - 0.5)
-          .slice(0, 5)
-          .map(p => ({
-            id:    'v' + p.pageid,
-            src:   'how',
-            title: p.title,
-            body:  stripHtml(p.extract || ''),
-            img:   p.thumbnail.source,
-            url:   `https://en.wikivoyage.org/wiki/${encodeURIComponent(p.title.replace(/ /g,'_'))}`,
+      const vCats = [...curTopics].flatMap(tid => TOPIC_MAP[tid]?.vCats||[]);
+      if (vCats.length) {
+        const cat = rand(vCats);
+        const url = ['https://en.wikivoyage.org/w/api.php','?action=query','&generator=categorymembers',`&gcmtitle=${encodeURIComponent(cat)}`,'&gcmlimit=25','&gcmtype=page','&gcmnamespace=0','&prop=pageimages%7Cextracts','&exintro=1','&exchars=600','&piprop=thumbnail','&pithumbsize=500','&pilimit=25','&format=json','&origin=*'].join('');
+        const data = await fetchOne(url);
+        if (data?.query?.pages) {
+          const valid = Object.values(data.query.pages).filter(p => {
+            if (!p?.thumbnail?.source || !isValidTitle(p.title)) return false;
+            const s = stripHtml(p.extract||'').slice(0,500);
+            return s.length >= 40 && GEO_RE.test(s) && !NONPLACE_RE.test(s);
+          }).sort(() => Math.random()-.5).slice(0,5).map(p => ({
+            id:'v'+p.pageid, src:'how', title:p.title, body:stripHtml(p.extract||''), img:p.thumbnail.source,
+            url:`https://en.wikivoyage.org/wiki/${encodeURIComponent(p.title.replace(/ /g,'_'))}`,
           }));
-        if (valid.length >= 2) return valid;
+          if (valid.length >= 2) return valid;
+        }
       }
     }
-
-    // Random fallback — fetch 16 candidates, validate strictly
+    // Random fallback
     const url = `https://${lang}.wikivoyage.org/api/rest_v1/page/random/summary`;
     const all  = await Promise.all(Array.from({length:16}, () => fetchOne(url)));
-    const good = all
-      .filter(d => {
-        if (!d?.thumbnail?.source || !d.extract || d.extract.length < 40) return false;
-        if (!isValidTitle(d.title)) return false;
-        const sample = d.extract.slice(0, 500);
-        return GEO_RE.test(sample) && !NONPLACE_RE.test(sample);
-      })
-      .slice(0, 5)
-      .map(d => toArticle(d, 'v'));
+    const good = all.filter(d => {
+      if (!d?.thumbnail?.source || !isValidTitle(d.title) || d.extract?.length < 40) return false;
+      const s = d.extract.slice(0,500);
+      return GEO_RE.test(s) && !NONPLACE_RE.test(s);
+    }).slice(0,5).map(d => toArticle(d,'v'));
     if (good.length) return good;
   }
-
   return [];
 }
 
 // ── PREFETCH QUEUE ─────────────────────────────────────────────────────────
 const QUEUE_MIN = 8;
-
 async function fillQueue() {
-  if (filling) return;
-  filling = true;
+  if (filling) return; filling = true;
   try {
-    // fetchVoyage handles topic-based Wikivoyage routing internally
-    // fetchWikiByTopic handles the curTopics.size check internally
-    const fn = curMode === 'wiki'
-      ? (curTopics.size ? fetchWikiByTopic : fetchWiki)
-      : fetchVoyage;
+    const fn = curMode === 'wiki' ? (curTopics.size ? fetchWikiByTopic : fetchWiki) : fetchVoyage;
     const [a, b] = await Promise.all([fn(), fn()]);
-    const fresh  = [...a, ...b];
+    const fresh = [...a,...b];
     queue.push(...fresh);
-    // Preload images into browser cache
-    fresh.forEach(art => { if (art.img) { const i = new Image(); i.src = art.img; } });
+    fresh.forEach(art => { if (art.img) { const i=new Image(); i.src=art.img; } });
   } finally { filling = false; }
 }
 
 function flushQueue(n) {
-  const batch = queue.splice(0, n || 5);
+  const batch = queue.splice(0, n||5);
   if (!batch.length) return;
   articles.push(...batch);
   batch.forEach(renderCard);
@@ -882,7 +826,7 @@ function flushQueue(n) {
     hinted = true;
     const h = document.getElementById('hint');
     h.style.display = 'flex';
-    setTimeout(() => { h.style.display = 'none'; }, 5500);
+    setTimeout(() => { h.style.display='none'; }, 5500);
   }
   attachSentinel();
   if (queue.length < QUEUE_MIN) fillQueue();
@@ -894,12 +838,13 @@ function attachSentinel() {
   if (cards.length < 2) return;
   sentinel = new IntersectionObserver(entries => {
     if (entries[0].isIntersecting) { sentinel.disconnect(); flushQueue(5); }
-  }, {rootMargin: '0px 0px 200% 0px'});
-  sentinel.observe(cards[cards.length - 2]);
+  }, {rootMargin:'0px 0px 200% 0px'});
+  sentinel.observe(cards[cards.length-2]);
 }
 
 // ── BOOT ───────────────────────────────────────────────────────────────────
 async function boot() {
+  fetchOnThisDay(); // fire and forget — populates otdIds in background
   try {
     await fillQueue();
     document.getElementById('spinner')?.remove();
@@ -914,111 +859,105 @@ async function boot() {
 
 function resetFeed() {
   sentinel?.disconnect();
-  articles = []; queue = []; hinted = false; filling = false;
+  articles=[]; queue=[]; hinted=false; filling=false;
   document.getElementById('hint').style.display = 'none';
-  const isHow = curMode === 'how';
-  document.getElementById('feed').innerHTML =
-    `<div class="spin-wrap" id="spinner"><div class="spin${isHow?' h':''}"></div><div class="spin-lbl">${isHow ? 'Loading destinations…' : 'Loading articles…'}</div></div>`;
+  const isHow = curMode==='how';
+  document.getElementById('feed').innerHTML = `<div class="spin-wrap" id="spinner"><div class="spin${isHow?' h':''}"></div><div class="spin-lbl">${isHow?'Loading destinations…':'Loading articles…'}</div></div>`;
   boot();
 }
 
 // ── RENDER ─────────────────────────────────────────────────────────────────
 function renderCard(a) {
-  const isHow   = a.src === 'how', isLiked = liked.has(a.id);
+  const isHow   = a.src==='how', isLiked=liked.has(a.id);
+  const pageid  = parseInt(a.id.slice(1));
+  const isOTD   = a.src==='wiki' && otdIds.has(pageid);
   const img     = a.img ? `<img src="${esc(a.img)}" alt="" onerror="this.remove()">` : '';
   const artImg  = a.img ? `<img src="${esc(a.img)}" alt="" class="art-img" onerror="this.remove()">` : '';
   const card    = document.createElement('div');
-  card.className = 'card' + (isHow ? ' how' : '');
+  card.className = 'card'+(isHow?' how':'');
   card.dataset.id = a.id;
   card.innerHTML = `
     <div class="cbg">${img}<div class="cveil"></div></div>
+    ${isOTD ? '<div class="otd-badge">📅 On This Day</div>' : ''}
+    <div class="swipe-ind like-ind">❤️ Like</div>
+    <div class="swipe-ind skip-ind">✕ Skip</div>
     <div class="panel">
-      <div class="chip ${isHow?'h':'w'}">${isHow ? '🗺️ Wikivoyage' : '📖 Wikipedia'}</div>
+      <div class="chip ${isHow?'h':'w'}">${isHow?'🗺️ Wikivoyage':'📖 Wikipedia'}</div>
       ${artImg}
       <h2 class="art-title"></h2>
       <p class="art-body"></p>
       <div class="acts">
-        <button class="act${isLiked?' liked':''}" id="lb-${esc(a.id)}">${isLiked ? '❤️ Liked' : '🤍 Like'}</button>
+        <button class="act${isLiked?' liked':''}" id="lb-${esc(a.id)}">${isLiked?'❤️ Liked':'🤍 Like'}</button>
         <button class="act">📤 Share</button>
-        <button class="act cta${isHow?' hcta':''}">${isHow ? '📋' : '📖'} Read Full Article</button>
+        <button class="act cta${isHow?' hcta':''}">${isHow?'📋':'📖'} Read Full Article</button>
       </div>
     </div>`;
   card.querySelector('.art-title').textContent = a.title;
   card.querySelector('.art-body').textContent  = a.body;
-  const [likeBtn, shareBtn, readBtn] = card.querySelectorAll('.act');
+  const [likeBtn,shareBtn,readBtn] = card.querySelectorAll('.act');
   likeBtn.addEventListener('click',  () => toggleLike(a.id));
   shareBtn.addEventListener('click', () => doShare(a.url, a.title));
-  readBtn.addEventListener('click',  () => window.open(a.url, '_blank'));
+  readBtn.addEventListener('click',  () => window.open(a.url,'_blank'));
   document.getElementById('feed').appendChild(card);
 }
 
 function showError() {
-  const isHow = curMode === 'how';
-  const card = document.createElement('div');
-  card.className = 'card';
-  card.innerHTML = `
-    <div class="cbg"><div class="cveil"></div></div>
-    <div class="err">
-      <div class="err-ico">${isHow ? '🗺️' : '📖'}</div>
-      <div class="err-ttl">Nothing loaded</div>
-      <div class="err-msg">${isHow ? 'Wikivoyage' : 'Wikipedia'} didn't respond. Check your connection and try again.</div>
-      <button class="err-btn">Try again</button>
-    </div>`;
+  const isHow = curMode==='how';
+  const card = document.createElement('div'); card.className='card';
+  card.innerHTML = `<div class="cbg"><div class="cveil"></div></div><div class="err"><div class="err-ico">${isHow?'🗺️':'📖'}</div><div class="err-ttl">Nothing loaded</div><div class="err-msg">${isHow?'Wikivoyage':'Wikipedia'} didn't respond.</div><button class="err-btn">Try again</button></div>`;
   card.querySelector('.err-btn').addEventListener('click', resetFeed);
   document.getElementById('feed').appendChild(card);
 }
 
-// ── LIKES ──────────────────────────────────────────────────────────────────
+// ── LIKES + IDB ────────────────────────────────────────────────────────────
 function toggleLike(id) {
-  const a = articles.find(x => x.id === id);
-  if (!a) return;
-  liked.has(id) ? liked.delete(id) : liked.set(id, a);
+  const a = articles.find(x => x.id===id); if (!a) return;
+  if (liked.has(id)) { liked.delete(id); IDB.delete(id); }
+  else               { liked.set(id, a); IDB.put(a); }
   saveLiked(); updateBadge();
-  const btn = document.getElementById('lb-' + id);
-  if (btn) { const on = liked.has(id); btn.className = 'act' + (on ? ' liked' : ''); btn.textContent = on ? '❤️ Liked' : '🤍 Like'; }
+  const btn = document.getElementById('lb-'+id);
+  if (btn) { const on=liked.has(id); btn.className='act'+(on?' liked':''); btn.textContent=on?'❤️ Liked':'🤍 Like'; }
 }
 function removeLike(id) {
-  liked.delete(id); saveLiked(); updateBadge();
-  const btn = document.getElementById('lb-' + id);
-  if (btn) { btn.className = 'act'; btn.textContent = '🤍 Like'; }
+  liked.delete(id); IDB.delete(id); saveLiked(); updateBadge();
+  const btn = document.getElementById('lb-'+id);
+  if (btn) { btn.className='act'; btn.textContent='🤍 Like'; }
   renderLikedList();
 }
 function updateBadge() {
   const n = liked.size;
   ['badge','burgerBadge'].forEach(id => {
     const el = document.getElementById(id);
-    if (el) { el.textContent = n; el.style.display = n ? 'inline-block' : 'none'; }
+    if (el) { el.textContent=n; el.style.display=n?'inline-block':'none'; }
   });
-  // burger dot: show if any likes
   const dot = document.getElementById('burgerDot');
-  if (dot) dot.style.display = (n || curTopics.size) ? 'block' : 'none';
+  if (dot) dot.style.display = (n||curTopics.size) ? 'block' : 'none';
 }
 function updateTopicBadge() {
   const n = curTopics.size;
   const tb = document.getElementById('topicBadge');
-  if (tb) { tb.textContent = n; tb.style.display = n ? 'inline-block' : 'none'; }
-  // sync burger Topics button style
-  const btn = document.getElementById('burgerTopicsBtn');
-  if (btn) btn.className = 'burger-action' + (n ? ' active' : '');
-  // sync desktop Topics button style
+  if (tb) { tb.textContent=n; tb.style.display=n?'inline-block':'none'; }
+  const bb = document.getElementById('burgerTopicsBtn');
+  if (bb) bb.className='burger-action'+(n?' active':'');
   const dtb = document.getElementById('topicsBtn');
-  if (dtb) dtb.style.background = n ? 'rgba(102,126,234,.18)' : '';
-  // burger dot
+  if (dtb) dtb.style.background = n?'rgba(102,126,234,.18)':'';
   const dot = document.getElementById('burgerDot');
-  if (dot) dot.style.display = (liked.size || n) ? 'block' : 'none';
+  if (dot) dot.style.display = (liked.size||n) ? 'block' : 'none';
 }
 
 function renderLikedList() {
   const c = document.getElementById('likedList');
   if (!liked.size) {
-    c.innerHTML = `<div class="empty"><div class="empty-ico">🔖</div><div class="empty-ttl">Nothing saved yet</div><div class="empty-txt">Like articles while scrolling to save them here.</div></div>`;
+    c.innerHTML = '<div class="empty"><div class="empty-ico">🔖</div><div class="empty-ttl">Nothing saved yet</div><div class="empty-txt">Like articles while scrolling to save them here. They\'ll be available offline too.</div></div>';
     return;
   }
+  const offline = !navigator.onLine;
   c.innerHTML = [...liked.values()].reverse().map(a => `
     <div class="li">
-      <div class="li-src">${a.src === 'wiki' ? '📖 Wikipedia' : '🗺️ Wikivoyage'}</div>
+      <div class="li-src">${a.src==='wiki'?'📖 Wikipedia':'🗺️ Wikivoyage'}</div>
+      ${offline ? '<div class="li-offline">✓ Available offline</div>' : ''}
       <div class="li-ttl">${esc(a.title)}</div>
-      <div class="li-body">${esc(a.body.slice(0, 130))}</div>
+      <div class="li-body">${esc(a.body.slice(0,130))}</div>
       <div class="li-acts">
         <button class="li-btn" data-read="${esc(a.url)}">Read</button>
         <button class="li-btn" data-share-url="${esc(a.url)}" data-share-title="${esc(a.title)}">Share</button>
@@ -1027,86 +966,86 @@ function renderLikedList() {
     </div>`).join('');
 }
 document.getElementById('likedList').addEventListener('click', ev => {
-  const btn = ev.target.closest('.li-btn');
-  if (!btn) return;
-  if      (btn.dataset.read)     window.open(btn.dataset.read, '_blank');
+  const btn = ev.target.closest('.li-btn'); if (!btn) return;
+  if      (btn.dataset.read)     window.open(btn.dataset.read,'_blank');
   else if (btn.dataset.unlike)   removeLike(btn.dataset.unlike);
   else if (btn.dataset.shareUrl) doShare(btn.dataset.shareUrl, btn.dataset.shareTitle);
 });
 
 // ── SHARE ──────────────────────────────────────────────────────────────────
 function doShare(url, title) {
-  if (navigator.share) navigator.share({title, url}).catch(() => {});
-  else if (navigator.clipboard) navigator.clipboard.writeText(url).then(() => toast('Link copied!')).catch(() => {});
+  if (navigator.share) navigator.share({title,url}).catch(()=>{});
+  else if (navigator.clipboard) navigator.clipboard.writeText(url).then(()=>toast('Link copied!')).catch(()=>{});
+}
+
+// ── ON THIS DAY ────────────────────────────────────────────────────────────
+async function fetchOnThisDay() {
+  try {
+    const now = new Date();
+    const data = await fetchOne(`https://en.wikipedia.org/api/rest_v1/feed/onthisday/events/${now.getMonth()+1}/${now.getDate()}`);
+    (data?.events||[]).forEach(ev => (ev.pages||[]).forEach(p => { if (p.pageid) otdIds.add(p.pageid); }));
+    // Badge any already-rendered cards that match
+    document.getElementById('feed').querySelectorAll('.card').forEach(card => {
+      const a = articles.find(x => x.id===card.dataset.id);
+      if (a?.src==='wiki' && otdIds.has(parseInt(a.id.slice(1))) && !card.querySelector('.otd-badge')) {
+        const badge = document.createElement('div');
+        badge.className = 'otd-badge'; badge.textContent = '📅 On This Day';
+        card.appendChild(badge);
+      }
+    });
+  } catch {}
 }
 
 // ── TOPICS ─────────────────────────────────────────────────────────────────
-function buildTopicChips(container, chipClass) {
-  container.innerHTML = TOPICS.map(t =>
-    `<button class="${chipClass}${curTopics.has(t.id) ? ' on' : ''}" data-tid="${t.id}">${t.emoji} ${t.label}</button>`
-  ).join('');
+function buildTopicChips(container, cls) {
+  container.innerHTML = TOPICS.map(t => `<button class="${cls}${curTopics.has(t.id)?' on':''}" data-tid="${t.id}">${t.emoji} ${t.label}</button>`).join('');
 }
-
 function toggleTopic(id) {
   curTopics.has(id) ? curTopics.delete(id) : curTopics.add(id);
   saveTopics(); updateTopicBadge();
-  // sync all chip UIs
-  document.querySelectorAll('[data-tid]').forEach(el => {
-    el.classList.toggle('on', curTopics.has(el.dataset.tid));
-  });
+  document.querySelectorAll('[data-tid]').forEach(el => el.classList.toggle('on', curTopics.has(el.dataset.tid)));
   resetFeed();
 }
 
-// Build desktop topic sheet chips
-buildTopicChips(document.getElementById('topicGrid'), 'topic-chip');
+buildTopicChips(document.getElementById('topicGrid'),      'topic-chip');
+buildTopicChips(document.getElementById('burgerTopicGrid'),'btopic');
+
 document.getElementById('topicGrid').addEventListener('click', ev => {
-  const chip = ev.target.closest('.topic-chip');
-  if (chip) toggleTopic(chip.dataset.tid);
+  const c = ev.target.closest('.topic-chip'); if (c) toggleTopic(c.dataset.tid);
+});
+document.getElementById('burgerTopicGrid').addEventListener('click', ev => {
+  const c = ev.target.closest('.btopic'); if (c) toggleTopic(c.dataset.tid);
 });
 document.getElementById('sheetReset').addEventListener('click', () => {
   curTopics.clear(); saveTopics(); updateTopicBadge();
   document.querySelectorAll('[data-tid]').forEach(el => el.classList.remove('on'));
   resetFeed();
 });
-
-// Build mobile topic chips
-buildTopicChips(document.getElementById('burgerTopicGrid'), 'btopic');
-document.getElementById('burgerTopicGrid').addEventListener('click', ev => {
-  const chip = ev.target.closest('.btopic');
-  if (chip) toggleTopic(chip.dataset.tid);
-});
-
-// Open/close topic sheet (desktop)
 function openTopicSheet()  { document.getElementById('topicSheet').classList.add('open');    document.getElementById('sheetOverlay').classList.add('open'); }
 function closeTopicSheet() { document.getElementById('topicSheet').classList.remove('open'); document.getElementById('sheetOverlay').classList.remove('open'); }
 document.getElementById('topicsBtn').addEventListener('click',    openTopicSheet);
 document.getElementById('sheetOverlay').addEventListener('click', closeTopicSheet);
 
 // ── LANGUAGE ───────────────────────────────────────────────────────────────
-// Desktop dropdown
 const desktopLangDd = document.getElementById('langDd');
-desktopLangDd.innerHTML = LANGS.map(l =>
-  `<div class="lopt${l.c === curLang ? ' sel' : ''}" data-c="${l.c}">${l.f} ${l.n}</div>`
-).join('');
-document.getElementById('langBtn').addEventListener('click', ev => {
-  ev.stopPropagation();
-  desktopLangDd.classList.toggle('open');
-});
-desktopLangDd.addEventListener('click', ev => {
-  const o = ev.target.closest('.lopt');
-  if (!o) return;
-  setLang(o.dataset.c);
-  desktopLangDd.classList.remove('open');
-});
-document.addEventListener('click', ev => {
-  if (!ev.target.closest('.lang-wrap')) desktopLangDd.classList.remove('open');
-});
-
-// Mobile inline language grid
 const burgerLangGrid = document.getElementById('burgerLangGrid');
-burgerLangGrid.innerHTML = LANGS.map(l =>
-  `<button class="blopt${l.c === curLang ? ' sel' : ''}" data-c="${l.c}">${l.f} ${l.n}</button>`
-).join('');
+
+desktopLangDd.innerHTML  = LANGS.map(l => `<div class="lopt${l.c===curLang?' sel':''}" data-c="${l.c}">${l.f} ${l.n}</div>`).join('');
+burgerLangGrid.innerHTML = LANGS.map(l => `<button class="blopt${l.c===curLang?' sel':''}" data-c="${l.c}">${l.f} ${l.n}</button>`).join('');
+
+function setLang(c) {
+  curLang = c;
+  const lang = LANGS.find(l => l.c===c);
+  if (lang) { document.getElementById('langTxt').textContent = lang.n; document.getElementById('burgerLangTxt').textContent = lang.n; }
+  desktopLangDd.querySelectorAll('.lopt').forEach(o  => o.classList.toggle('sel',  o.dataset.c===curLang));
+  burgerLangGrid.querySelectorAll('.blopt').forEach(o => o.classList.toggle('sel', o.dataset.c===curLang));
+  resetFeed();
+}
+
+document.getElementById('langBtn').addEventListener('click', ev => { ev.stopPropagation(); desktopLangDd.classList.toggle('open'); });
+desktopLangDd.addEventListener('click', ev => { const o=ev.target.closest('.lopt'); if(o){setLang(o.dataset.c);desktopLangDd.classList.remove('open');} });
+document.addEventListener('click', ev => { if (!ev.target.closest('.lang-wrap')) desktopLangDd.classList.remove('open'); });
+
 burgerLangGrid.addEventListener('click', ev => {
   const o = ev.target.closest('.blopt');
   if (!o) return;
@@ -1114,21 +1053,6 @@ burgerLangGrid.addEventListener('click', ev => {
   burgerLangGrid.classList.remove('open');
   document.getElementById('burgerLangBtn').textContent = 'Change ›';
 });
-
-function setLang(c) {
-  curLang = c;
-  const lang = LANGS.find(l => l.c === c);
-  if (lang) {
-    document.getElementById('langTxt').textContent      = lang.n;
-    document.getElementById('burgerLangTxt').textContent = lang.n;
-  }
-  // Update sel class on both UIs
-  desktopLangDd.querySelectorAll('.lopt').forEach(o => o.classList.toggle('sel', o.dataset.c === curLang));
-  burgerLangGrid.querySelectorAll('.blopt').forEach(o => o.classList.toggle('sel', o.dataset.c === curLang));
-  resetFeed();
-}
-
-// Toggle mobile language grid inline
 document.getElementById('burgerLangBtn').addEventListener('click', ev => {
   ev.stopPropagation();
   const isOpen = burgerLangGrid.classList.toggle('open');
@@ -1137,98 +1061,175 @@ document.getElementById('burgerLangBtn').addEventListener('click', ev => {
 
 // ── MODE TOGGLE ─────────────────────────────────────────────────────────────
 function setMode(m) {
-  if (curMode === m) return;
-  curMode = m;
-  const isHow = m === 'how';
-  document.getElementById('wBtn').className = 'tbtn' + (isHow ? ''        : ' won on');
-  document.getElementById('hBtn').className = 'tbtn' + (isHow ? ' hon on' : '');
+  if (curMode===m) return; curMode=m;
+  const isHow = m==='how';
+  document.getElementById('wBtn').className = 'tbtn'+(isHow?'':' won on');
+  document.getElementById('hBtn').className = 'tbtn'+(isHow?' hon on':'');
   document.body.classList.toggle('how', isHow);
   resetFeed();
 }
 document.getElementById('wBtn').addEventListener('click', () => setMode('wiki'));
 document.getElementById('hBtn').addEventListener('click', () => setMode('how'));
 
-// ── BURGER MENU ─────────────────────────────────────────────────────────────
+// ── BURGER ─────────────────────────────────────────────────────────────────
 function closeBurger() {
   document.getElementById('burgerMenu').classList.remove('open');
-  // collapse sub-sections
   burgerLangGrid.classList.remove('open');
   document.getElementById('burgerLangBtn').textContent = 'Change ›';
   document.getElementById('burgerTopics').classList.remove('open');
   document.getElementById('burgerTopicsBtn').textContent = 'Filter ›';
 }
-document.getElementById('burgerBtn').addEventListener('click', ev => {
-  ev.stopPropagation();
-  document.getElementById('burgerMenu').classList.toggle('open');
-});
+document.getElementById('burgerBtn').addEventListener('click', ev => { ev.stopPropagation(); document.getElementById('burgerMenu').classList.toggle('open'); });
 document.getElementById('burgerTopicsBtn').addEventListener('click', ev => {
   ev.stopPropagation();
   const isOpen = document.getElementById('burgerTopics').classList.toggle('open');
   ev.currentTarget.textContent = isOpen ? 'Close ✕' : 'Filter ›';
 });
-document.getElementById('burgerLikesBtn').addEventListener('click', () => {
-  closeBurger();
-  document.getElementById('lp').classList.toggle('open');
-  renderLikedList();
-});
-document.getElementById('burgerAboutBtn').addEventListener('click', () => {
-  closeBurger();
-  document.getElementById('aboutOverlay').classList.toggle('open');
-});
-document.addEventListener('click', ev => {
-  if (!ev.target.closest('#burgerMenu') && !ev.target.closest('#burgerBtn')) closeBurger();
+document.getElementById('burgerLikesBtn').addEventListener('click', () => { closeBurger(); document.getElementById('lp').classList.toggle('open'); renderLikedList(); });
+document.getElementById('burgerAboutBtn').addEventListener('click', () => { closeBurger(); document.getElementById('aboutOverlay').classList.toggle('open'); });
+document.addEventListener('click', ev => { if (!ev.target.closest('#burgerMenu')&&!ev.target.closest('#burgerBtn')) closeBurger(); });
+
+// ── SETTINGS ───────────────────────────────────────────────────────────────
+function syncSwipeToggle() { document.getElementById('swipeToggle')?.classList.toggle('on', swipeEnabled); }
+document.getElementById('swipeToggle').addEventListener('click', () => { swipeEnabled=!swipeEnabled; saveSettings(); syncSwipeToggle(); });
+
+// ── HEADER BUTTONS ──────────────────────────────────────────────────────────
+document.getElementById('likesBtn').addEventListener('click', () => { document.getElementById('lp').classList.toggle('open'); renderLikedList(); });
+document.getElementById('lpClose').addEventListener('click',  () => document.getElementById('lp').classList.remove('open'));
+document.getElementById('aboutBtn').addEventListener('click', () => document.getElementById('aboutOverlay').classList.toggle('open'));
+document.getElementById('modalClose').addEventListener('click',() => document.getElementById('aboutOverlay').classList.remove('open'));
+document.getElementById('aboutOverlay').addEventListener('click', function(ev) { if(ev.target===this) this.classList.remove('open'); });
+document.addEventListener('keydown', ev => {
+  if (ev.key!=='Escape') return;
+  document.getElementById('aboutOverlay').classList.remove('open');
+  document.getElementById('lp').classList.remove('open');
+  closeBurger(); closeTopicSheet(); closeAmbient();
 });
 
-// ── HEADER BUTTONS (desktop) ────────────────────────────────────────────────
-document.getElementById('likesBtn').addEventListener('click', () => {
-  document.getElementById('lp').classList.toggle('open'); renderLikedList();
+// ── AMBIENT MODE ───────────────────────────────────────────────────────────
+function openAmbient(card) {
+  const a = articles.find(x => x.id===card.dataset.id); if (!a) return;
+  document.getElementById('ambientTitle').textContent   = a.title;
+  document.getElementById('ambientExcerpt').textContent = a.body;
+  const bg = document.getElementById('ambientBg');
+  bg.style.backgroundImage = a.img ? `url(${a.img})` : '';
+  const ov = document.getElementById('ambientOverlay');
+  ov.classList.remove('closing'); ov.classList.add('open');
+}
+
+function closeAmbient() {
+  const ov = document.getElementById('ambientOverlay');
+  if (!ov.classList.contains('open')) return;
+  ov.classList.add('closing');
+  ov.addEventListener('animationend', () => ov.classList.remove('open','closing'), {once:true});
+}
+
+document.getElementById('ambientOverlay').addEventListener('click', ev => {
+  if (!ev.target.closest('.ambient-content,.ambient-close')) closeAmbient();
 });
-document.getElementById('lpClose').addEventListener('click', () => {
-  document.getElementById('lp').classList.remove('open');
-});
-document.getElementById('aboutBtn').addEventListener('click', () => {
-  document.getElementById('aboutOverlay').classList.toggle('open');
-});
-document.getElementById('modalClose').addEventListener('click', () => {
-  document.getElementById('aboutOverlay').classList.remove('open');
-});
-document.getElementById('aboutOverlay').addEventListener('click', function(ev) {
-  if (ev.target === this) this.classList.remove('open');
-});
-document.addEventListener('keydown', ev => {
-  if (ev.key !== 'Escape') return;
-  document.getElementById('aboutOverlay').classList.remove('open');
-  document.getElementById('lp').classList.remove('open');
-  closeBurger();
-  closeTopicSheet();
-});
+document.getElementById('ambientClose').addEventListener('click', closeAmbient);
+
+// ── SWIPE GESTURES + LONG PRESS ────────────────────────────────────────────
+(function() {
+  const feed = document.getElementById('feed');
+  let startX=0, startY=0, curDx=0;
+  let activeCard=null, swiping=false, lpTimer=null;
+
+  function curCard() {
+    const idx = Math.round(feed.scrollTop/window.innerHeight);
+    return feed.querySelectorAll('.card')[idx]||null;
+  }
+  function ind(card, cls) { return card?.querySelector('.'+cls); }
+
+  function applyDrag(card, dx) {
+    card.style.transform  = `translateX(${dx}px) rotate(${dx*0.055}deg)`;
+    card.style.transition = 'none';
+    const p = Math.min(Math.abs(dx)/95,1);
+    const li = ind(card,'like-ind'), si = ind(card,'skip-ind');
+    if (dx>0) { if(li)li.style.opacity=p; if(si)si.style.opacity=0; }
+    else       { if(si)si.style.opacity=p; if(li)li.style.opacity=0; }
+  }
+
+  function springBack(card) {
+    card.style.transition='transform .38s cubic-bezier(.25,1,.5,1)';
+    card.style.transform='';
+    ['like-ind','skip-ind'].forEach(c=>{const el=ind(card,c);if(el)el.style.opacity=0;});
+  }
+
+  function flyOff(card, dir) {
+    card.style.transition = 'transform .2s cubic-bezier(.4,0,1,1),opacity .2s';
+    card.style.transform  = `translateX(${dir>0?150:-150}vw) rotate(${dir>0?25:-25}deg)`;
+    card.style.opacity    = '0';
+    if (dir>0) toggleLike(card.dataset.id);
+    setTimeout(() => {
+      feed.scrollBy({top:window.innerHeight, behavior:'smooth'});
+      setTimeout(()=>{ card.style.transform=''; card.style.opacity=''; springBack(card); },420);
+    }, 195);
+  }
+
+  document.addEventListener('touchstart', ev => {
+    if (ev.touches.length>1) return;
+    const card = ev.target.closest('.card');
+    if (!card || ev.target.closest('button,.acts')) return;
+    startX=ev.touches[0].clientX; startY=ev.touches[0].clientY;
+    curDx=0; swiping=false; activeCard=card;
+    lpTimer = setTimeout(()=>{ if(!swiping){ openAmbient(card); activeCard=null; } lpTimer=null; },620);
+  },{passive:true});
+
+  document.addEventListener('touchmove', ev => {
+    if (!activeCard) return;
+    const dx=ev.touches[0].clientX-startX, dy=ev.touches[0].clientY-startY;
+    if (!swiping) {
+      if (Math.abs(dy)>Math.abs(dx)+8) { clearTimeout(lpTimer); activeCard=null; return; }
+      if (Math.abs(dx)>10) { swiping=true; clearTimeout(lpTimer); }
+      else return;
+    }
+    if (activeCard!==curCard()) { springBack(activeCard); activeCard=null; return; }
+    curDx=dx;
+    if (swipeEnabled && ev.cancelable) { applyDrag(activeCard,curDx); ev.preventDefault(); }
+  },{passive:false});
+
+  document.addEventListener('touchend', ()=>{
+    clearTimeout(lpTimer);
+    if (!activeCard||!swiping) { activeCard=null; swiping=false; return; }
+    const card=activeCard; activeCard=null; swiping=false;
+    if (swipeEnabled && Math.abs(curDx)>90) flyOff(card, curDx>0?1:-1);
+    else springBack(card);
+  },{passive:true});
+
+  // Desktop arrow keys
+  document.addEventListener('keydown', ev => {
+    if (!['ArrowLeft','ArrowRight'].includes(ev.key)) return;
+    if (ev.target.closest('input,textarea,button')) return;
+    const card = curCard(); if (!card) return;
+    flyOff(card, ev.key==='ArrowRight'?1:-1);
+  });
+})();
 
 // ── DOUBLE-TAP TO LIKE ──────────────────────────────────────────────────────
 (function() {
-  let lt = 0, lx = 0, ly = 0, zoomed = false;
-  const unzoom = () => setTimeout(() => { zoomed = false; }, 1200);
-  if (window.visualViewport) {
-    window.visualViewport.addEventListener('resize', () => {
-      if (window.visualViewport.scale > 1.05) { zoomed = true; lt = 0; unzoom(); }
-    });
-  }
-  document.addEventListener('touchstart', ev => {
-    if (ev.touches.length > 1) { zoomed = true; lt = 0; unzoom(); return; }
-    if (zoomed) { lt = 0; return; }
-    const card = ev.target.closest('.card');
-    if (!card || ev.target.closest('button,.acts,.cbg')) { lt = 0; return; }
-    const now = Date.now(), x = ev.touches[0].clientX, y = ev.touches[0].clientY;
-    if (now - lt < 340 && Math.hypot(x - lx, y - ly) < 40) {
+  let lt=0,lx=0,ly=0,zoomed=false;
+  const unzoom=()=>setTimeout(()=>{zoomed=false;},1200);
+  if(window.visualViewport){window.visualViewport.addEventListener('resize',()=>{if(window.visualViewport.scale>1.05){zoomed=true;lt=0;unzoom();}});}
+  document.addEventListener('touchstart',ev=>{
+    if(ev.touches.length>1){zoomed=true;lt=0;unzoom();return;}
+    if(zoomed){lt=0;return;}
+    const card=ev.target.closest('.card');
+    if(!card||ev.target.closest('button,.acts,.cbg')){lt=0;return;}
+    const now=Date.now(),x=ev.touches[0].clientX,y=ev.touches[0].clientY;
+    if(now-lt<340&&Math.hypot(x-lx,y-ly)<40){
       ev.preventDefault();
       toggleLike(card.dataset.id);
-      const h = document.createElement('div');
-      h.className = 'heart'; h.textContent = '❤️';
-      h.style.cssText = `left:${x}px;top:${y}px`;
-      document.body.appendChild(h);
-      setTimeout(() => h.remove(), 750);
-      lt = 0;
-    } else { lt = now; lx = x; ly = y; }
-  }, {passive: false});
+      const h=document.createElement('div');h.className='heart';h.textContent='❤️';
+      h.style.cssText=`left:${x}px;top:${y}px`;
+      document.body.appendChild(h);setTimeout(()=>h.remove(),750);lt=0;
+    }else{lt=now;lx=x;ly=y;}
+  },{passive:false});
 })();
 
-// ── INIT ────
+// ── INIT ────────────────────────────────────────────────────────────────────
+loadPersistedState();
+boot();
+</script>
+</body>
+</html>

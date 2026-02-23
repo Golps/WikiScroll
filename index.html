@@ -254,6 +254,7 @@ body.how .toggle-sw.on{background:var(--h1);}
   height:100vh;scroll-snap-align:start;position:relative;
   display:flex;align-items:center;justify-content:center;
   background:#07070d;overflow:hidden;will-change:transform;
+  content-visibility:auto;contain-intrinsic-size:100vw 100vh;
 }
 .cbg{position:absolute;inset:0;z-index:0;}
 .cbg img{width:100%;height:100%;object-fit:cover;opacity:.45;filter:blur(28px) saturate(1.6);transform:scale(1.12) translateZ(0);}
@@ -397,10 +398,12 @@ body.how .toggle-sw.on{background:var(--h1);}
 @keyframes ambBgIn{from{opacity:0;filter:blur(10px) saturate(1) brightness(.2)}to{opacity:1;filter:blur(48px) saturate(1.5) brightness(.4)}}
 .ambient-content{
   position:relative;z-index:1;text-align:center;
-  padding:40px 32px;max-width:min(620px,90vw);
+  padding:40px 32px;max-width:min(620px,90vw);max-height:80vh;overflow-y:auto;
   animation:ambContentIn .8s .18s cubic-bezier(.4,0,.2,1) both;
-  pointer-events:none;
+  pointer-events:auto;
+  scrollbar-width:none;-ms-overflow-style:none;
 }
+.ambient-content::-webkit-scrollbar{display:none;}
 @keyframes ambContentIn{from{opacity:0;transform:translateY(28px)}to{opacity:1;transform:translateY(0)}}
 .ambient-label{
   font-family:'Syne',sans-serif;font-size:11px;font-weight:700;
@@ -415,7 +418,7 @@ body.how .toggle-sw.on{background:var(--h1);}
 }
 .ambient-excerpt{
   font-size:15px;line-height:1.75;color:rgba(255,255,255,.52);
-  display:-webkit-box;-webkit-line-clamp:5;-webkit-box-orient:vertical;overflow:hidden;
+  display:-webkit-box;-webkit-line-clamp:12;-webkit-box-orient:vertical;overflow:hidden;
 }
 .ambient-close{
   position:absolute;top:max(20px,env(safe-area-inset-top));right:20px;z-index:2;
@@ -669,6 +672,7 @@ let curTopics = new Set();
 let swipeEnabled = true;
 let articles = [], liked = new Map(), queue = [];
 let filling = false, hinted = false, sentinel = null;
+let fillGeneration = 0;
 const otdIds = new Set();
 
 // ── LOCALSTORAGE ───────────────────────────────────────────────────────────
@@ -678,6 +682,12 @@ function lsSet(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch
 function loadPersistedState() {
   const savedLikes = lsGet('ws_liked');
   if (Array.isArray(savedLikes)) { savedLikes.forEach(a => liked.set(a.id, a)); updateBadge(); }
+  // Hydrate from IDB as fallback (e.g. localStorage cleared but IDB survives)
+  IDB.getAll().then(items => {
+    let changed = false;
+    items.forEach(a => { if (!liked.has(a.id)) { liked.set(a.id, a); changed = true; } });
+    if (changed) { saveLiked(); updateBadge(); }
+  });
   const savedTopics = lsGet('ws_topics');
   if (Array.isArray(savedTopics)) { curTopics = new Set(savedTopics); updateTopicBadge(); }
   const settings = lsGet('ws_settings') || {};
@@ -699,19 +709,16 @@ const IDB = (() => {
     req.onerror   = () => rej();
   });
   const tx = async (mode, fn) => {
-    try { const d = await open(); fn(d.transaction('articles', mode).objectStore('articles')); } catch {}
+    try { const d = await open(); fn(d.transaction('articles', mode).objectStore('articles')); } catch(e) { console.warn('IDB operation failed:', e); }
   };
   return {
     put:    a  => tx('readwrite', s => s.put(a)),
     delete: id => tx('readwrite', s => s.delete(id)),
-    getAll: () => new Promise(async res => {
-      try {
-        const d = await open();
+    getAll: () => open().then(d => new Promise((res) => {
         const req = d.transaction('articles','readonly').objectStore('articles').getAll();
         req.onsuccess = () => res(req.result || []);
         req.onerror   = () => res([]);
-      } catch { res([]); }
-    }),
+      })).catch(() => []),
   };
 })();
 
@@ -731,7 +738,7 @@ function fetchOne(url) {
   return fetch(url, {signal:ac.signal}).then(r => r.ok ? r.json() : null).catch(() => null).finally(() => clearTimeout(id));
 }
 function toArticle(d, prefix) {
-  return { id: prefix+d.pageid, src: prefix==='w'?'wiki':'how', title: d.title, body: d.extract, img: d.thumbnail.source, url: d.content_urls?.desktop?.page||'#' };
+  return { id: prefix+d.pageid, src: prefix==='w'?'wiki':'how', title: d.title, body: d.extract, img: d.thumbnail?.source||'', url: d.content_urls?.desktop?.page||'#' };
 }
 
 // ── ARTICLE VALIDATORS ────────────────────────────────────────────────────
@@ -808,9 +815,11 @@ async function fetchVoyage() {
 const QUEUE_MIN = 8;
 async function fillQueue() {
   if (filling) return; filling = true;
+  const gen = fillGeneration;
   try {
     const fn = curMode === 'wiki' ? (curTopics.size ? fetchWikiByTopic : fetchWiki) : fetchVoyage;
     const [a, b] = await Promise.all([fn(), fn()]);
+    if (gen !== fillGeneration) return; // stale — mode/lang changed while awaiting
     const fresh = [...a,...b];
     queue.push(...fresh);
     fresh.forEach(art => { if (art.img) { const i=new Image(); i.src=art.img; } });
@@ -835,12 +844,29 @@ function flushQueue(n) {
 function attachSentinel() {
   sentinel?.disconnect();
   const cards = document.getElementById('feed').querySelectorAll('.card');
-  if (cards.length < 2) return;
+  if (cards.length < 4) return;
   sentinel = new IntersectionObserver(entries => {
     if (entries[0].isIntersecting) { sentinel.disconnect(); flushQueue(5); }
-  }, {rootMargin:'0px 0px 200% 0px'});
-  sentinel.observe(cards[cards.length-2]);
+  }, {rootMargin:'0px 0px 400% 0px'});
+  sentinel.observe(cards[cards.length-4]);
 }
+
+// ── DOM PRUNING ───────────────────────────────────────────────────────────
+function pruneOldCards() {
+  const feed = document.getElementById('feed');
+  const cards = feed.querySelectorAll('.card');
+  const idx = Math.round(feed.scrollTop / window.innerHeight);
+  let pruned = 0;
+  cards.forEach((card, i) => {
+    if (i < idx - 12) { card.remove(); pruned++; }
+  });
+  if (pruned) attachSentinel();
+}
+let pruneTimer = null;
+document.getElementById('feed').addEventListener('scroll', () => {
+  clearTimeout(pruneTimer);
+  pruneTimer = setTimeout(pruneOldCards, 400);
+}, {passive:true});
 
 // ── BOOT ───────────────────────────────────────────────────────────────────
 async function boot() {
@@ -859,6 +885,7 @@ async function boot() {
 
 function resetFeed() {
   sentinel?.disconnect();
+  fillGeneration++;
   articles=[]; queue=[]; hinted=false; filling=false;
   document.getElementById('hint').style.display = 'none';
   const isHow = curMode==='how';
@@ -1112,7 +1139,7 @@ function openAmbient(card) {
   document.getElementById('ambientTitle').textContent   = a.title;
   document.getElementById('ambientExcerpt').textContent = a.body;
   const bg = document.getElementById('ambientBg');
-  bg.style.backgroundImage = a.img ? `url(${a.img})` : '';
+  bg.style.backgroundImage = a.img ? `url("${a.img.replace(/[\\"()]/g, '\\$&')}")` : '';
   const ov = document.getElementById('ambientOverlay');
   ov.classList.remove('closing'); ov.classList.add('open');
 }
@@ -1173,7 +1200,10 @@ document.getElementById('ambientClose').addEventListener('click', closeAmbient);
     if (!card || ev.target.closest('button,.acts')) return;
     startX=ev.touches[0].clientX; startY=ev.touches[0].clientY;
     curDx=0; swiping=false; activeCard=card;
-    lpTimer = setTimeout(()=>{ if(!swiping){ openAmbient(card); activeCard=null; } lpTimer=null; },620);
+    // Only trigger ambient long-press outside selectable text areas
+    if (!ev.target.closest('.art-title,.art-body,.art-img')) {
+      lpTimer = setTimeout(()=>{ if(!swiping){ openAmbient(card); activeCard=null; } lpTimer=null; },620);
+    }
   },{passive:true});
 
   document.addEventListener('touchmove', ev => {

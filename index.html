@@ -111,7 +111,7 @@ body.how .burger-dot{background:var(--h1);}
   max-height:0;overflow:hidden;
   transition:max-height .3s cubic-bezier(.4,0,.2,1);
 }
-.burger-menu.open{max-height:700px;}
+.burger-menu.open{max-height:100dvh;overflow-y:auto;}
 .burger-inner{
   padding:calc(max(13px,env(safe-area-inset-top)) + 60px) 18px calc(18px + env(safe-area-inset-bottom));
 }
@@ -370,6 +370,7 @@ body.how .err-btn{background:linear-gradient(135deg,var(--h1),var(--h2));}
 
 /* ── RESPONSIVE ── */
 @media(max-width:600px){
+  .hdr{grid-template-columns:auto 1fr auto;}
   .logo{font-size:19px;}
   .tbtn{font-size:11px;padding:5px 10px;}
   .panel{width:93vw;max-height:86vh;padding:18px;border-radius:22px;}
@@ -498,11 +499,11 @@ body.how .err-btn{background:linear-gradient(135deg,var(--h1),var(--h2));}
       An infinite scrolling interface for exploring random Wikipedia or Wikivoyage articles in multiple languages.<br><br>
       Swipe or scroll to discover fascinating articles!
     </div>
-    <div class="modal-contact">Contact: <a href="mailto:contact@wikiscroll.com">contact@wikiscroll.com</a></div>
+    <div class="modal-contact">Contact: <a href="/cdn-cgi/l/email-protection#65060a0b1104061125120c0e0c1606170a09094b060a08"><span class="__cf_email__" data-cfemail="bbd8d4d5cfdad8cffbccd2d0d2c8d8c9d4d7d795d8d4d6">[email&#160;protected]</span></a></div>
   </div>
 </div>
 
-<script>
+<script data-cfasync="false" src="/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"></script><script>
 'use strict';
 
 // ── CONSTANTS ──────────────────────────────────────────────────────────────
@@ -1230,9 +1231,4 @@ document.addEventListener('keydown', ev => {
   }, {passive: false});
 })();
 
-// ── INIT ────────────────────────────────────────────────────────────────────
-loadPersistedState();
-boot();
-</script>
-</body>
-</html>
+// ── INIT ────

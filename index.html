@@ -1134,20 +1134,40 @@ async function fetchVoyage() {
 // ── RABBIT HOLE: FETCH RELATED ────────────────────────────────────────────
 async function fetchRelated(article) {
   if (article.src !== 'wiki') return [];
+  // Use the Action API to get pages linked from this article, with extracts+thumbnails
   const title = encodeURIComponent(article.title.replace(/ /g, '_'));
-  const url = `https://${curLang}.wikipedia.org/api/rest_v1/page/related/${title}`;
+  const url = [
+    `https://${curLang}.wikipedia.org/w/api.php`,
+    '?action=query',
+    `&titles=${title}`,
+    '&generator=links',
+    '&gpllimit=30',
+    '&gplnamespace=0',
+    '&prop=pageimages%7Cextracts',
+    '&exintro=1',
+    '&exchars=800',
+    '&piprop=thumbnail',
+    '&pithumbsize=500',
+    '&pilimit=30',
+    '&format=json',
+    '&origin=*',
+  ].join('');
   const data = await fetchOne(url);
-  if (!data?.pages) return [];
+  if (!data?.query?.pages) return [];
   const seenIds = new Set(articles.map(a => a.id).concat(queue.map(a => a.id)));
-  return data.pages
-    .filter(p => p?.thumbnail?.source && p.extract?.length >= 80 && isValidTitle(p.title) && !seenIds.has('w'+p.pageid))
+  return Object.values(data.query.pages)
+    .filter(p => p?.thumbnail?.source && isValidTitle(p.title) && !seenIds.has('w'+p.pageid))
+    .filter(p => {
+      const text = stripHtml(p.extract||'');
+      return text.length >= 80;
+    })
     .sort(() => Math.random() - 0.5)
     .slice(0, 3)
     .map(p => ({
       id: 'w'+p.pageid, src: 'wiki', title: p.title,
       body: stripHtml(p.extract||''),
-      img: p.thumbnail?.source||'',
-      url: p.content_urls?.desktop?.page || `https://${curLang}.wikipedia.org/wiki/${encodeURIComponent(p.title.replace(/ /g,'_'))}`,
+      img: p.thumbnail.source,
+      url: `https://${curLang}.wikipedia.org/wiki/${encodeURIComponent(p.title.replace(/ /g,'_'))}`,
       _related: true,
     }));
 }

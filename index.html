@@ -292,6 +292,15 @@ body.how .toggle-sw.on{background:var(--h1);}
   color:#fcd34d;font-family:'Syne',sans-serif;font-size:11px;font-weight:700;
   letter-spacing:.8px;pointer-events:none;
 }
+.otd-star{
+  position:absolute;z-index:2;
+  top:max(66px,calc(env(safe-area-inset-top) + 54px));
+  right:14px;
+  font-size:28px;pointer-events:none;
+  filter:drop-shadow(0 2px 8px rgba(251,191,36,.5));
+  animation:otdPulse 2.5s ease-in-out infinite;
+}
+@keyframes otdPulse{0%,100%{opacity:.85;transform:scale(1)}50%{opacity:1;transform:scale(1.12)}}
 
 /* ── PANEL ── */
 .panel{
@@ -325,11 +334,12 @@ body.how .toggle-sw.on{background:var(--h1);}
   display:flex;align-items:center;gap:8px;padding:14px 20px;border-radius:14px;
   border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.07);
   color:#fff;cursor:pointer;font-size:15px;font-weight:500;
-  transition:background .2s,opacity .1s;white-space:nowrap;font-family:'DM Sans',sans-serif;
+  transition:background .2s,border-color .2s,opacity .1s;white-space:nowrap;font-family:'DM Sans',sans-serif;
+  -webkit-tap-highlight-color:transparent;
 }
 .act:hover{background:rgba(255,255,255,.13);}
 .act:active{opacity:.75;}
-.act.liked{background:rgba(239,68,68,.15);border-color:rgba(239,68,68,.35);}
+.act.liked{background:rgba(239,68,68,.15);border-color:rgba(239,68,68,.35);color:#fff;}
 .act.cta{flex:1;justify-content:center;border:none;font-weight:600;background:linear-gradient(135deg,var(--w1),var(--w2));}
 .act.cta.hcta{background:linear-gradient(135deg,var(--h1),var(--h2));}
 .act.cta:hover{filter:brightness(1.1);}
@@ -467,6 +477,8 @@ body.how .err-btn{background:linear-gradient(135deg,var(--h1),var(--h2));}
   .hdr-right > #topicsBtn,
   .hdr-right > #aboutBtn{display:none;}
   .burger-btn{display:flex;}
+  .card{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;}
+  .card img{pointer-events:none;}
 }
 </style>
 </head>
@@ -905,7 +917,7 @@ function renderCard(a) {
   card.dataset.id = a.id;
   card.innerHTML = `
     <div class="cbg">${img}<div class="cveil"></div></div>
-    ${isOTD ? '<div class="otd-badge">📅 On This Day</div>' : ''}
+    ${isOTD ? '<div class="otd-badge">📅 On This Day</div><div class="otd-star">⭐</div>' : ''}
     <div class="swipe-ind like-ind">❤️ Like</div>
     <div class="swipe-ind skip-ind">✕ Skip</div>
     <div class="panel">
@@ -1018,6 +1030,9 @@ async function fetchOnThisDay() {
         const badge = document.createElement('div');
         badge.className = 'otd-badge'; badge.textContent = '📅 On This Day';
         card.appendChild(badge);
+        const star = document.createElement('div');
+        star.className = 'otd-star'; star.textContent = '⭐';
+        card.appendChild(star);
       }
     });
   } catch {}
@@ -1200,10 +1215,7 @@ document.getElementById('ambientClose').addEventListener('click', closeAmbient);
     if (!card || ev.target.closest('button,.acts')) return;
     startX=ev.touches[0].clientX; startY=ev.touches[0].clientY;
     curDx=0; swiping=false; activeCard=card;
-    // Only trigger ambient long-press outside selectable text areas
-    if (!ev.target.closest('.art-title,.art-body,.art-img')) {
-      lpTimer = setTimeout(()=>{ if(!swiping){ openAmbient(card); activeCard=null; } lpTimer=null; },620);
-    }
+    lpTimer = setTimeout(()=>{ if(!swiping){ openAmbient(card); activeCard=null; } lpTimer=null; },620);
   },{passive:true});
 
   document.addEventListener('touchmove', ev => {

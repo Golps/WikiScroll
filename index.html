@@ -191,12 +191,15 @@ body{font-family:'DM Sans',sans-serif;background:#07070d;color:#fff;}
   font-family:'Syne',sans-serif;font-size:22px;font-weight:800;letter-spacing:-1px;
   background:linear-gradient(135deg,var(--w1),var(--w2));
   -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
-  white-space:nowrap;
+  white-space:nowrap;position:relative;
 }
-body.how .logo{
+.logo::after{
+  content:attr(data-text);position:absolute;inset:0;
   background:linear-gradient(135deg,var(--h1),var(--h2));
   -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+  opacity:0;transition:opacity .4s ease;
 }
+body.how .logo::after{opacity:1;}
 
 /* ── TOGGLE ── */
 .toggle{
@@ -531,6 +534,26 @@ body.how .toggle-sw.on{background:var(--h1);}
 .hint-txt{font-size:11px;color:var(--dim);letter-spacing:.4px;}
 .hint-arr{width:16px;height:16px;border-right:2px solid var(--dim);border-bottom:2px solid var(--dim);transform:rotate(45deg);}
 
+/* ── PULL TO REFRESH ── */
+.ptr-indicator{
+  position:fixed;top:0;left:50%;transform:translateX(-50%) translateY(-60px);z-index:150;
+  width:44px;height:44px;border-radius:50%;
+  background:rgba(20,20,30,.85);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+  border:1px solid var(--border);
+  display:flex;align-items:center;justify-content:center;
+  transition:transform .3s cubic-bezier(.34,1.56,.64,1);pointer-events:none;
+}
+.ptr-indicator svg{width:22px;height:22px;stroke:var(--dim);stroke-width:2;fill:none;transition:transform .3s ease,stroke .2s;}
+.ptr-indicator.ready svg{stroke:var(--accent,#a5b4fc);transform:rotate(180deg);}
+.ptr-indicator.loading svg{animation:ptr-spin .7s linear infinite;stroke:var(--accent,#a5b4fc);}
+body.how .ptr-indicator.ready svg,body.how .ptr-indicator.loading svg{stroke:#6ee7b7;}
+@keyframes ptr-spin{to{transform:rotate(360deg)}}
+body.light .ptr-indicator{background:rgba(255,255,255,.9);border-color:rgba(0,0,0,.08);}
+body.light .ptr-indicator svg{stroke:rgba(0,0,0,.3);}
+body.light .ptr-indicator.ready svg{stroke:#4a5ad8;}
+body.light .ptr-indicator.loading svg{stroke:#4a5ad8;}
+
+
 /* ── LIKES PANEL ── */
 .lp{
   position:fixed;top:0;right:-430px;width:420px;height:var(--vh);
@@ -800,6 +823,7 @@ body.how .sp-about-logo{
 body.light{background:#f4f3ef;color:#1a1a2e;}
 body.light .hdr{background:linear-gradient(to bottom,rgba(244,243,239,.97) 60%,transparent);}
 body.light .logo{background:linear-gradient(135deg,#4a5ad8,#6b3fa0);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+body.light .logo::after{background:linear-gradient(135deg,#0d8c7e,#1aa866);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
 body.light .toggle{background:rgba(0,0,0,.06);border-color:rgba(0,0,0,.1);}
 body.light .tbtn{color:rgba(0,0,0,.55);}
 body.light .tbtn.on{color:#fff;}
@@ -815,7 +839,8 @@ body.light .art-body{color:rgba(0,0,0,.55);}
 body.light .act{background:rgba(0,0,0,.04);border-color:rgba(0,0,0,.1);color:#333;}
 body.light .act:hover{background:rgba(0,0,0,.08);}
 body.light .act.liked{background:rgba(239,68,68,.1);border-color:rgba(239,68,68,.25);color:#dc2626;}
-body.light .act.cta{color:#fff;}
+body.light .act.cta{color:#fff;background:linear-gradient(135deg,#4a5ad8,#6340a8);}
+body.light .act.cta.hcta{background:linear-gradient(135deg,#0d8c7e,#1aa866);}
 body.light .act.deeper{background:rgba(180,140,20,.06);border-color:rgba(180,140,20,.18);color:rgba(140,100,10,.85);}
 body.light .burger-menu,.light .burger-backdrop{background:rgba(244,243,239,.99);}
 body.light .burger-backdrop{background:rgba(0,0,0,.25);}
@@ -1190,7 +1215,7 @@ body.light .offline-banner{background:rgba(239,68,68,.08);color:#dc2626;}
 
 <!-- HEADER -->
 <header class="hdr">
-  <div class="hdr-left"><div class="logo">WikiScroll</div></div>
+  <div class="hdr-left"><div class="logo" data-text="WikiScroll">WikiScroll</div></div>
   <div class="hdr-mid">
     <div class="toggle">
       <button class="tbtn won on" id="wBtn">Wikipedia</button>
@@ -1296,9 +1321,9 @@ body.light .offline-banner{background:rgba(239,68,68,.08);color:#dc2626;}
       </div>
       <button class="toggle-sw" id="themeToggle" role="switch" aria-label="Toggle light mode"></button>
     </div>
-    <div class="burger-row" style="flex-direction:column;align-items:flex-start;">
+    <div class="burger-row" style="flex-direction:column;align-items:stretch;">
       <div class="burger-row-label"><span class="ico">📊</span><span>Today's Stats</span></div>
-      <div class="streak-display" style="padding-left:32px;">
+      <div class="streak-display" style="margin-top:6px;">
         <div class="streak-main">
           <span class="streak-fire">🔥</span>
           <span><span class="streak-num" id="streakCount">0</span> articles today</span>
@@ -1316,7 +1341,7 @@ body.light .offline-banner{background:rgba(239,68,68,.08);color:#dc2626;}
           Swipe right to like · Left to skip · Long-press for Ambient Mode.
         </div>
         <div class="sp-about-contact">contact [at] wikiscroll.com</div>
-        <div style="margin-top:10px;"><a href="#" id="burgerPrivacyLink" onclick="event.preventDefault();closeBurger();openPrivacy();" style="font-size:11px;color:rgba(255,255,255,.25);text-decoration:none;">Privacy Policy</a></div>
+        <div style="margin-top:12px;text-align:center;"><a href="#" id="burgerPrivacyLink" onclick="event.preventDefault();event.stopPropagation();closeBurger();setTimeout(openPrivacy,350);" style="font-size:12px;color:rgba(255,255,255,.35);text-decoration:underline;text-underline-offset:3px;padding:8px 16px;display:inline-block;">Privacy Policy</a></div>
       </div>
     </div>
   </div>
@@ -1388,6 +1413,13 @@ body.light .offline-banner{background:rgba(239,68,68,.08);color:#dc2626;}
   <div class="hint-arr"></div>
 </div>
 
+<!-- PULL TO REFRESH -->
+<div class="ptr-indicator" id="ptrIndicator">
+  <svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+</div>
+
+</div>
+
 <!-- SETTINGS PANEL (desktop) -->
 
 <!-- PRIVACY POLICY MODAL -->
@@ -1416,7 +1448,7 @@ body.light .offline-banner{background:rgba(239,68,68,.08);color:#dc2626;}
 
       <p style="margin-bottom:14px;"><strong style="color:rgba(255,255,255,.85);">Children's privacy.</strong> WikiScroll does not knowingly collect data from anyone, including children under 13. Since no personal data is collected or transmitted, COPPA requirements are inherently met.</p>
 
-      <p style="margin-bottom:14px;"><strong style="color:rgba(255,255,255,.85);">Changes to this policy.</strong> We may update this privacy policy from time to time. Any changes will be reflected on this page with an updated revision date.</p>
+      <p style="margin-bottom:14px;"><strong style="color:rgba(255,255,255,.85);">Changes to this policy.</strong> WikiScroll reserves the right to update, modify, or replace this privacy policy at any time and for any reason. Any changes will be reflected on this page with an updated revision date. Your continued use of WikiScroll after changes constitutes acceptance of the revised policy. We recommend reviewing this policy periodically.</p>
 
       <p style="margin-bottom:0;"><strong style="color:rgba(255,255,255,.85);">Contact.</strong> If you have questions about this policy, contact us at contact [at] wikiscroll.com.</p>
     </div>
@@ -1501,9 +1533,9 @@ body.light .offline-banner{background:rgba(239,68,68,.08);color:#dc2626;}
 
   <div class="sp-section">
     <div class="sp-section-title">Stats</div>
-    <div class="sp-row" style="flex-direction:column;align-items:flex-start;gap:8px;">
+    <div class="sp-row" style="flex-direction:column;align-items:stretch;gap:8px;">
       <div class="sp-row-label"><span class="ico">📊</span><span>Today's Stats</span></div>
-      <div class="streak-display" style="padding-left:32px;">
+      <div class="streak-display" style="margin-top:4px;">
         <div class="streak-main">
           <span class="streak-fire">🔥</span>
           <span><span class="streak-num" id="dkStreakCount">0</span> articles today</span>
@@ -1524,7 +1556,7 @@ body.light .offline-banner{background:rgba(239,68,68,.08);color:#dc2626;}
         Swipe right to like · Left to skip · Long-press for Ambient Mode.
       </div>
       <div class="sp-about-contact">contact [at] wikiscroll.com</div>
-      <div style="margin-top:10px;"><a href="#" id="privacyLinkSettings" onclick="event.preventDefault();openPrivacy();" style="font-size:11px;color:rgba(255,255,255,.25);text-decoration:none;">Privacy Policy</a></div>
+      <div style="margin-top:12px;text-align:center;"><a href="#" id="privacyLinkSettings" onclick="event.preventDefault();openPrivacy();" style="font-size:12px;color:rgba(255,255,255,.35);text-decoration:underline;text-underline-offset:3px;padding:8px 16px;display:inline-block;">Privacy Policy</a></div>
     </div>
   </div>
 </div>
@@ -2261,6 +2293,56 @@ function resetFeed() {
   boot();
 }
 
+// ── PULL TO REFRESH ──────────────────────────────────────────────────────
+{
+  const feed = document.getElementById('feed');
+  const ptr = document.getElementById('ptrIndicator');
+  let ptrStartY = 0, ptrActive = false, ptrDist = 0;
+  const PTR_THRESHOLD = 80;
+
+  feed.addEventListener('touchstart', ev => {
+    if (feed.scrollTop > 5 || ev.touches.length > 1) return;
+    ptrStartY = ev.touches[0].clientY;
+    ptrActive = true;
+    ptrDist = 0;
+    ptr.classList.remove('ready','loading');
+  }, {passive:true});
+
+  feed.addEventListener('touchmove', ev => {
+    if (!ptrActive) return;
+    const dy = ev.touches[0].clientY - ptrStartY;
+    if (dy < 0) { ptrDist = 0; return; }
+    ptrDist = Math.min(dy, 140);
+    // Rubber-band: diminishing returns past threshold
+    const visual = ptrDist < PTR_THRESHOLD ? ptrDist : PTR_THRESHOLD + (ptrDist - PTR_THRESHOLD) * 0.3;
+    ptr.style.transform = `translateX(-50%) translateY(${visual - 20}px)`;
+    ptr.style.transition = 'none';
+    if (ptrDist >= PTR_THRESHOLD) ptr.classList.add('ready');
+    else ptr.classList.remove('ready');
+  }, {passive:true});
+
+  feed.addEventListener('touchend', () => {
+    if (!ptrActive) return;
+    ptrActive = false;
+    ptr.style.transition = 'transform .5s cubic-bezier(.34,1.56,.64,1)';
+    ptr.style.transform = 'translateX(-50%) translateY(-60px)';
+    if (ptrDist >= PTR_THRESHOLD) {
+      ptr.classList.remove('ready');
+      ptr.classList.add('loading');
+      // Hold spinner briefly then refresh
+      setTimeout(() => {
+        ptr.classList.remove('loading');
+        resetFeed();
+        toast('✨ Feed refreshed');
+      }, 600);
+    } else {
+      ptr.classList.remove('ready');
+    }
+  }, {passive:true});
+}
+
+
+
 // ── RENDER ─────────────────────────────────────────────────────────────────
 function renderCard(a) {
   const isHow   = a.src==='how', isLiked=liked.has(a.id);
@@ -2453,105 +2535,145 @@ function deepLinkUrl(a) {
   return `${base}?a=${encodeURIComponent(a.id)}`;
 }
 function doShare(a) {
-  // a can be an article object or {url, title} from liked list
   const url = a.url, title = a.title;
   if (!a.body) {
-    // Simple share (from liked list with no body context)
     const shareUrl = a.id ? deepLinkUrl(a) : url;
     if (navigator.share) navigator.share({title, url: shareUrl}).catch(()=>{});
     else if (navigator.clipboard) navigator.clipboard.writeText(shareUrl).then(()=>toast('Link copied!')).catch(()=>{});
     return;
   }
-  // Offer image share
-  openShareImage(a);
+  generateAndShare(a);
 }
 
-function openShareImage(a) {
+async function generateAndShare(a) {
+  toast('📤 Preparing share…');
   const canvas = document.createElement('canvas');
   const W = 1080, H = 1350;
   canvas.width = W; canvas.height = H;
   const ctx = canvas.getContext('2d');
+  const isHow = a.src === 'how';
+  const shareUrl = deepLinkUrl(a);
 
   // Background gradient
-  const isHow = a.src === 'how';
   const grd = ctx.createLinearGradient(0, 0, W, H);
-  if (isHow) { grd.addColorStop(0, '#0a1a18'); grd.addColorStop(0.5, '#0d2420'); grd.addColorStop(1, '#071510'); }
-  else       { grd.addColorStop(0, '#0a0a18'); grd.addColorStop(0.5, '#141028'); grd.addColorStop(1, '#0d0820'); }
-  ctx.fillStyle = grd;
-  ctx.fillRect(0, 0, W, H);
+  if (isHow) { grd.addColorStop(0,'#0a1a18'); grd.addColorStop(0.5,'#0d2420'); grd.addColorStop(1,'#071510'); }
+  else       { grd.addColorStop(0,'#0a0a18'); grd.addColorStop(0.5,'#141028'); grd.addColorStop(1,'#0d0820'); }
+  ctx.fillStyle = grd; ctx.fillRect(0,0,W,H);
 
-  // Decorative gradient orbs
-  const orb1 = ctx.createRadialGradient(W*0.25, H*0.2, 0, W*0.25, H*0.2, 400);
-  orb1.addColorStop(0, isHow ? 'rgba(17,153,142,.15)' : 'rgba(102,126,234,.15)');
+  // Decorative orbs
+  const orb1 = ctx.createRadialGradient(W*.25,H*.2,0,W*.25,H*.2,400);
+  orb1.addColorStop(0, isHow ? 'rgba(17,153,142,.12)' : 'rgba(102,126,234,.12)');
   orb1.addColorStop(1, 'transparent');
-  ctx.fillStyle = orb1; ctx.fillRect(0, 0, W, H);
-  const orb2 = ctx.createRadialGradient(W*0.8, H*0.7, 0, W*0.8, H*0.7, 350);
-  orb2.addColorStop(0, isHow ? 'rgba(56,239,125,.08)' : 'rgba(118,75,162,.1)');
+  ctx.fillStyle = orb1; ctx.fillRect(0,0,W,H);
+  const orb2 = ctx.createRadialGradient(W*.8,H*.7,0,W*.8,H*.7,350);
+  orb2.addColorStop(0, isHow ? 'rgba(56,239,125,.06)' : 'rgba(118,75,162,.08)');
   orb2.addColorStop(1, 'transparent');
-  ctx.fillStyle = orb2; ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = orb2; ctx.fillRect(0,0,W,H);
+
+  // Try to load article image
+  let imgLoaded = false;
+  if (a.img) {
+    try {
+      const img = await new Promise((resolve, reject) => {
+        const i = new Image();
+        i.crossOrigin = 'anonymous';
+        i.onload = () => resolve(i);
+        i.onerror = () => reject();
+        i.src = a.img;
+        setTimeout(reject, 4000);
+      });
+      // Draw image at top — rounded with vignette
+      const imgY = 60, imgH = 480, imgW = W - 120, imgX = 60;
+      ctx.save();
+      ctx.beginPath(); ctx.roundRect(imgX, imgY, imgW, imgH, 24); ctx.clip();
+      const scale = Math.max(imgW/img.width, imgH/img.height);
+      const sw = imgW/scale, sh = imgH/scale;
+      const sx = (img.width-sw)/2, sy = (img.height-sh)/2;
+      ctx.drawImage(img, sx, sy, sw, sh, imgX, imgY, imgW, imgH);
+      const vig = ctx.createLinearGradient(0, imgY+imgH-160, 0, imgY+imgH);
+      vig.addColorStop(0, 'rgba(0,0,0,0)');
+      vig.addColorStop(1, isHow ? 'rgba(7,21,16,.85)' : 'rgba(10,10,24,.85)');
+      ctx.fillStyle = vig; ctx.fillRect(imgX, imgY, imgW, imgH);
+      ctx.restore();
+      imgLoaded = true;
+    } catch {}
+  }
+
+  const contentY = imgLoaded ? 580 : 200;
 
   // Source badge
   ctx.fillStyle = isHow ? 'rgba(17,153,142,.2)' : 'rgba(102,126,234,.2)';
-  const badgeText = isHow ? '🗺️  WIKIVOYAGE' : '📖  WIKIPEDIA';
-  ctx.font = '600 28px "DM Sans", sans-serif';
-  const bw = ctx.measureText(badgeText).width + 48;
-  const bx = (W - bw) / 2, by = 100;
-  ctx.beginPath();
-  ctx.roundRect(bx, by, bw, 52, 26);
-  ctx.fill();
+  const badgeText = isHow ? '\u{1f5fa}\ufe0f  WIKIVOYAGE' : '\u{1f4d6}  WIKIPEDIA';
+  ctx.font = '600 26px "DM Sans", sans-serif';
+  const bw = ctx.measureText(badgeText).width + 44;
+  const bx = (W-bw)/2, by = contentY;
+  ctx.beginPath(); ctx.roundRect(bx, by, bw, 48, 24); ctx.fill();
   ctx.fillStyle = isHow ? '#6ee7b7' : '#a5b4fc';
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.fillText(badgeText, W/2, by+26);
+  ctx.fillText(badgeText, W/2, by+24);
 
-  // Category tag
+  // Category + reading time
   const cat = detectCategory(a.body);
+  const rt = readingTime(a.body);
   if (cat) {
-    ctx.font = '500 24px "DM Sans", sans-serif';
-    ctx.fillStyle = 'rgba(255,255,255,.35)';
-    ctx.fillText(`${cat.emoji}  ${cat.label}`, W/2, by + 90);
+    ctx.font = '500 22px "DM Sans", sans-serif';
+    ctx.fillStyle = 'rgba(255,255,255,.3)';
+    ctx.fillText(cat.emoji + '  ' + cat.label + '  \u00b7  \u23f1 ' + rt, W/2, by + 72);
   }
 
-  // Title — word-wrap
+  // Title
   ctx.fillStyle = '#ffffff';
-  ctx.font = '800 64px "Syne", sans-serif';
+  ctx.font = imgLoaded ? '800 54px "Syne", sans-serif' : '800 60px "Syne", sans-serif';
   ctx.textAlign = 'center';
-  const titleY = cat ? 300 : 260;
-  const titleLines = wrapText(ctx, a.title, W - 140, 64);
-  titleLines.forEach((line, i) => {
-    ctx.fillText(line, W/2, titleY + i * 78);
+  const titleY = contentY + (cat ? 120 : 85);
+  const titleLines = wrapText(ctx, a.title, W-140, imgLoaded ? 54 : 60);
+  titleLines.slice(0,3).forEach((line, i) => {
+    ctx.fillText(line, W/2, titleY + i*70);
   });
 
-  // Excerpt — word-wrap
-  const excerptY = titleY + titleLines.length * 78 + 50;
-  ctx.fillStyle = 'rgba(255,255,255,.55)';
-  ctx.font = '400 30px "DM Sans", sans-serif';
-  const bodyLines = wrapText(ctx, a.body.slice(0, 400), W - 140, 30);
-  bodyLines.slice(0, 8).forEach((line, i) => {
-    ctx.fillText(line, W/2, excerptY + i * 46);
+  // Excerpt
+  const excerptY = titleY + Math.min(titleLines.length,3)*70 + 40;
+  ctx.fillStyle = 'rgba(255,255,255,.5)';
+  ctx.font = '400 28px "DM Sans", sans-serif';
+  const maxBodyLines = imgLoaded ? 5 : 8;
+  const bodyLines = wrapText(ctx, a.body.slice(0,400), W-140, 28);
+  bodyLines.slice(0, maxBodyLines).forEach((line, i) => {
+    ctx.fillText(line, W/2, excerptY + i*42);
   });
+
+  // Divider
+  ctx.strokeStyle = 'rgba(255,255,255,.06)'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(W*.3, H-130); ctx.lineTo(W*.7, H-130); ctx.stroke();
 
   // Bottom branding
-  ctx.fillStyle = 'rgba(255,255,255,.2)';
-  ctx.font = '700 26px "Syne", sans-serif';
-  ctx.fillText('WikiScroll', W/2, H - 100);
-  ctx.font = '400 20px "DM Sans", sans-serif';
+  ctx.fillStyle = 'rgba(255,255,255,.25)';
+  ctx.font = '700 28px "Syne", sans-serif';
+  ctx.fillText('WikiScroll', W/2, H-90);
+  ctx.font = '400 18px "DM Sans", sans-serif';
   ctx.fillStyle = 'rgba(255,255,255,.15)';
-  ctx.fillText('wikiscroll.com/?a=' + encodeURIComponent(a.id), W/2, H - 65);
+  ctx.fillText('wikiscroll.com', W/2, H-55);
 
-  // Divider line
-  ctx.strokeStyle = 'rgba(255,255,255,.06)';
-  ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.moveTo(W*0.3, H-130); ctx.lineTo(W*0.7, H-130); ctx.stroke();
-
-  // Show preview
-  const dataUrl = canvas.toDataURL('image/png');
-  const preview = document.getElementById('shareImgPreview');
-  preview.src = dataUrl;
-  document.getElementById('shareImgOverlay').classList.add('open');
-  // Store for share/download
-  preview._canvas = canvas;
-  preview._article = a;
+  // Share directly
+  try {
+    const blob = await new Promise(r => canvas.toBlob(r, 'image/png'));
+    const file = new File([blob], 'wikiscroll-' + a.title.replace(/[^a-zA-Z0-9]/g,'-').slice(0,30) + '.png', {type:'image/png'});
+    if (navigator.share && navigator.canShare && navigator.canShare({files:[file]})) {
+      await navigator.share({ title: a.title, text: a.title + ' — via WikiScroll', url: shareUrl, files: [file] });
+    } else if (navigator.share) {
+      await navigator.share({ title: a.title, text: a.title + ' — via WikiScroll', url: shareUrl });
+    } else {
+      const preview = document.getElementById('shareImgPreview');
+      preview.src = canvas.toDataURL('image/png');
+      preview._canvas = canvas; preview._article = a;
+      document.getElementById('shareImgOverlay').classList.add('open');
+      return;
+    }
+  } catch(e) {
+    if (e.name === 'AbortError') return;
+    try { await navigator.clipboard.writeText(shareUrl); toast('Link copied!'); } catch { toast('Share unavailable'); }
+  }
 }
+
 
 function wrapText(ctx, text, maxW, fontSize) {
   const words = text.split(/\s+/);
@@ -2868,7 +2990,7 @@ function openPrivacy() {
 document.getElementById('privacyClose').addEventListener('click', () => document.getElementById('privacyOverlay').classList.remove('open'));
 document.getElementById('privacyOverlay').addEventListener('click', function(ev) { if(ev.target===this) this.classList.remove('open'); });
 document.getElementById('privacyLinkSettings').addEventListener('click', ev => { ev.preventDefault(); openPrivacy(); });
-document.getElementById('burgerPrivacyLink')?.addEventListener('click', ev => { ev.preventDefault(); closeBurger(); openPrivacy(); });
+document.getElementById('burgerPrivacyLink')?.addEventListener('click', ev => { ev.preventDefault(); ev.stopPropagation(); closeBurger(); setTimeout(openPrivacy, 350); });
 document.addEventListener('keydown', ev => {
   if (ev.key!=='Escape') return;
   document.getElementById('privacyOverlay').classList.remove('open');
@@ -2974,7 +3096,7 @@ document.getElementById('ambientClose').addEventListener('click', closeAmbient);
     requestAnimationFrame(() => {
       const dist = dir > 0 ? 110 : -110;
       const rot = dir > 0 ? 8 : -8;
-      card.style.transition = 'transform .45s cubic-bezier(.32,.94,.6,1), opacity .35s ease-out';
+      card.style.transition = 'transform .65s cubic-bezier(.32,.94,.6,1), opacity .5s ease-out';
       card.style.transform = `translateX(${dist}vw) rotate(${rot}deg) translateZ(0)`;
       card.style.opacity = '0';
 
@@ -3009,7 +3131,7 @@ document.getElementById('ambientClose').addEventListener('click', closeAmbient);
       };
       card.addEventListener('transitionend', finish, {once:true});
       // Safety timeout — transitionend can fail on fast tabs or GPU glitches
-      setTimeout(finish, 550);
+      setTimeout(finish, 750);
     });
   }
 

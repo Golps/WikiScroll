@@ -1418,8 +1418,6 @@ body.light .offline-banner{background:rgba(239,68,68,.08);color:#dc2626;}
   <svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
 </div>
 
-</div>
-
 <!-- SETTINGS PANEL (desktop) -->
 
 <!-- PRIVACY POLICY MODAL -->
@@ -2535,160 +2533,16 @@ function deepLinkUrl(a) {
   return `${base}?a=${encodeURIComponent(a.id)}`;
 }
 function doShare(a) {
-  const url = a.url, title = a.title;
-  if (!a.body) {
-    const shareUrl = a.id ? deepLinkUrl(a) : url;
-    if (navigator.share) navigator.share({title, url: shareUrl}).catch(()=>{});
-    else if (navigator.clipboard) navigator.clipboard.writeText(shareUrl).then(()=>toast('Link copied!')).catch(()=>{});
-    return;
-  }
-  generateAndShare(a);
-}
-
-async function generateAndShare(a) {
-  toast('📤 Preparing share…');
-  const canvas = document.createElement('canvas');
-  const W = 1080, H = 1350;
-  canvas.width = W; canvas.height = H;
-  const ctx = canvas.getContext('2d');
-  const isHow = a.src === 'how';
-  const shareUrl = deepLinkUrl(a);
-
-  // Background gradient
-  const grd = ctx.createLinearGradient(0, 0, W, H);
-  if (isHow) { grd.addColorStop(0,'#0a1a18'); grd.addColorStop(0.5,'#0d2420'); grd.addColorStop(1,'#071510'); }
-  else       { grd.addColorStop(0,'#0a0a18'); grd.addColorStop(0.5,'#141028'); grd.addColorStop(1,'#0d0820'); }
-  ctx.fillStyle = grd; ctx.fillRect(0,0,W,H);
-
-  // Decorative orbs
-  const orb1 = ctx.createRadialGradient(W*.25,H*.2,0,W*.25,H*.2,400);
-  orb1.addColorStop(0, isHow ? 'rgba(17,153,142,.12)' : 'rgba(102,126,234,.12)');
-  orb1.addColorStop(1, 'transparent');
-  ctx.fillStyle = orb1; ctx.fillRect(0,0,W,H);
-  const orb2 = ctx.createRadialGradient(W*.8,H*.7,0,W*.8,H*.7,350);
-  orb2.addColorStop(0, isHow ? 'rgba(56,239,125,.06)' : 'rgba(118,75,162,.08)');
-  orb2.addColorStop(1, 'transparent');
-  ctx.fillStyle = orb2; ctx.fillRect(0,0,W,H);
-
-  // Try to load article image
-  let imgLoaded = false;
-  if (a.img) {
-    try {
-      const img = await new Promise((resolve, reject) => {
-        const i = new Image();
-        i.crossOrigin = 'anonymous';
-        i.onload = () => resolve(i);
-        i.onerror = () => reject();
-        i.src = a.img;
-        setTimeout(reject, 4000);
-      });
-      // Draw image at top — rounded with vignette
-      const imgY = 60, imgH = 480, imgW = W - 120, imgX = 60;
-      ctx.save();
-      ctx.beginPath(); ctx.roundRect(imgX, imgY, imgW, imgH, 24); ctx.clip();
-      const scale = Math.max(imgW/img.width, imgH/img.height);
-      const sw = imgW/scale, sh = imgH/scale;
-      const sx = (img.width-sw)/2, sy = (img.height-sh)/2;
-      ctx.drawImage(img, sx, sy, sw, sh, imgX, imgY, imgW, imgH);
-      const vig = ctx.createLinearGradient(0, imgY+imgH-160, 0, imgY+imgH);
-      vig.addColorStop(0, 'rgba(0,0,0,0)');
-      vig.addColorStop(1, isHow ? 'rgba(7,21,16,.85)' : 'rgba(10,10,24,.85)');
-      ctx.fillStyle = vig; ctx.fillRect(imgX, imgY, imgW, imgH);
-      ctx.restore();
-      imgLoaded = true;
-    } catch {}
-  }
-
-  const contentY = imgLoaded ? 580 : 200;
-
-  // Source badge
-  ctx.fillStyle = isHow ? 'rgba(17,153,142,.2)' : 'rgba(102,126,234,.2)';
-  const badgeText = isHow ? '\u{1f5fa}\ufe0f  WIKIVOYAGE' : '\u{1f4d6}  WIKIPEDIA';
-  ctx.font = '600 26px "DM Sans", sans-serif';
-  const bw = ctx.measureText(badgeText).width + 44;
-  const bx = (W-bw)/2, by = contentY;
-  ctx.beginPath(); ctx.roundRect(bx, by, bw, 48, 24); ctx.fill();
-  ctx.fillStyle = isHow ? '#6ee7b7' : '#a5b4fc';
-  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.fillText(badgeText, W/2, by+24);
-
-  // Category + reading time
-  const cat = detectCategory(a.body);
-  const rt = readingTime(a.body);
-  if (cat) {
-    ctx.font = '500 22px "DM Sans", sans-serif';
-    ctx.fillStyle = 'rgba(255,255,255,.3)';
-    ctx.fillText(cat.emoji + '  ' + cat.label + '  \u00b7  \u23f1 ' + rt, W/2, by + 72);
-  }
-
-  // Title
-  ctx.fillStyle = '#ffffff';
-  ctx.font = imgLoaded ? '800 54px "Syne", sans-serif' : '800 60px "Syne", sans-serif';
-  ctx.textAlign = 'center';
-  const titleY = contentY + (cat ? 120 : 85);
-  const titleLines = wrapText(ctx, a.title, W-140, imgLoaded ? 54 : 60);
-  titleLines.slice(0,3).forEach((line, i) => {
-    ctx.fillText(line, W/2, titleY + i*70);
-  });
-
-  // Excerpt
-  const excerptY = titleY + Math.min(titleLines.length,3)*70 + 40;
-  ctx.fillStyle = 'rgba(255,255,255,.5)';
-  ctx.font = '400 28px "DM Sans", sans-serif';
-  const maxBodyLines = imgLoaded ? 5 : 8;
-  const bodyLines = wrapText(ctx, a.body.slice(0,400), W-140, 28);
-  bodyLines.slice(0, maxBodyLines).forEach((line, i) => {
-    ctx.fillText(line, W/2, excerptY + i*42);
-  });
-
-  // Divider
-  ctx.strokeStyle = 'rgba(255,255,255,.06)'; ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.moveTo(W*.3, H-130); ctx.lineTo(W*.7, H-130); ctx.stroke();
-
-  // Bottom branding
-  ctx.fillStyle = 'rgba(255,255,255,.25)';
-  ctx.font = '700 28px "Syne", sans-serif';
-  ctx.fillText('WikiScroll', W/2, H-90);
-  ctx.font = '400 18px "DM Sans", sans-serif';
-  ctx.fillStyle = 'rgba(255,255,255,.15)';
-  ctx.fillText('wikiscroll.com', W/2, H-55);
-
-  // Share directly
-  try {
-    const blob = await new Promise(r => canvas.toBlob(r, 'image/png'));
-    const file = new File([blob], 'wikiscroll-' + a.title.replace(/[^a-zA-Z0-9]/g,'-').slice(0,30) + '.png', {type:'image/png'});
-    if (navigator.share && navigator.canShare && navigator.canShare({files:[file]})) {
-      await navigator.share({ title: a.title, text: a.title + ' — via WikiScroll', url: shareUrl, files: [file] });
-    } else if (navigator.share) {
-      await navigator.share({ title: a.title, text: a.title + ' — via WikiScroll', url: shareUrl });
-    } else {
-      const preview = document.getElementById('shareImgPreview');
-      preview.src = canvas.toDataURL('image/png');
-      preview._canvas = canvas; preview._article = a;
-      document.getElementById('shareImgOverlay').classList.add('open');
-      return;
-    }
-  } catch(e) {
-    if (e.name === 'AbortError') return;
-    try { await navigator.clipboard.writeText(shareUrl); toast('Link copied!'); } catch { toast('Share unavailable'); }
+  // Share only the deep link URL — the Cloudflare Pages Function ([[path]].js)
+  // injects dynamic OG tags so platforms render a rich preview automatically
+  const shareUrl = a.id ? deepLinkUrl(a) : (a.url || 'https://wikiscroll.com');
+  if (navigator.share) {
+    navigator.share({ url: shareUrl }).catch(() => {});
+  } else if (navigator.clipboard) {
+    navigator.clipboard.writeText(shareUrl).then(() => toast('Link copied!')).catch(() => {});
   }
 }
 
-
-function wrapText(ctx, text, maxW, fontSize) {
-  const words = text.split(/\s+/);
-  const lines = [];
-  let cur = '';
-  for (const w of words) {
-    const test = cur ? cur + ' ' + w : w;
-    if (ctx.measureText(test).width > maxW && cur) {
-      lines.push(cur);
-      cur = w;
-    } else cur = test;
-  }
-  if (cur) lines.push(cur);
-  return lines;
-}
 
 // Share image overlay events
 document.getElementById('shareImgClose').addEventListener('click', () => {
@@ -3056,26 +2910,46 @@ document.getElementById('ambientClose').addEventListener('click', closeAmbient);
   }
 
   function resetCard(card) {
+    // After fly-off, keep card hidden and remove from scroll-snap
+    // so the feed can never snap back to a swiped card
     card.style.transition = 'none';
     card.style.transform = '';
-    card.style.opacity = '';
+    card.style.opacity = '0';
+    card.style.visibility = 'hidden';
+    card.style.scrollSnapAlign = 'none';
+    card.style.pointerEvents = 'none';
     const li = ind(card,'like-ind'), si = ind(card,'skip-ind');
     if(li){ li.style.transition=''; li.style.opacity=0; }
     if(si){ si.style.transition=''; si.style.opacity=0; }
-    void card.offsetWidth; // force reflow to commit reset
-    card.style.transition = '';
   }
 
-  function advanceFeed() {
-    const nextTop = (Math.round(feed.scrollTop / window.innerHeight) + 1) * window.innerHeight;
-    feed.style.scrollSnapType = 'none';
-    feed.style.webkitScrollSnapType = 'none';
-    feed.scrollTop = nextTop;
-    // Double-rAF ensures the browser commits the scroll position before re-enabling snap
+  function advanceFeed(swipedCard) {
+    // Find the next visible card after the swiped one
+    const allCards = Array.from(feed.querySelectorAll('.card'));
+    const swipedIdx = swipedCard ? allCards.indexOf(swipedCard) : -1;
+    
+    if (swipedIdx >= 0 && swipedIdx + 1 < allCards.length) {
+      // Scroll to the card after the swiped one
+      const nextCard = allCards[swipedIdx + 1];
+      const nextTop = nextCard.offsetTop;
+      feed.style.scrollSnapType = 'none';
+      feed.style.webkitScrollSnapType = 'none';
+      feed.scrollTop = nextTop;
+    } else {
+      // Fallback: advance by one viewport
+      const vh = window.innerHeight;
+      const nextTop = (Math.floor(feed.scrollTop / vh) + 1) * vh;
+      feed.style.scrollSnapType = 'none';
+      feed.style.webkitScrollSnapType = 'none';
+      feed.scrollTop = nextTop;
+    }
+    // Triple-rAF ensures scroll position commits before re-enabling snap
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
-        feed.style.scrollSnapType = '';
-        feed.style.webkitScrollSnapType = '';
+        requestAnimationFrame(() => {
+          feed.style.scrollSnapType = '';
+          feed.style.webkitScrollSnapType = '';
+        });
       });
     });
   }
@@ -3092,7 +2966,12 @@ document.getElementById('ambientClose').addEventListener('click', closeAmbient);
     // 2) Like on right
     if (dir > 0) toggleLike(card.dataset.id);
 
-    // 3) Fly off — single GPU transition
+    // 3) Find next card by DOM position (before animation starts)
+    const allCards = Array.from(feed.querySelectorAll('.card'));
+    const cardIdx = allCards.indexOf(card);
+    const nextCard = cardIdx >= 0 ? allCards[cardIdx + 1] : null;
+
+    // 4) Fly off — single GPU transition
     requestAnimationFrame(() => {
       const dist = dir > 0 ? 110 : -110;
       const rot = dir > 0 ? 8 : -8;
@@ -3100,9 +2979,7 @@ document.getElementById('ambientClose').addEventListener('click', closeAmbient);
       card.style.transform = `translateX(${dist}vw) rotate(${rot}deg) translateZ(0)`;
       card.style.opacity = '0';
 
-      // 4) Glow flash on next card
-      const nextIdx = Math.round(feed.scrollTop/window.innerHeight) + 1;
-      const nextCard = feed.querySelectorAll('.card')[nextIdx];
+      // 5) Glow flash on next card
       if (nextCard) {
         let flash = nextCard.querySelector('.swipe-flash');
         if (!flash) {
@@ -3116,18 +2993,17 @@ document.getElementById('ambientClose').addEventListener('click', closeAmbient);
         setTimeout(() => flash.classList.remove('show'), 600);
       }
 
-      // 5) Wait for transition to end, then advance
+      // 6) Wait for transition to end, then advance
       let done = false;
       const finish = () => {
         if (done) return;
         done = true;
         card.removeEventListener('transitionend', finish);
-        advanceFeed();
-        // Reset card after it's scrolled away
-        requestAnimationFrame(() => {
-          resetCard(card);
-          flyLock = false;
-        });
+        // First hide the swiped card and remove from snap
+        resetCard(card);
+        // Then advance to next card
+        advanceFeed(card);
+        flyLock = false;
       };
       card.addEventListener('transitionend', finish, {once:true});
       // Safety timeout — transitionend can fail on fast tabs or GPU glitches

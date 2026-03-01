@@ -159,8 +159,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" integrity="sha512-h9FcoyWjHcOcmEVkxOfTLnmZFWIH0iZhZT1H2TbOq55xssQGEJHEaIm+PgoUaZbRvQTNTluNOEfb1ZRy6D3bA==" crossorigin="anonymous" referrerpolicy="no-referrer">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js" integrity="sha512-puJW3E/qXDqYp9IfhAI54BJEaWIfloJ7JWs7OeD5i6ruC9JZL1gERT1wjfqERvhDMj2QIo7uo2djIo40UWE8w==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" crossorigin="anonymous">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js" crossorigin="anonymous"></script>
 <style>
 :root{
   --w1:#667eea;--w2:#764ba2;
@@ -1034,17 +1034,20 @@ body.light .depth-step.active .ds-dot{background:#d97706;}
 /* Map explore button on cards */
 .map-btn{
   position:absolute;top:12px;right:12px;z-index:10;
-  width:40px;height:40px;border-radius:50%;
-  display:flex;align-items:center;justify-content:center;
-  background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.18);
+  display:flex;align-items:center;gap:6px;
+  padding:8px 14px 8px 10px;border-radius:50px;
+  background:rgba(17,153,142,.2);border:1px solid rgba(17,153,142,.35);
   backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
-  cursor:pointer;font-size:20px;line-height:1;
+  cursor:pointer;font-size:12px;font-weight:600;line-height:1;
+  color:#6ee7b7;font-family:'DM Sans',sans-serif;
   transition:transform .2s, background .2s, box-shadow .2s;
   box-shadow:0 4px 16px rgba(0,0,0,.3);
+  white-space:nowrap;
 }
-.map-btn:hover{transform:scale(1.08);background:rgba(255,255,255,.2);box-shadow:0 6px 24px rgba(0,0,0,.4);}
+.map-btn .map-btn-ico{font-size:16px;line-height:1;}
+.map-btn:hover{transform:scale(1.05);background:rgba(17,153,142,.3);box-shadow:0 6px 24px rgba(0,0,0,.4);}
 .map-btn:active{transform:scale(.95);}
-body.light .map-btn{background:rgba(0,0,0,.06);border-color:rgba(0,0,0,.1);box-shadow:0 4px 16px rgba(0,0,0,.1);}
+body.light .map-btn{background:rgba(17,153,142,.1);border-color:rgba(17,153,142,.25);color:#0d7c6e;box-shadow:0 4px 16px rgba(0,0,0,.1);}
 body.light .map-container{box-shadow:0 20px 60px rgba(0,0,0,.3);}
 body.light .map-hdr{background:linear-gradient(to bottom,rgba(255,255,255,.85) 0%,rgba(255,255,255,0) 100%);}
 body.light .map-title{color:#1a1a2e;text-shadow:none;}
@@ -2181,7 +2184,7 @@ function renderCard(a) {
     const mapBtn = document.createElement('button');
     mapBtn.className = 'map-btn';
     mapBtn.title = 'Explore on Map';
-    mapBtn.textContent = '🗺️';
+    mapBtn.innerHTML = '<span class="map-btn-ico">🗺️</span>Map';
     mapBtn.addEventListener('click', (e) => { e.stopPropagation(); openMap(a); });
     card.querySelector('.panel').appendChild(mapBtn);
   }
@@ -2656,28 +2659,45 @@ function setHaptic(val) { hapticEnabled=val; saveSettings(); syncAllToggles(); t
 document.getElementById('hapticToggle').addEventListener('click', () => setHaptic(!hapticEnabled));
 document.getElementById('dkHapticToggle').addEventListener('click', () => setHaptic(!hapticEnabled));
 
-// iOS haptic workaround: need <input type="checkbox" switch> + <label>, click the LABEL
-// Based on ios-haptics library pattern (Safari 17.4+ / iOS 18+)
-const _hapticId = 'ws-haptic-cb';
-const _hapticInput = document.createElement('input');
-_hapticInput.type = 'checkbox';
-_hapticInput.id = _hapticId;
-_hapticInput.setAttribute('switch', '');
-_hapticInput.style.cssText = 'position:fixed;top:-200px;left:-200px;opacity:0;pointer-events:none;';
-const _hapticLabel = document.createElement('label');
-_hapticLabel.htmlFor = _hapticId;
-_hapticLabel.style.cssText = 'position:fixed;top:-200px;left:-200px;opacity:0;pointer-events:none;';
-document.body.appendChild(_hapticInput);
-document.body.appendChild(_hapticLabel);
-
+// iOS haptic workaround: create fresh <input type="checkbox" switch> + <label> each call
+// Based on ios-haptics library: https://github.com/tijnjh/ios-haptics
+// Key: Safari only fires haptic on user-gesture-initiated label.click() for switch checkboxes
+// Must create fresh elements each time (Safari may suppress repeated toggles on same element)
+let _hapticCounter = 0;
 function triggerHaptic() {
   if (!hapticEnabled) return;
-  // Android: Vibration API
+  // Android: Vibration API (works natively)
   if (navigator.vibrate) { navigator.vibrate(12); return; }
-  // iOS: click the label associated with the switch checkbox
-  // This triggers Safari's native haptic feedback for switch toggles
-  try { _hapticLabel.click(); } catch {}
+  // iOS: create fresh checkbox switch + label, click label, remove both
+  try {
+    const id = 'ws-hap-' + (++_hapticCounter);
+    const input = document.createElement('input');
+    input.type = 'checkbox';
+    input.id = id;
+    input.setAttribute('switch', '');
+    input.style.cssText = 'position:fixed;top:-9999px;left:-9999px;opacity:0;pointer-events:none;width:0;height:0;';
+    const label = document.createElement('label');
+    label.setAttribute('for', id);
+    label.style.cssText = 'position:fixed;top:-9999px;left:-9999px;opacity:0;pointer-events:none;width:0;height:0;';
+    document.body.appendChild(input);
+    document.body.appendChild(label);
+    label.click();
+    // Clean up immediately
+    input.remove();
+    label.remove();
+  } catch {}
 }
+
+// Haptic on vertical scroll (triggered from touchend so it's in user gesture context)
+let _feedScrollStartY = 0;
+document.getElementById('feed').addEventListener('touchstart', (e) => {
+  _feedScrollStartY = e.touches[0]?.clientY || 0;
+}, { passive: true });
+document.getElementById('feed').addEventListener('touchend', (e) => {
+  const dy = Math.abs((e.changedTouches[0]?.clientY || 0) - _feedScrollStartY);
+  // Only fire haptic if user scrolled enough to snap to a new card (roughly >40px drag)
+  if (dy > 40) triggerHaptic();
+}, { passive: true });
 
 // Depth sliders — sync both sliders + step indicators on drag
 document.getElementById('depthSlider').addEventListener('input', ev => {
@@ -3038,18 +3058,24 @@ let mapInstance = null;
 let mapMarker = null;
 
 async function geocodePlace(title) {
-  // Use Nominatim to geocode the place name
   const q = encodeURIComponent(title.replace(/\s*\(.*?\)\s*/g, '').trim());
   const url = `https://nominatim.openstreetmap.org/search?q=${q}&format=json&limit=1&accept-language=en`;
   try {
-    const resp = await fetch(url, { headers: { 'User-Agent': 'WikiScroll/1.0' } });
+    const resp = await fetch(url);
+    if (!resp.ok) return null;
     const data = await resp.json();
     if (data?.length) return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon), display: data[0].display_name };
-  } catch {}
+  } catch (e) { console.warn('Geocode failed:', e); }
   return null;
 }
 
 async function openMap(article) {
+  // Check if Leaflet loaded
+  if (typeof L === 'undefined') {
+    toast('Map library failed to load. Check your connection.');
+    return;
+  }
+
   const overlay = document.getElementById('mapOverlay');
   const loading = document.getElementById('mapLoading');
   const canvas = document.getElementById('mapCanvas');
@@ -3061,54 +3087,73 @@ async function openMap(article) {
   titleEl.textContent = article.title;
   badgeText.textContent = article.title;
   readLink.href = article.url;
+  loading.querySelector('.map-loading-text').textContent = '🗺️ Loading map…';
   loading.classList.remove('hidden');
   overlay.classList.add('open');
+
+  // Small delay to let CSS transition start before heavy work
+  await new Promise(r => setTimeout(r, 50));
 
   // Geocode the place
   const geo = await geocodePlace(article.title);
   if (!geo) {
     loading.querySelector('.map-loading-text').textContent = '📍 Could not locate this place';
-    setTimeout(() => loading.classList.add('hidden'), 2000);
+    setTimeout(() => loading.classList.add('hidden'), 2500);
     // Still show a world view
-    if (!mapInstance) {
-      mapInstance = L.map(canvas, { zoomControl: false, attributionControl: false }).setView([20, 0], 2);
-      L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-        maxZoom: 19, subdomains: 'abcd',
-      }).addTo(mapInstance);
-      L.control.zoom({ position: 'bottomright' }).addTo(mapInstance);
-    }
-    setTimeout(() => mapInstance.invalidateSize(), 100);
+    try {
+      if (!mapInstance) {
+        mapInstance = L.map(canvas, { zoomControl: false, attributionControl: false }).setView([20, 0], 2);
+        const isDark = !document.body.classList.contains('light');
+        L.tileLayer(isDark
+          ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+          : 'https://{s}.basemaps.cartocdn.com/voyager/{z}/{x}/{y}{r}.png', {
+          maxZoom: 19, subdomains: 'abcd',
+        }).addTo(mapInstance);
+        L.control.zoom({ position: 'bottomright' }).addTo(mapInstance);
+      }
+      setTimeout(() => mapInstance.invalidateSize(), 200);
+      setTimeout(() => mapInstance.invalidateSize(), 500);
+    } catch (e) { console.warn('Map init failed:', e); }
     return;
   }
 
   loading.classList.add('hidden');
 
-  if (!mapInstance) {
-    mapInstance = L.map(canvas, { zoomControl: false, attributionControl: false }).setView([geo.lat, geo.lng], 8);
-    const isDark = !document.body.classList.contains('light');
-    L.tileLayer(isDark
-      ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
-      : 'https://{s}.basemaps.cartocdn.com/voyager/{z}/{x}/{y}{r}.png', {
-      maxZoom: 19, subdomains: 'abcd',
-    }).addTo(mapInstance);
-    L.control.zoom({ position: 'bottomright' }).addTo(mapInstance);
-  } else {
-    mapInstance.setView([geo.lat, geo.lng], 8, { animate: true, duration: 1.2 });
+  try {
+    if (!mapInstance) {
+      mapInstance = L.map(canvas, { zoomControl: false, attributionControl: false }).setView([geo.lat, geo.lng], 8);
+      const isDark = !document.body.classList.contains('light');
+      L.tileLayer(isDark
+        ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+        : 'https://{s}.basemaps.cartocdn.com/voyager/{z}/{x}/{y}{r}.png', {
+        maxZoom: 19, subdomains: 'abcd',
+      }).addTo(mapInstance);
+      L.control.zoom({ position: 'bottomright' }).addTo(mapInstance);
+    } else {
+      mapInstance.setView([geo.lat, geo.lng], 8, { animate: true, duration: 1.2 });
+    }
+
+    // Custom marker
+    const markerIcon = L.divIcon({
+      className: 'map-marker-custom',
+      html: '<div class="map-pin"><div class="map-pin-dot"></div><div class="map-pin-ring"></div></div>',
+      iconSize: [32, 32],
+      iconAnchor: [16, 16],
+    });
+    if (mapMarker) mapMarker.remove();
+    mapMarker = L.marker([geo.lat, geo.lng], { icon: markerIcon }).addTo(mapInstance);
+    mapMarker.bindPopup(`<strong>${article.title}</strong><br><span style="font-size:12px;opacity:.7">${geo.display?.split(',').slice(0,3).join(',') || ''}</span>`).openPopup();
+
+    // Multiple invalidateSize calls to handle CSS transition timing
+    setTimeout(() => mapInstance.invalidateSize(), 100);
+    setTimeout(() => mapInstance.invalidateSize(), 350);
+    setTimeout(() => mapInstance.invalidateSize(), 700);
+  } catch (e) {
+    console.warn('Map render failed:', e);
+    loading.querySelector('.map-loading-text').textContent = '❌ Map failed to render';
+    loading.classList.remove('hidden');
+    setTimeout(() => loading.classList.add('hidden'), 2500);
   }
-
-  // Custom marker
-  const markerIcon = L.divIcon({
-    className: 'map-marker-custom',
-    html: '<div class="map-pin"><div class="map-pin-dot"></div><div class="map-pin-ring"></div></div>',
-    iconSize: [32, 32],
-    iconAnchor: [16, 16],
-  });
-  if (mapMarker) mapMarker.remove();
-  mapMarker = L.marker([geo.lat, geo.lng], { icon: markerIcon }).addTo(mapInstance);
-  mapMarker.bindPopup(`<strong>${article.title}</strong><br><span style="font-size:12px;opacity:.7">${geo.display?.split(',').slice(0,3).join(',') || ''}</span>`).openPopup();
-
-  // Ensure map renders properly after CSS transition
-  setTimeout(() => mapInstance.invalidateSize(), 350);
 }
 
 function closeMap() {
@@ -3139,10 +3184,7 @@ function trackScrollView() {
   if (idx !== _lastViewedIdx && idx >= 0) {
     _lastViewedIdx = idx;
     const card = feed.querySelectorAll('.card')[idx];
-    if (card && card.dataset.id) {
-      bumpStat();
-      triggerHaptic();
-    }
+    if (card && card.dataset.id) bumpStat();
   }
 }
 

@@ -378,7 +378,7 @@ body.how .toggle-sw.on{background:var(--h1);}
 
 /* ── MODAL ── */
 .modal-overlay{
-  position:fixed;inset:0;z-index:500;display:none;
+  position:fixed;inset:0;z-index:900;display:none;
   align-items:center;justify-content:center;
   background:rgba(0,0,0,.6);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
 }
@@ -990,7 +990,7 @@ body.light .depth-step.active .ds-dot{background:#d97706;}
   box-shadow:0 20px 60px rgba(0,0,0,.6);
 }
 .map-overlay.open .map-container{opacity:1;transform:translateY(0) scale(1);}
-.map-container #mapCanvas{width:100%;height:100%;z-index:0;}
+.map-container #mapCanvas{width:100%;height:100%;z-index:0;touch-action:none;}
 .map-hdr{
   position:absolute;top:0;left:0;right:0;z-index:10;
   display:flex;align-items:center;justify-content:space-between;
@@ -1097,6 +1097,25 @@ body.light .map-pin-ring{border-color:rgba(74,90,216,.5);}
 }
 .streak-progress-fill{height:100%;border-radius:2px;background:linear-gradient(90deg,#fbbf24,#f59e0b);transition:width .4s ease;}
 body.light .streak-progress{background:rgba(0,0,0,.06);}
+/* Week heatmap */
+.week-heatmap{display:flex;gap:5px;margin-top:10px;width:100%;}
+.week-day{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;}
+.week-day-cell{width:100%;aspect-ratio:1;border-radius:5px;background:rgba(255,255,255,.05);transition:background .3s;}
+.week-day-cell.lvl-1{background:rgba(251,191,36,.15);}
+.week-day-cell.lvl-2{background:rgba(251,191,36,.3);}
+.week-day-cell.lvl-3{background:rgba(251,191,36,.5);}
+.week-day-cell.lvl-4{background:rgba(245,158,11,.7);}
+.week-day-cell.today{box-shadow:0 0 0 1.5px rgba(251,191,36,.5);}
+.week-day-lbl{font-size:9px;color:rgba(255,255,255,.3);font-weight:500;letter-spacing:.3px;}
+.week-day-cnt{font-size:9px;color:rgba(255,255,255,.25);font-weight:600;line-height:1;}
+body.light .week-day-cell{background:rgba(0,0,0,.04);}
+body.light .week-day-cell.lvl-1{background:rgba(217,119,6,.1);}
+body.light .week-day-cell.lvl-2{background:rgba(217,119,6,.2);}
+body.light .week-day-cell.lvl-3{background:rgba(217,119,6,.35);}
+body.light .week-day-cell.lvl-4{background:rgba(217,119,6,.55);}
+body.light .week-day-cell.today{box-shadow:0 0 0 1.5px rgba(217,119,6,.4);}
+body.light .week-day-lbl{color:rgba(0,0,0,.3);}
+body.light .week-day-cnt{color:rgba(0,0,0,.25);}
 
 /* ── OFFLINE BANNER ── */
 .offline-banner{
@@ -1256,7 +1275,7 @@ body.light .offline-banner{background:rgba(239,68,68,.08);color:#dc2626;}
     <div class="burger-row">
       <div class="burger-row-label">
         <span class="ico">📳</span>
-        <div><div>Haptic Feedback <span class="beta-tag">Beta</span></div><div class="burger-row-sub">Light vibration on swipe (iOS 18+ / Android)</div></div>
+        <div><div>Haptic Feedback <span class="beta-tag">Beta</span></div><div class="burger-row-sub">Light vibration on swipe (Android)</div></div>
       </div>
       <button class="toggle-sw" id="hapticToggle" role="switch" aria-label="Toggle haptic feedback"></button>
     </div>
@@ -1286,17 +1305,18 @@ body.light .offline-banner{background:rgba(239,68,68,.08);color:#dc2626;}
           <span class="streak-label" id="streakLabel"></span>
         </div>
         <div class="streak-progress"><div class="streak-progress-fill" id="streakProgress" style="width:0%"></div></div>
+        <div class="week-heatmap" id="weekHeatmap"></div>
       </div>
     </div>
-    <div class="burger-row" style="flex-direction:column;align-items:stretch;gap:0;padding:0;">
-      <div class="sp-about" style="border:none;margin:0;">
+    <div class="burger-row" style="flex-direction:column;align-items:stretch;gap:0;padding:14px 0 0 0;border-bottom:none;">
+      <div class="sp-about" style="margin:0;">
         <div class="sp-about-logo">WikiScroll</div>
         <div class="sp-about-body">
           Infinite scrolling through Wikipedia and Wikivoyage in multiple languages.<br><br>
           Swipe right to like · Left to skip · Long-press for Ambient Mode.
         </div>
         <div class="sp-about-contact">contact [at] wikiscroll.com</div>
-        <div style="margin-top:10px;"><a href="#" id="burgerPrivacyLink" style="font-size:11px;color:rgba(255,255,255,.25);text-decoration:none;">Privacy Policy</a></div>
+        <div style="margin-top:10px;"><a href="#" id="burgerPrivacyLink" onclick="event.preventDefault();closeBurger();openPrivacy();" style="font-size:11px;color:rgba(255,255,255,.25);text-decoration:none;">Privacy Policy</a></div>
       </div>
     </div>
   </div>
@@ -1462,7 +1482,7 @@ body.light .offline-banner{background:rgba(239,68,68,.08);color:#dc2626;}
     <div class="sp-row">
       <div class="sp-row-label">
         <span class="ico">📳</span>
-        <div><div>Haptic Feedback <span class="beta-tag">Beta</span></div><div class="sp-row-sub">Light vibration on swipe (iOS 18+ / Android)</div></div>
+        <div><div>Haptic Feedback <span class="beta-tag">Beta</span></div><div class="sp-row-sub">Light vibration on swipe (Android)</div></div>
       </div>
       <button class="toggle-sw" id="dkHapticToggle" role="switch"></button>
     </div>
@@ -1490,6 +1510,7 @@ body.light .offline-banner{background:rgba(239,68,68,.08);color:#dc2626;}
           <span class="streak-label" id="dkStreakLabel"></span>
         </div>
         <div class="streak-progress"><div class="streak-progress-fill" id="dkStreakProgress" style="width:0%"></div></div>
+        <div class="week-heatmap" id="dkWeekHeatmap"></div>
       </div>
     </div>
   </div>
@@ -1503,7 +1524,7 @@ body.light .offline-banner{background:rgba(239,68,68,.08);color:#dc2626;}
         Swipe right to like · Left to skip · Long-press for Ambient Mode.
       </div>
       <div class="sp-about-contact">contact [at] wikiscroll.com</div>
-      <div style="margin-top:10px;"><a href="#" id="privacyLinkSettings" style="font-size:11px;color:rgba(255,255,255,.25);text-decoration:none;">Privacy Policy</a></div>
+      <div style="margin-top:10px;"><a href="#" id="privacyLinkSettings" onclick="event.preventDefault();openPrivacy();" style="font-size:11px;color:rgba(255,255,255,.25);text-decoration:none;">Privacy Policy</a></div>
     </div>
   </div>
 </div>
@@ -1753,7 +1774,39 @@ function bumpStat() {
   const s = loadStats();
   s.count++;
   lsSet('ws_stats', s);
+  // Update weekly log
+  const today = todayKey();
+  const wk = lsGet('ws_weekly') || {};
+  wk[today] = (wk[today] || 0) + 1;
+  // Prune entries older than 14 days
+  const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 14);
+  const cutKey = cutoff.toISOString().slice(0,10);
+  Object.keys(wk).forEach(k => { if (k < cutKey) delete wk[k]; });
+  lsSet('ws_weekly', wk);
   syncStreakDisplay();
+}
+function renderWeekHeatmap(containerId) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  const wk = lsGet('ws_weekly') || {};
+  const days = ['S','M','T','W','T','F','S'];
+  const today = new Date();
+  const todayStr = todayKey();
+  let html = '';
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(today);
+    d.setDate(d.getDate() - i);
+    const key = d.toISOString().slice(0,10);
+    const cnt = wk[key] || 0;
+    const lvl = cnt === 0 ? '' : cnt <= 3 ? 'lvl-1' : cnt <= 8 ? 'lvl-2' : cnt <= 20 ? 'lvl-3' : 'lvl-4';
+    const isToday = key === todayStr;
+    html += `<div class="week-day">
+      <div class="week-day-cell ${lvl}${isToday?' today':''}"></div>
+      <div class="week-day-lbl">${days[d.getDay()]}</div>
+      ${cnt > 0 ? `<div class="week-day-cnt">${cnt}</div>` : ''}
+    </div>`;
+  }
+  el.innerHTML = html;
 }
 function syncStreakDisplay() {
   const s = loadStats();
@@ -1773,6 +1826,9 @@ function syncStreakDisplay() {
     const el = document.getElementById(id);
     if (el) el.style.width = pct + '%';
   });
+  // Weekly heatmap
+  renderWeekHeatmap('weekHeatmap');
+  renderWeekHeatmap('dkWeekHeatmap');
 }
 
 // ── THEME ──────────────────────────────────────────────────────────────────
@@ -2049,7 +2105,7 @@ async function goDeeper(articleId, btn) {
     queue.splice(insertAt, 0, ...related);
     relatedInQueue += related.length;
     // Preload images
-    related.forEach(art => { if (art.img) { const i = new Image(); i.src = art.img; } });
+    related.forEach(art => preloadImg(art.img));
     btn.classList.add('used');
     btn.textContent = `🐇 ${related.length} added`;
     toast(`${related.length} related article${related.length>1?'s':''} queued`);
@@ -2061,17 +2117,34 @@ async function goDeeper(articleId, btn) {
 }
 
 // ── PREFETCH QUEUE ─────────────────────────────────────────────────────────
-const QUEUE_MIN = 8;
+const QUEUE_MIN = 15;
+// Persistent image cache to prevent GC of preloaded images
+const _imgCache = new Map();
+function preloadImg(url) {
+  if (!url || _imgCache.has(url)) return;
+  const img = new Image();
+  img.src = url;
+  _imgCache.set(url, img);
+  // Evict old entries if cache grows too large
+  if (_imgCache.size > 60) {
+    const first = _imgCache.keys().next().value;
+    _imgCache.delete(first);
+  }
+}
+function preloadQueueImages() {
+  // Preload all images in the current queue (up to 20)
+  queue.slice(0, 20).forEach(art => preloadImg(art.img));
+}
 async function fillQueue() {
   if (filling) return; filling = true;
   const gen = fillGeneration;
   try {
     const fn = curMode === 'wiki' ? (curTopics.size ? fetchWikiByTopic : fetchWiki) : fetchVoyage;
-    const [a, b] = await Promise.all([fn(), fn()]);
+    const [a, b, c] = await Promise.all([fn(), fn(), fn()]);
     if (gen !== fillGeneration) return; // stale — mode/lang changed while awaiting
-    const fresh = [...a,...b];
+    const fresh = [...a,...b,...c];
     queue.push(...fresh);
-    fresh.forEach(art => { if (art.img) { const i=new Image(); i.src=art.img; } });
+    fresh.forEach(art => preloadImg(art.img));
   } finally { filling = false; }
 }
 
@@ -2088,6 +2161,7 @@ function flushQueue(n) {
     setTimeout(() => { h.style.display='none'; }, 5500);
   }
   attachSentinel();
+  preloadQueueImages();
   if (queue.length < QUEUE_MIN) fillQueue();
 }
 
@@ -2119,12 +2193,56 @@ document.getElementById('feed').addEventListener('scroll', () => {
 }, {passive:true});
 
 // ── BOOT ───────────────────────────────────────────────────────────────────
+async function resolveDeepLink() {
+  // Check for ?a=w12345 or ?a=v12345 deep link
+  const params = new URLSearchParams(window.location.search);
+  const aid = params.get('a');
+  if (!aid) return null;
+  // Clean URL without reloading
+  try { window.history.replaceState({}, '', window.location.pathname); } catch {}
+  const prefix = aid.charAt(0); // 'w' or 'v'
+  const pageid = parseInt(aid.slice(1));
+  if (!pageid || (prefix !== 'w' && prefix !== 'v')) return null;
+  try {
+    const lang = curLang || 'en';
+    const domain = prefix === 'w' ? `${lang}.wikipedia.org` : `en.wikivoyage.org`;
+    const url = `https://${domain}/api/rest_v1/page/summary/${pageid}`;
+    // Try by pageid — use mobile-sections endpoint
+    const resp = await fetchOne(`https://${domain}/w/api.php?action=query&pageids=${pageid}&prop=extracts|pageimages|info&exintro=1&explaintext=1&piprop=thumbnail&pithumbsize=800&inprop=url&format=json&origin=*`);
+    const pages = resp?.query?.pages;
+    if (!pages) return null;
+    const p = Object.values(pages)[0];
+    if (!p || p.missing !== undefined) return null;
+    const art = {
+      id: (prefix === 'w' ? 'w' : 'v') + p.pageid,
+      src: prefix === 'w' ? 'wiki' : 'how',
+      title: p.title,
+      body: stripHtml(p.extract || ''),
+      img: p.thumbnail?.source || '',
+      url: p.fullurl || `https://${domain}/wiki/${encodeURIComponent(p.title.replace(/ /g,'_'))}`
+    };
+    if (!art.body || art.body.length < 30) return null;
+    toast(`📎 Opened shared article`);
+    return art;
+  } catch (e) {
+    console.warn('Deep link resolve failed:', e);
+    return null;
+  }
+}
+
 async function boot() {
   fetchOnThisDay(); // fire and forget — populates otdIds in background
   try {
+    // Check for deep link article
+    const deepArt = await resolveDeepLink();
     await fillQueue();
     document.getElementById('spinner')?.remove();
-    if (!queue.length) { showError(); return; }
+    if (deepArt) {
+      // Render deep link article first
+      articles.push(deepArt);
+      renderCard(deepArt);
+    }
+    if (!queue.length && !deepArt) { showError(); return; }
     flushQueue(5);
   } catch(e) {
     console.error(e);
@@ -2295,7 +2413,7 @@ function renderLikedList() {
       <div class="li-body">${esc(a.body.slice(0,130))}</div>
       <div class="li-acts">
         <button class="li-btn" data-read="${esc(a.url)}">Read</button>
-        <button class="li-btn" data-share-url="${esc(a.url)}" data-share-title="${esc(a.title)}">Share</button>
+        <button class="li-btn" data-share-url="${esc(a.url)}" data-share-title="${esc(a.title)}" data-share-id="${esc(a.id)}">Share</button>
         ${opts}
         <button class="li-btn" data-unlike="${esc(a.id)}">Remove</button>
       </div>
@@ -2309,7 +2427,7 @@ document.getElementById('likedList').addEventListener('click', ev => {
   const btn = ev.target.closest('.li-btn,.coll-assign'); if (!btn) return;
   if      (btn.dataset.read)     window.open(btn.dataset.read,'_blank');
   else if (btn.dataset.unlike)   removeLike(btn.dataset.unlike);
-  else if (btn.dataset.shareUrl) doShare({url: btn.dataset.shareUrl, title: btn.dataset.shareTitle});
+  else if (btn.dataset.shareUrl) doShare({url: btn.dataset.shareUrl, title: btn.dataset.shareTitle, id: btn.dataset.shareId});
   else if (btn.dataset.addcoll !== undefined) addToCollection(parseInt(btn.dataset.addcoll), btn.dataset.aid);
   if (btn.id === 'deleteCollBtn' && activeCollection !== null) deleteCollection(activeCollection);
 });
@@ -2329,13 +2447,19 @@ document.getElementById('collNewInput').addEventListener('keydown', ev => {
 });
 
 // ── SHARE ──────────────────────────────────────────────────────────────────
+function deepLinkUrl(a) {
+  // Build shareable WikiScroll deep link: wikiscroll.com/?a=w12345
+  const base = 'https://wikiscroll.com/';
+  return `${base}?a=${encodeURIComponent(a.id)}`;
+}
 function doShare(a) {
   // a can be an article object or {url, title} from liked list
   const url = a.url, title = a.title;
   if (!a.body) {
     // Simple share (from liked list with no body context)
-    if (navigator.share) navigator.share({title,url}).catch(()=>{});
-    else if (navigator.clipboard) navigator.clipboard.writeText(url).then(()=>toast('Link copied!')).catch(()=>{});
+    const shareUrl = a.id ? deepLinkUrl(a) : url;
+    if (navigator.share) navigator.share({title, url: shareUrl}).catch(()=>{});
+    else if (navigator.clipboard) navigator.clipboard.writeText(shareUrl).then(()=>toast('Link copied!')).catch(()=>{});
     return;
   }
   // Offer image share
@@ -2412,7 +2536,7 @@ function openShareImage(a) {
   ctx.fillText('WikiScroll', W/2, H - 100);
   ctx.font = '400 20px "DM Sans", sans-serif';
   ctx.fillStyle = 'rgba(255,255,255,.15)';
-  ctx.fillText('wikiscroll.com', W/2, H - 65);
+  ctx.fillText('wikiscroll.com/?a=' + encodeURIComponent(a.id), W/2, H - 65);
 
   // Divider line
   ctx.strokeStyle = 'rgba(255,255,255,.06)';
@@ -2462,18 +2586,19 @@ document.getElementById('shareImgDownload').addEventListener('click', () => {
 document.getElementById('shareImgShare').addEventListener('click', async () => {
   const preview = document.getElementById('shareImgPreview');
   const a = preview._article;
+  const shareUrl = a ? deepLinkUrl(a) : 'https://wikiscroll.com';
   if (navigator.share && navigator.canShare) {
     try {
       const blob = await new Promise(r => preview._canvas.toBlob(r, 'image/png'));
       const file = new File([blob], 'wikiscroll.png', {type:'image/png'});
       if (navigator.canShare({files:[file]})) {
-        await navigator.share({title: a?.title||'WikiScroll', text: a?.title, url: a?.url, files:[file]});
+        await navigator.share({title: a?.title||'WikiScroll', text: `${a?.title} — WikiScroll`, url: shareUrl, files:[file]});
       } else {
-        await navigator.share({title: a?.title||'WikiScroll', url: a?.url});
+        await navigator.share({title: a?.title||'WikiScroll', url: shareUrl});
       }
     } catch(e) { if (e.name!=='AbortError') toast('Share failed'); }
-  } else if (a?.url) {
-    if (navigator.clipboard) navigator.clipboard.writeText(a.url).then(()=>toast('Link copied!')).catch(()=>{});
+  } else {
+    if (navigator.clipboard) navigator.clipboard.writeText(shareUrl).then(()=>toast('Link copied!')).catch(()=>{});
   }
   document.getElementById('shareImgOverlay').classList.remove('open');
 });
@@ -2659,45 +2784,14 @@ function setHaptic(val) { hapticEnabled=val; saveSettings(); syncAllToggles(); t
 document.getElementById('hapticToggle').addEventListener('click', () => setHaptic(!hapticEnabled));
 document.getElementById('dkHapticToggle').addEventListener('click', () => setHaptic(!hapticEnabled));
 
-// iOS haptic workaround: create fresh <input type="checkbox" switch> + <label> each call
-// Based on ios-haptics library: https://github.com/tijnjh/ios-haptics
-// Key: Safari only fires haptic on user-gesture-initiated label.click() for switch checkboxes
-// Must create fresh elements each time (Safari may suppress repeated toggles on same element)
-let _hapticCounter = 0;
+// Haptic feedback — Android only via Vibration API
+// iOS Safari does not support the Vibration API and Apple has not provided
+// a reliable web-based alternative. The checkbox switch workaround has been
+// patched/unreliable as of iOS 26.
 function triggerHaptic() {
   if (!hapticEnabled) return;
-  // Android: Vibration API (works natively)
-  if (navigator.vibrate) { navigator.vibrate(12); return; }
-  // iOS: create fresh checkbox switch + label, click label, remove both
-  try {
-    const id = 'ws-hap-' + (++_hapticCounter);
-    const input = document.createElement('input');
-    input.type = 'checkbox';
-    input.id = id;
-    input.setAttribute('switch', '');
-    input.style.cssText = 'position:fixed;top:-9999px;left:-9999px;opacity:0;pointer-events:none;width:0;height:0;';
-    const label = document.createElement('label');
-    label.setAttribute('for', id);
-    label.style.cssText = 'position:fixed;top:-9999px;left:-9999px;opacity:0;pointer-events:none;width:0;height:0;';
-    document.body.appendChild(input);
-    document.body.appendChild(label);
-    label.click();
-    // Clean up immediately
-    input.remove();
-    label.remove();
-  } catch {}
+  if (navigator.vibrate) navigator.vibrate(12);
 }
-
-// Haptic on vertical scroll (triggered from touchend so it's in user gesture context)
-let _feedScrollStartY = 0;
-document.getElementById('feed').addEventListener('touchstart', (e) => {
-  _feedScrollStartY = e.touches[0]?.clientY || 0;
-}, { passive: true });
-document.getElementById('feed').addEventListener('touchend', (e) => {
-  const dy = Math.abs((e.changedTouches[0]?.clientY || 0) - _feedScrollStartY);
-  // Only fire haptic if user scrolled enough to snap to a new card (roughly >40px drag)
-  if (dy > 40) triggerHaptic();
-}, { passive: true });
 
 // Depth sliders — sync both sliders + step indicators on drag
 document.getElementById('depthSlider').addEventListener('input', ev => {
@@ -3102,7 +3196,7 @@ async function openMap(article) {
     // Still show a world view
     try {
       if (!mapInstance) {
-        mapInstance = L.map(canvas, { zoomControl: false, attributionControl: false }).setView([20, 0], 2);
+        mapInstance = L.map(canvas, { zoomControl: false, attributionControl: false, scrollWheelZoom: true, zoomSnap: 0.5, wheelPxPerZoomLevel: 120 }).setView([20, 0], 2);
         const isDark = !document.body.classList.contains('light');
         L.tileLayer(isDark
           ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
@@ -3121,7 +3215,7 @@ async function openMap(article) {
 
   try {
     if (!mapInstance) {
-      mapInstance = L.map(canvas, { zoomControl: false, attributionControl: false }).setView([geo.lat, geo.lng], 8);
+      mapInstance = L.map(canvas, { zoomControl: false, attributionControl: false, scrollWheelZoom: true, zoomSnap: 0.5, wheelPxPerZoomLevel: 120 }).setView([geo.lat, geo.lng], 5);
       const isDark = !document.body.classList.contains('light');
       L.tileLayer(isDark
         ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
@@ -3130,7 +3224,7 @@ async function openMap(article) {
       }).addTo(mapInstance);
       L.control.zoom({ position: 'bottomright' }).addTo(mapInstance);
     } else {
-      mapInstance.setView([geo.lat, geo.lng], 8, { animate: true, duration: 1.2 });
+      mapInstance.setView([geo.lat, geo.lng], 5, { animate: true, duration: 1.2 });
     }
 
     // Custom marker
@@ -3163,6 +3257,15 @@ document.getElementById('mapClose').addEventListener('click', closeMap);
 document.getElementById('mapOverlay').addEventListener('click', ev => {
   if (ev.target === ev.currentTarget) closeMap();
 });
+
+// Prevent browser zoom on map (trackpad pinch-to-zoom sends wheel+ctrlKey)
+const mapContainer = document.querySelector('.map-container');
+mapContainer.addEventListener('wheel', ev => {
+  if (ev.ctrlKey) ev.preventDefault();
+}, { passive: false });
+// Safari non-standard pinch events
+mapContainer.addEventListener('gesturestart', ev => ev.preventDefault(), { passive: false });
+mapContainer.addEventListener('gesturechange', ev => ev.preventDefault(), { passive: false });
 
 // ── DYNAMIC KB HINTS ─────────────────────────────────────────────────────
 function updateKbHints() {

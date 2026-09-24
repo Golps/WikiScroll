@@ -126,9 +126,9 @@ Group saved articles into named collections, and share one as a link. The link o
 | | |
 |---|---|
 | **Reading** | Full-height cards with introductions trimmed to whole sentences that fit the screen. Ambient mode. An occasional "On this day" badge marks people and events tied to today's date. |
-| **Your library** | Saved articles (also kept in IndexedDB for offline reading), reading history for the last 50 articles, and named collections. |
+| **Your library** | Saved articles (also kept in IndexedDB for offline reading), reading history for the last 50 articles, and named collections, with undo when one is deleted. |
 | **Sharing** | Article links get a proper preview in messaging apps. Collections are shared as a snapshot of up to 30 articles, verified again when the link is opened. |
-| **Languages** | 15 content languages, and the interface translated into all of them. Arabic and Hebrew get a right-to-left layout. |
+| **Languages** | 15 content languages, and the interface translated into all of them. Each reader downloads only their own language. Arabic and Hebrew get a right-to-left layout. |
 | **Input** | Touch swipes, double-tap to save, pull to refresh, mouse drag, two-finger trackpad swipes, and keyboard shortcuts. |
 | **Install and offline** | Installable as a Progressive Web App. The app shell and recently viewed images are cached, so saved articles and cached content work offline. New discoveries and maps need a connection. |
 | **Appearance** | Dark theme by default, with a light theme. Responsive layouts for phones, tablets and wide desktops. |
@@ -201,6 +201,7 @@ Discovery depends on public APIs that can be slow, rate-limited or briefly unava
 - **Stale-while-revalidate:** cached supply is served immediately and refreshed in the background, and yesterday's cards stay available during an outage.
 - **No stale replies:** every request carries a feed generation number, so a slow reply meant for the previous source, language or filter can never appear in the new feed.
 - **Shared links are verified:** shared collections carry only article IDs. Titles, excerpts and images are fetched again from Wikimedia, escaped, and checked against strict limits before anything is rendered.
+- **Locked-down pages:** a Content Security Policy allows scripts only from WikiScroll, the map library's CDN and Cloudflare Web Analytics, with no inline scripts. The API answers only WikiScroll's own pages.
 
 [docs/ENGINEERING.md](docs/ENGINEERING.md) walks through each of these with code references, and covers what the test suite does and doesn't verify.
 
@@ -243,7 +244,7 @@ This repository is a snapshot of the code behind wikiscroll.com. It isn't finish
 
 ## Forking and contributing
 
-You're welcome to study this code, fork it and build something of your own. This repository is published as a reference snapshot and isn't actively maintained, so issues and pull requests may not get a response. [CONTRIBUTING.md](CONTRIBUTING.md) has more detail. To report a security problem with wikiscroll.com, follow [SECURITY.md](SECURITY.md) instead of opening a public issue.
+You're welcome to study this code, fork it and build something of your own. This repository is published as a reference snapshot and isn't actively maintained, so issues and pull requests may not get a response. [CONTRIBUTING.md](CONTRIBUTING.md) has more detail, and [CHANGELOG.md](CHANGELOG.md) lists what changed in each release. To report a security problem with wikiscroll.com, follow [SECURITY.md](SECURITY.md) instead of opening a public issue.
 
 If WikiScroll is useful to you, a ⭐ on the repository helps others find it.
 

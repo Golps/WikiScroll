@@ -1,10 +1,10 @@
 import { wordmark } from './wordmark.js';
 import {verifyCollection} from './verified.js';
 import {permit,limited} from './security.js';
+import {LANGS as languages} from './languages.js';
 const renders=new Map();
 export const encodeCollection=c=>btoa(String.fromCharCode(...new TextEncoder().encode(JSON.stringify(c)))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
 const esc = s => String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const languages = new Set('en es fr de it pt ru ja zh ar hi ko nl pl he'.split(' '));
 export function decodeCollection(encoded) {
   if (!encoded || encoded.length>12000 || !/^[\w-]+$/.test(encoded)) throw Error('Invalid collection');
   const value=JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(encoded.replace(/-/g,'+').replace(/_/g,'/')),c=>c.charCodeAt(0))));

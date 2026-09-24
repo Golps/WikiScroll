@@ -7,11 +7,11 @@ import {completeExtracts,extractParams} from './extracts.js';
 import {vitalArticles} from './vital.js';
 import {completeNeeds,HELP_LANGS} from './needs.js';
 import {todayResponse} from './today.js';
+import {LANGS} from './languages.js';
 /** WikiScroll Worker: explicit routing, static assets and article unfurls.
  * Handles article requests and social previews.
  * No GitHub integration, Pages runtime, KV or framework is required.
  */
-const LANGS = new Set(['en','es','fr','de','it','pt','ru','ja','zh','ar','hi','ko','nl','pl','he']);
 // Wikivoyage editions large enough for a feed. Arabic and Korean have none;
 // Hindi has about 200 guides. Those readers get English guides instead.
 export const VOYAGE_LANGS = new Set(['en','es','fr','de','it','pt','ru','ja','zh','he','nl','pl']);
@@ -37,7 +37,10 @@ const cooldowns = new Map();
 const inFlight = new Map();
 const escape = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const strip = s => String(s ?? '').replace(/<[^>]*>/g,'').replace(/\s+/g,' ').trim();
-const json = (body,status=200,headers={}) => Response.json(body,{status,headers:{'Cache-Control':'no-store','Access-Control-Allow-Origin':'*',...headers}});
+// The API serves WikiScroll's own pages, which call it from the same origin, so
+// it sends no CORS headers: other sites cannot spend its Wikimedia budget from
+// their visitors' browsers.
+const json = (body,status=200,headers={}) => Response.json(body,{status,headers:{'Cache-Control':'no-store',...headers}});
 
 export function retryDelay(value, now=Date.now()) {
   if (/^\d+(\.\d+)?$/.test(value || '')) return Math.max(1000,Number(value)*1000);
@@ -223,8 +226,7 @@ async function handle(request,env,ctx) {
     const url=new URL(request.url);
     if(['/collection','/collection.png','/api/collection'].includes(url.pathname)) return collectionResponse(request,ctx,env);
     if(url.pathname.startsWith('/api/')){
-      if(request.method==='OPTIONS')return new Response(null,{status:204,headers:{'Access-Control-Allow-Origin':'*','Access-Control-Allow-Methods':'GET, HEAD, OPTIONS'}});
-      if(!['GET','HEAD'].includes(request.method))return json({error:'Method not allowed'},405,{'Allow':'GET, HEAD, OPTIONS'});
+      if(!['GET','HEAD'].includes(request.method))return json({error:'Method not allowed'},405,{'Allow':'GET, HEAD'});
       if(url.pathname==='/api/travel'){
         const requested=url.searchParams.get('lang')||'en',place=(url.searchParams.get('place')||'').trim(),style=url.searchParams.get('style')||'',offset=Number(url.searchParams.get('offset')||0);
         const styles={nature:'nature OR hiking OR park',coast:'beach OR coast OR island',culture:'museum OR history OR culture',city:'city OR urban'};

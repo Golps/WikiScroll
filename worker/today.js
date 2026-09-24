@@ -54,10 +54,10 @@ export function parseToday(feed, lang) {
 export async function todayResponse(url, ctx, {langs, permit, limited, env, feed = fetchFeed}) {
   const lang = url.searchParams.get('lang') || 'en', md = url.searchParams.get('md') || '';
   if (!langs.has(lang) || !MONTH_DAY.test(md)) return Response.json({error: 'Invalid date or language'}, {status: 400, headers: {'Cache-Control': 'no-store'}});
-  const headers = ttl => ({'Cache-Control': `public, max-age=${Math.min(ttl, 3600)}`, 'Access-Control-Allow-Origin': '*'});
+  const headers = ttl => ({'Cache-Control': `public, max-age=${Math.min(ttl, 3600)}`});
   // A failed or timed-out feed is a temporary error, never an empty day: the
   // browser keeps retrying, and browsers never cache the failure.
-  const unavailable = () => Response.json({error: 'On this day is temporarily unavailable.'}, {status: 503, headers: {'Cache-Control': 'no-store', 'Retry-After': String(RETRY_TTL), 'Access-Control-Allow-Origin': '*'}});
+  const unavailable = () => Response.json({error: 'On this day is temporarily unavailable.'}, {status: 503, headers: {'Cache-Control': 'no-store', 'Retry-After': String(RETRY_TTL)}});
   const key = new Request(`https://wikiscroll.com/__today/v3/${lang}/${md}`), cache = globalThis.caches?.default;
   try {
     const hit = await cache?.match(key);

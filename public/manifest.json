@@ -3,6 +3,13 @@
   "name": "WikiScroll: The discovery reader",
   "short_name": "WikiScroll",
   "description": "Replace doomscrolling with mindful discovery. Explore surprising Wikipedia knowledge and Wikivoyage destinations, save what matters, and learn at your own pace.",
+  "lang": "en",
+  "dir": "auto",
+  "categories": [
+    "education",
+    "books",
+    "travel"
+  ],
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

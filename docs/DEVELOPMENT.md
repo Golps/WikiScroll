@@ -111,6 +111,8 @@ These results come from serving `public/` as static files in a desktop browser:
 
 In static mode every reader's browser talks to Wikimedia directly, and the controls that need the Worker stay visible but won't load results.
 
+**Security headers.** `public/_headers` (security headers and the Content Security Policy) is read by Cloudflare and Netlify. GitHub Pages can't set custom headers, so a copy there runs without them; the app works the same, with less protection against injected scripts.
+
 **Serve it from the root of a domain.** The app uses root-relative paths (`/app.js`, `/sw.js`, `/images/…`), so it must be served at `/`. On GitHub Pages, that means a custom domain or a `username.github.io` repository. A project site at `username.github.io/repo/` would need those paths rewritten first.
 
 **Publish `public/` as the site.** GitHub Pages can publish a branch's root or `docs/` folder, or deploy any folder through GitHub Actions. With Actions, a minimal workflow in your fork looks like this:
@@ -148,6 +150,7 @@ WikiScroll was written for one deployment, at `wikiscroll.com`. Before deploying
 | **Name and logo** | `branding/` sources, then `node scripts/build-branding.mjs`. The wordmark is also embedded in `worker/wordmark.js` for generated images. |
 | **Worker name** | `name` in `wrangler.jsonc`, and the `Uploaded wikiscroll` check in `scripts/deploy.sh` |
 | **Map key** | `CARTO_BASEMAP_KEY` in `public/app.js`: optional, but recommended for public deployments, restricted to your domain |
+| **Content Security Policy** | `PAGE_CSP` in `worker/security.js` and the `/*` block of `public/_headers`. Update both if you add a script, map-tile, analytics or API host. |
 | **Tests** | Several tests use `https://wikiscroll.com` as an example origin. They still pass, but update them if you change behavior that depends on the domain. |
 
 Please use your own name and logo for a public deployment, so readers can tell your project apart from wikiscroll.com, and keep the attribution to Wikimedia and the other sources in [THIRD_PARTY_NOTICES.md](../THIRD_PARTY_NOTICES.md).
@@ -155,10 +158,11 @@ Please use your own name and logo for a public deployment, so readers can tell y
 ## Conventions
 
 - **Remove leftovers.** When you remove or replace a feature, remove its styles, scripts, translations and tests in the same change. `test/unused-css.test.js` fails on style rules that nothing uses. Delete the rule instead of silencing the test.
-- **Version static assets.** When a file in `public/` changes, bump its `?v=` number in `index.html`, update the matching entry in the `SHELL` list in `sw.js`, and bump the `CACHE` name there.
-- **Keep mirrored tables identical.** `VIEW_SCALE`, the Wikivoyage language list and `HELP_LANGS` exist in both the Worker and `app.js`. Change both; tests compare them.
+- **Version static assets.** When a file in `public/` changes, bump its `?v=` number in `index.html`, update the matching entry in the `SHELL` list in `sw.js`, and bump the `CACHE` name there. When a dictionary in `public/translations/` changes, bump `VERSION` in `public/lang.js` (and `lang.js`'s own `?v=`), then the dictionary entries in `SHELL`.
+- **Keep mirrored tables identical.** `VIEW_SCALE`, the Wikivoyage language list, `HELP_LANGS` and the language list (`worker/languages.js`) exist in both the Worker and `app.js`. Change both; tests compare them.
+- **No inline scripts or handlers.** The Content Security Policy blocks them. Attach behavior with `addEventListener`; for images that may fail, use `data-fallback` (see `app.js`). New external hosts must be added to `PAGE_CSP` in `worker/security.js` and to `public/_headers`; a test keeps the two identical.
 - **Preserve storage keys.** The `ws_*` `localStorage` keys and the `wikiscroll` IndexedDB database hold readers' libraries. Add migrations; never rename keys.
-- **Translate new labels.** Add every new interface string to `public/translations.js` for all 14 non-English languages. A message that includes a collection name or a number needs a template entry (`"Added to \"{name}\""`) and a matching pattern in `public/i18n.js`. `test/i18n.test.js` fails when a toast message has no translation.
+- **Translate new labels.** Add every new interface string to all 14 files in `public/translations/`. A message that includes a collection name or a number needs a template entry (`"Added to \"{name}\""`) and a matching pattern in `public/i18n.js`. `test/i18n.test.js` fails when a toast message has no translation.
 - **About content.** Edit `public/about/index.html`, then run `node scripts/build-about.mjs` to copy it into the in-app dialog.
 - **Branding.** Edit the sources in `branding/`, then run `node scripts/build-branding.mjs` (after `pnpm install`) to regenerate icons and the share image. With unchanged sources, it reproduces the committed images byte for byte.
 - **Wording.** Keep product copy calm and factual. Describe only what the app does today.

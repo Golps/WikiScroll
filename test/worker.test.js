@@ -402,12 +402,28 @@ test('a Known batch borrowed from Popular is served but never cached',async()=>{
 });
 test('every copy of the supported language list is identical',async()=>{
   const {readFileSync}=await import('node:fs');
+  const {LANGS}=await import('../worker/languages.js');
   const read=f=>readFileSync(new URL('../'+f,import.meta.url),'utf8');
-  const router=[...read('worker/index.js').match(/const LANGS = new Set\(\[([^\]]+)\]\)/)[1].matchAll(/'([a-z]{2})'/g)].map(m=>m[1]).sort();
-  const collections=read('worker/collections.js').match(/const languages = new Set\('([a-z ]+)'\.split/)[1].split(' ').sort();
+  const shared=[...LANGS].sort();
+  assert.equal(shared.length,15);
+  // The router and shared collections use the one Worker list.
+  for(const file of ['worker/index.js','worker/collections.js']){
+    assert.match(read(file),/import \{LANGS( as languages)?\} from '\.\/languages\.js';/,file);
+    assert.doesNotMatch(read(file),/'ar','hi','ko'|'en es fr/,file+' keeps no copy of its own');
+  }
   const reader=[...read('public/app.js').match(/const LANGS = \[([\s\S]*?)\];/)[1].matchAll(/c:'([a-z]{2})'/g)].map(m=>m[1]).sort();
-  assert.equal(router.length,15);
-  assert.deepEqual(collections,router);assert.deepEqual(reader,router);
+  assert.deepEqual(reader,shared);
+});
+test('the API sends no CORS headers, so other sites cannot spend its budget',async()=>{
+  const invalid=await worker.fetch(request('lang=evil.test'),env,ctx);
+  assert.equal(invalid.headers.get('Access-Control-Allow-Origin'),null);
+  const preflight=await worker.fetch(new Request('https://wikiscroll.com/api/articles',{method:'OPTIONS'}),env,ctx);
+  assert.equal(preflight.status,405);
+  assert.equal(preflight.headers.get('Access-Control-Allow-Origin'),null);
+  assert.equal(preflight.headers.get('Allow'),'GET, HEAD');
+  const {readFileSync}=await import('node:fs');
+  for(const file of ['worker/index.js','worker/today.js','worker/topics.js','worker/collections.js'])
+    assert.doesNotMatch(readFileSync(new URL('../'+file,import.meta.url),'utf8'),/Access-Control-Allow-Origin/,file);
 });
 test('complete travel pages are shared from the edge cache; partial pages are not cached',async t=>{
   const cache=edgeCache();let searches=0;

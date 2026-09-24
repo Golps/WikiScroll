@@ -32,6 +32,8 @@ test('existing storage keys and native Safari privacy mechanism remain',()=>{
   assert.match(source,/dlg.showModal\(\)/);
   assert.match(source,/_privacyOpenTime < 500/);
   const html=fs.readFileSync(new URL('../public/index.html',import.meta.url),'utf8');
-  assert.match(html,/onclick="closeBurger\(\);setTimeout\(openPrivacy,350\)"/);
-  assert.match(html,/onclick="closeSettings\(\);setTimeout\(openPrivacy,100\)"/);
+  assert.match(html,/data-open-privacy="burger"/);
+  assert.match(html,/data-open-privacy="settings"/);
+  assert.match(source,/closeBurger\(\); setTimeout\(openPrivacy, 350\)/);
+  assert.match(source,/closeSettings\(\); setTimeout\(openPrivacy, 100\)/);
 });

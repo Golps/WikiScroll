@@ -175,6 +175,17 @@ const IDB = (() => {
 // ── HELPERS ────────────────────────────────────────────────────────────────
 function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
 function stripHtml(s) { return String(s||'').replace(/<[^>]+>/g,''); }
+// Images that fail to load are removed, or replaced by the card's globe
+// fallback. One listener instead of inline onerror attributes, which the
+// Content Security Policy does not allow. Error events do not bubble, so it
+// listens in the capture phase.
+document.addEventListener('error', event => {
+  const img = event.target;
+  if (!(img instanceof HTMLImageElement) || !img.dataset.fallback) return;
+  if (img.dataset.fallback === 'media') img.closest('.art-media')?.classList.add('image-unavailable');
+  (img.dataset.fallback === 'parent' ? img.parentElement : img).remove();
+}, true);
+
 function toast(msg, ms = 2200) {
   const t = document.createElement('div');
   t.className = 'toast'; t.textContent = msg;
@@ -320,7 +331,7 @@ function renderHistory() {
       try { timeStr = new Intl.RelativeTimeFormat(curLang, {numeric: 'auto', style: 'short'}).format(-value, unit); } catch { timeStr = value + unit[0] + ' ago'; }
     }
     return `<button type="button" class="hi" data-url="${esc(h.url)}">
-      ${image && /^https:\/\//i.test(image) ? `<span class="saved-image"><img src="${esc(image)}" alt="" loading="lazy" decoding="async" onerror="this.parentElement.remove()"></span>` : ''}
+      ${image && /^https:\/\//i.test(image) ? `<span class="saved-image"><img src="${esc(image)}" alt="" loading="lazy" decoding="async" data-fallback="parent"></span>` : ''}
       <div class="hi-time">${h.src==='wiki'?'📖':'🗺️'} ${timeStr}</div>
       <div class="hi-ttl" dir="auto">${esc(h.title)}</div>
       <span class="history-read">${atlasIcon.arrow}<span>Read</span></span>
@@ -353,13 +364,38 @@ function addToCollection(colIdx, articleId) {
   renderLikedList();
   toast('Added to "'+col.name+'"');
 }
+// A deleted collection can be restored for a few seconds from a notice at the
+// top of Saved Articles (inside the panel, so keyboard users can reach it).
+let deletedCollection = null;
 function deleteCollection(colIdx) {
-  collections.splice(colIdx, 1);
+  const [col] = collections.splice(colIdx, 1);
+  if (!col) return;
+  clearTimeout(deletedCollection?.timer);
+  deletedCollection = {col, index: colIdx, timer: setTimeout(() => { deletedCollection = null; renderLikedList(); }, 8000)};
   activeCollection = null;
   saveCollections();
-  renderCollTabs();
   renderLikedList();
-  toast('Collection deleted');
+  document.getElementById('undoDeleteBtn')?.focus({preventScroll: true});
+}
+function undoDeleteCollection() {
+  if (!deletedCollection) return;
+  const {col, index, timer} = deletedCollection;
+  clearTimeout(timer); deletedCollection = null;
+  // A collection created with the same name in the meantime keeps its place.
+  if (!collections.some(c => c.name.toLowerCase() === col.name.toLowerCase())) {
+    collections.splice(Math.min(index, collections.length), 0, col);
+    activeCollection = collections.indexOf(col);
+    saveCollections();
+  }
+  renderLikedList();
+}
+// Inside a collection, Remove takes the article out of that collection only;
+// it stays saved. In "All", Remove unsaves it.
+function removeFromCollection(colIdx, id) {
+  const col = collections[colIdx]; if (!col) return;
+  col.ids = col.ids.filter(x => x !== id);
+  saveCollections();
+  renderLikedList();
 }
 
 // ── DEPTH ENGINE ──────────────────────────────────────────────────────────
@@ -864,8 +900,8 @@ function renderCard(a) {
   // The first card's photo is the page's largest paint: fetch it immediately.
   const lead    = !document.querySelector('#feed .card[data-id]');
   const load    = lead ? 'loading="eager"' : 'loading="lazy"';
-  const img     = a.img ? `<img src="${esc(a.img)}" alt="" decoding="async" ${load} onerror="this.remove()">` : '';
-  const artImg  = a.img ? `<figure class="art-media"><img class="art-backdrop" aria-hidden="true" src="${esc(a.img)}" alt="" ${load}><img src="${esc(a.img)}" alt="" decoding="async" ${lead ? 'loading="eager" fetchpriority="high"' : 'loading="lazy"'} class="art-img" onerror="this.closest('.art-media').classList.add('image-unavailable');this.remove()"><span class="art-media-fallback" aria-hidden="true"><svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="1"><circle cx="32" cy="32" r="24"/><ellipse cx="32" cy="32" rx="12" ry="24"/><path d="M8 32h48M12 19h40M12 45h40"/></svg></span></figure>` : '';
+  const img     = a.img ? `<img src="${esc(a.img)}" alt="" decoding="async" ${load} data-fallback="remove">` : '';
+  const artImg  = a.img ? `<figure class="art-media"><img class="art-backdrop" aria-hidden="true" src="${esc(a.img)}" alt="" ${load}><img src="${esc(a.img)}" alt="" decoding="async" ${lead ? 'loading="eager" fetchpriority="high"' : 'loading="lazy"'} class="art-img" data-fallback="media"><span class="art-media-fallback" aria-hidden="true"><svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="1"><circle cx="32" cy="32" r="24"/><ellipse cx="32" cy="32" rx="12" ry="24"/><path d="M8 32h48M12 19h40M12 45h40"/></svg></span></figure>` : '';
   const cat     = isHow ? {label:'Travel',emoji:'🌍'} : TOPIC_MAP[a.topic] || (/^https:\/\/en\./.test(a.url) ? detectCategory(a) : null) || {label:'Discovery',emoji:'🧭'};
   const catHtml = cat ? `<span class="cat-tag">${cat.emoji} ${esc(cat.label)}</span>` : '';
   const need    = !isHow && Array.isArray(a.needs) ? a.needs.find(n => Object.hasOwn(NEED_LABELS, n)) : null;
@@ -992,6 +1028,7 @@ function renderLikedList() {
     if (activeCollection !== null) {
       c.innerHTML += `<div style="text-align:center;margin-top:12px;"><button class="li-btn" id="deleteCollBtn">Delete this collection</button></div>`;
     }
+    c.insertAdjacentHTML('afterbegin', undoNotice());
     return;
   }
   const offline = !navigator.onLine;
@@ -999,7 +1036,7 @@ function renderLikedList() {
     const inColls = collections.filter(col => col.ids.includes(a.id)).map(col => col.name);
     const collLabel = inColls.length ? `<div style="font-size:11px;color:var(--accent);margin-bottom:8px;"> ${esc(inColls.join(', '))}</div>` : '';
     return `<div class="li">
-      ${a.img && /^https:\/\//i.test(a.img) ? `<div class="saved-image"><img src="${esc(a.img)}" alt="" loading="lazy" decoding="async" onerror="this.parentElement.remove()"></div>` : ''}
+      ${a.img && /^https:\/\//i.test(a.img) ? `<div class="saved-image"><img src="${esc(a.img)}" alt="" loading="lazy" decoding="async" data-fallback="parent"></div>` : ''}
       <div class="li-src">${a.src==='wiki'?'Wikipedia':'Wikivoyage'}</div>
       ${offline ? '<div class="li-offline">✓ Available offline</div>' : ''}
       ${collLabel}
@@ -1009,13 +1046,17 @@ function renderLikedList() {
         <button class="li-btn" data-read="${esc(a.url)}">${atlasIcon.arrow}<span>Read</span></button>
         <button class="li-btn" data-share-url="${esc(a.url)}" data-share-title="${esc(a.title)}" data-share-id="${esc(a.id)}">${atlasIcon.share}<span>Share</span></button>
         <button class="li-btn" data-collect="${esc(a.id)}" aria-label="Save to collection">${atlasIcon.bookmark}<span>Collect</span></button>
-        <button class="li-btn" data-unlike="${esc(a.id)}"><svg class="atlas-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7m4-7v7"/></svg><span>Remove</span></button>
+        <button class="li-btn" ${activeCollection !== null ? `data-uncollect="${esc(a.id)}" aria-label="Remove from this collection" title="Remove from this collection"` : `data-unlike="${esc(a.id)}"`}><svg class="atlas-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7m4-7v7"/></svg><span>Remove</span></button>
       </div>
     </div>`;
   }).join('');
   if (activeCollection !== null) {
     c.innerHTML += `<div style="text-align:center;margin-top:12px;"><button class="li-btn" id="deleteCollBtn">Delete this collection</button></div>`;
   }
+  c.insertAdjacentHTML('afterbegin', undoNotice());
+}
+function undoNotice() {
+  return deletedCollection ? `<div class="coll-undo" role="status"><span>Collection deleted</span><button class="li-btn" id="undoDeleteBtn">Undo</button></div>` : '';
 }
 document.getElementById('likedList').addEventListener('click', ev => {
   const btn = ev.target.closest('.li-btn'); if (!btn) return;
@@ -1025,8 +1066,10 @@ document.getElementById('likedList').addEventListener('click', ev => {
   }
   else if (btn.dataset.collect) openCollectionChooser(btn.dataset.collect);
   else if (btn.dataset.unlike)   removeLike(btn.dataset.unlike);
+  else if (btn.dataset.uncollect) removeFromCollection(activeCollection, btn.dataset.uncollect);
   else if (btn.dataset.shareUrl) doShare({url: btn.dataset.shareUrl, title: btn.dataset.shareTitle, id: btn.dataset.shareId});
   if (btn.id === 'deleteCollBtn' && activeCollection !== null) deleteCollection(activeCollection);
+  if (btn.id === 'undoDeleteBtn') undoDeleteCollection();
 });
 document.getElementById('collTabs').addEventListener('click', ev => {
   const tab = ev.target.closest('.coll-tab'); if (!tab) return;
@@ -1140,6 +1183,9 @@ const burgerLangGrid = document.getElementById('burgerLangGrid');
 desktopLangDd.innerHTML  = LANGS.map(l => `<button class="lopt${l.c===curLang?' sel':''}" data-c="${l.c}">${l.f} ${l.n}</button>`).join('');
 burgerLangGrid.innerHTML = LANGS.map(l => `<button class="blopt${l.c===curLang?' sel':''}" data-c="${l.c}">${l.f} ${l.n}</button>`).join('');
 
+// A dictionary that arrives after the first render may change plural forms.
+document.addEventListener('wsi18n:ready', syncActivityDisplay);
+
 // Updates language labels + selected states everywhere (hoisted — also called
 // during loadPersistedState before setLang exists in the flow)
 function applyLangUI() {
@@ -1228,6 +1274,7 @@ document.getElementById('burgerBtn').addEventListener('click', ev => {
   else openBurger();
 });
 document.getElementById('burgerBackdrop').addEventListener('click', closeBurger);
+document.getElementById('burgerDone').addEventListener('click', closeBurger);
 document.getElementById('burgerTopicsBtn').addEventListener('click', ev => {
   ev.stopPropagation();
   const isOpen = document.getElementById('burgerTopics').classList.toggle('open');
@@ -1349,7 +1396,10 @@ document.getElementById('desktopHistoryBtn').addEventListener('click', openHisto
 document.getElementById('hpClose').addEventListener('click', closeAllPanels);
 document.getElementById('historyList').addEventListener('click', ev => {
   const hi = ev.target.closest('.hi'); if (!hi?.dataset.url) return;
-  window.open(hi.dataset.url, '_blank', 'noopener');
+  // Offline, a saved article opens from its offline copy, as in Saved Articles.
+  const saved = !navigator.onLine && [...liked.values()].find(a => a.url === hi.dataset.url);
+  if (saved) openAmbient({dataset: {id: saved.id}});
+  else window.open(hi.dataset.url, '_blank', 'noopener');
 });
 
 // Desktop settings panel open/close
@@ -1391,8 +1441,8 @@ document.getElementById('lpClose').addEventListener('click', closeAllPanels);
 // Privacy policy — native <dialog> via showModal().
 // Why: showModal() renders in the browser's TOP LAYER, above all page content,
 // immune to z-index/stacking-context/CSS-class issues (the previous class-toggle
-// approach worked in Chrome but not Safari). Opening is still triggered by the
-// buttons' inline onclick — proven to fire in every browser.
+// approach worked in Chrome but not Safari). The Privacy Policy buttons close
+// the settings drawer first, then open the dialog once the drawer has moved.
 let _privacyOpenTime = 0;
 function openPrivacy() {
   _privacyOpenTime = Date.now();
@@ -1411,6 +1461,10 @@ function closePrivacy() {
   else dlg.removeAttribute('open');
 }
 document.getElementById('privacyClose').addEventListener('click', closePrivacy);
+document.querySelectorAll('[data-open-privacy]').forEach(btn => btn.addEventListener('click', () => {
+  if (btn.dataset.openPrivacy === 'burger') { closeBurger(); setTimeout(openPrivacy, 350); }
+  else { closeSettings(); setTimeout(openPrivacy, 100); }
+}));
 // Backdrop click closes — a click on ::backdrop targets the dialog element itself.
 // Coordinate check distinguishes backdrop clicks from clicks on the dialog's own
 // padding. The 500ms guard absorbs Safari's delayed synthetic click after tap.

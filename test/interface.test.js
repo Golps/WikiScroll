@@ -155,3 +155,57 @@ test('a shared Wikivoyage guide opens in Wikivoyage mode without loading the fee
   assert.equal(resets, 1, 'a normal mode change still reloads the feed');
   assert.match(app, /if \(\/\^v\[1-9\]\\d\{0,11\}\$\/\.test\(new URLSearchParams\(location\.search\)\.get\('a'\) \|\| ''\)\) setMode\('how', false\);/);
 });
+
+test('a deleted collection can be restored for a few seconds, from inside the Saved panel', () => {
+  const timers = [];
+  const c = vm.createContext({
+    collections: [{name: 'Sea life', ids: ['w1']}, {name: 'Mountains', ids: ['w2']}], activeCollection: 0, saveCollections() {},
+    renderLikedList() {}, document: {getElementById: () => ({focus() {}})},
+    setTimeout: (fn, ms) => { timers.push({fn, ms}); return timers.length; }, clearTimeout() {},
+  });
+  vm.runInContext(slice(app, 'let deletedCollection', '// ── DEPTH ENGINE') + slice(app, 'function undoNotice(', '\n}') + '\n}', c);
+  vm.runInContext('deleteCollection(0)', c);
+  assert.deepEqual(c.collections.map(x => x.name), ['Mountains']);
+  assert.match(vm.runInContext('undoNotice()', c), /role="status".*Collection deleted.*id="undoDeleteBtn">Undo</);
+  assert.equal(timers[0].ms, 8000);
+  vm.runInContext('undoDeleteCollection()', c);
+  assert.deepEqual(c.collections.map(x => x.name), ['Sea life', 'Mountains'], 'restored in its old place');
+  assert.equal(c.activeCollection, 0, 'and shown again');
+  assert.equal(vm.runInContext('undoNotice()', c), '');
+  // After the notice expires, the deletion is final.
+  vm.runInContext('deleteCollection(1)', c); timers.at(-1).fn();
+  vm.runInContext('undoDeleteCollection()', c);
+  assert.deepEqual(c.collections.map(x => x.name), ['Sea life']);
+  assert.match(app, /if \(btn\.id === 'undoDeleteBtn'\) undoDeleteCollection\(\);/);
+});
+
+test('Remove inside a collection takes the article out of that collection only', () => {
+  const c = vm.createContext({collections: [{name: 'Sea life', ids: ['w1', 'w2']}], saveCollections() {}, renderLikedList() {}, setTimeout, clearTimeout, document: {}});
+  vm.runInContext(slice(app, 'let deletedCollection', '// ── DEPTH ENGINE'), c);
+  vm.runInContext('removeFromCollection(0, "w1")', c);
+  assert.deepEqual(c.collections[0].ids, ['w2']);
+  // The list renders a collection-only Remove inside a collection, and unsaves in "All".
+  assert.match(app, /activeCollection !== null \? `data-uncollect="\$\{esc\(a\.id\)\}" aria-label="Remove from this collection"/);
+  assert.match(app, /else if \(btn\.dataset\.uncollect\) removeFromCollection\(activeCollection, btn\.dataset\.uncollect\);/);
+});
+
+test('History opens a saved article from its offline copy when there is no connection', () => {
+  const handler = slice(app, "document.getElementById('historyList').addEventListener('click', ev => {", '\n});');
+  const run = online => {
+    const calls = [];
+    const c = vm.createContext({navigator: {onLine: online}, liked: new Map([['w1', {id: 'w1', url: 'https://en.wikipedia.org/?curid=1'}]]),
+      openAmbient: card => calls.push('ambient ' + card.dataset.id), window: {open: url => calls.push('open ' + url)},
+      document: {getElementById: () => ({addEventListener: (type, fn) => fn({target: {closest: () => ({dataset: {url: 'https://en.wikipedia.org/?curid=1'}})}})})}});
+    vm.runInContext(handler + '\n});', c);
+    return calls;
+  };
+  assert.deepEqual(run(false), ['ambient w1']);
+  assert.deepEqual(run(true), ['open https://en.wikipedia.org/?curid=1']);
+});
+
+test('the installable app describes its language and store categories', () => {
+  const manifest = JSON.parse(read('manifest.json'));
+  assert.equal(manifest.lang, 'en');
+  assert.equal(manifest.dir, 'auto');
+  assert.deepEqual(manifest.categories, ['education', 'books', 'travel']);
+});

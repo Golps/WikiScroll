@@ -1,6 +1,7 @@
 /* Local, deterministic UI localization. Never sends article or collection text to a translation service. */
 (() => {
-  const dictionaries = window.WS_TRANSLATIONS || {};
+  // Filled one language at a time by /translations/<lang>.js (see lang.js).
+  const dictionaries = window.WS_TRANSLATIONS ||= {};
   let language = 'en';
   const originals = new WeakMap(), attributes = new WeakMap();
   const excluded = 'script,style,noscript,svg,textarea,.art-title,.art-body,.li-ttl,.li-body,.hi-ttl,.hi-body,.coll-tab:not([data-cid="null"]),#ambientTitle,#ambientExcerpt,#mapTitle,#mapBadgeText,#privacyDialog,#aboutDialog,.sp-about-logo,.logo,.lopt,.blopt,#langTxt,#burgerLangTxt,.kb-key';
@@ -70,11 +71,18 @@
     while(walker.nextNode()) {const node=walker.currentNode;node.nodeType===3?text(node):element(node);}
   }
   window.WSI18n={translate,apply,setLanguage(lang){
-    language=lang==='en'||dictionaries[lang]?lang:'en';
+    language=/^[a-z]{2}$/.test(lang)?lang:'en';
     document.documentElement.lang=language;
     // Preserve physical swipe directions; mirror reading controls, not navigation physics.
     document.body.classList.toggle('rtl-ui',['ar','he'].includes(language));
     apply();
+    // A dictionary that is still loading is applied the moment it arrives; the
+    // page stays hidden until then (see lang.js).
+    const shown=()=>document.documentElement.classList?.remove('i18n-pending');
+    if(language==='en'||dictionaries[language])return shown();
+    const pending=window.WSTranslations?.load(language);
+    if(!pending)return shown();
+    pending.then(ready=>{if(ready&&language===lang){apply();document.dispatchEvent(new Event('wsi18n:ready'));}}).finally(shown);
   }};
   new MutationObserver(records=>{
     const roots=new Set();

@@ -41,7 +41,7 @@ The browser asks the Worker for batches and keeps a reserve queued ahead of the 
 | `atlas.js` | Presentation only: fitting excerpts to the space available, making closed drawers `inert`, keeping the current card in place across resizes, dialog dismissal, theme metadata. |
 | `features.js` | Wikivoyage travel filters, and sharing and importing collection snapshots. |
 | `discovery.js` | The dismissible "follow your curiosity" hint for first-time readers. |
-| `i18n.js` + `translations.js` | Interface localization from bundled dictionaries, applied through a `MutationObserver`. Article text is excluded. |
+| `lang.js`, `i18n.js` + `translations/<lang>.js` | Interface localization. `lang.js` loads the reader's dictionary (one small file per language) as early as possible; `i18n.js` applies it through a `MutationObserver`. Article text is excluded. |
 | `sw.js` | Service worker: offline app shell, network-first page loads with a 2.5-second fallback to cache, and a cache of up to 80 Wikimedia images. |
 | `styles.css` | All styling, including the dark and light themes, responsive layouts, RTL and reduced-motion rules. |
 | `data/starter-en.json` | A small bundled set of English articles, used for an instant first screen when no filters are set. See [STARTER-SOURCES.md](STARTER-SOURCES.md). |
@@ -61,7 +61,8 @@ The browser asks the Worker for batches and keeps a reserve queued ahead of the 
 | `collections.js` | Decodes and validates shared collections, and renders the collection page and its SVG preview. |
 | `verified.js` | Fetches article metadata again from Wikimedia by page ID, for shared links and collections. |
 | `collection-image.js` | Converts the collection SVG to PNG with `resvg-wasm` and the bundled font. It loads only when needed. |
-| `security.js` | Rate-limit checks that fail closed, the `429` response, and security headers on every response. |
+| `security.js` | Rate-limit checks that fail closed, the `429` response, security headers on every response, and the page's Content Security Policy (`PAGE_CSP`). |
+| `languages.js` | The 15 supported languages, shared by the router and shared collections. |
 | `wordmark.js` | The logo as SVG path data, for generated images. |
 
 ### Everything else
@@ -100,12 +101,13 @@ These rules hold across the codebase, and many are enforced by tests. Changes sh
 - **Swipe right only saves.** Swiping right and double-tapping add a save and never remove one. Only the Save button and <kbd>L</kbd> toggle.
 - **Shared content is re-verified.** Collection links carry IDs. Displayed titles, excerpts and images come from Wikimedia, not from the link.
 - **Rate limits fail closed.** If a rate-limit binding is missing or errors, the Worker refuses expensive work instead of doing it without a limit.
-- **Mirrored tables stay identical.** `app.js` keeps copies of `VIEW_SCALE`, the list of Wikivoyage languages and `HELP_LANGS` from the Worker. Tests fail if they drift.
+- **Mirrored tables stay identical.** `app.js` keeps copies of `VIEW_SCALE`, the list of Wikivoyage languages, `HELP_LANGS` and the 15 languages (`worker/languages.js`) from the Worker. Tests fail if they drift.
+- **No inline scripts.** Pages run under a Content Security Policy without `'unsafe-inline'` for scripts, so behavior is attached with listeners, never with `on…=""` attributes or inline `<script>` blocks (JSON-LD data is fine). The API sends no CORS headers; it serves only WikiScroll's own pages.
 - **No dead CSS.** `test/unused-css.test.js` fails when a style rule targets a class or ID that no page or script uses.
 
 ## Cross-cutting concerns
 
 - **Caching layers:** browser (queued cards in memory, saved reserves in `localStorage`, service-worker cache), then Worker (in-flight request maps, per-isolate memory for the vital-article lists), then the Cloudflare edge cache (article batches and topic batches for 24 hours, complete travel search pages for 1 hour, vital-article lists for 7 days, "On this day" data for 6 hours, verified metadata for 24 hours).
 - **Cache versioning:** cache keys include a version (`version=5` for articles, `v=5` for topics). Front-end assets use `?v=` query strings that must match the `SHELL` list and the `CACHE` name in `sw.js`.
-- **Security headers:** `secure()` in `worker/security.js` adds `nosniff`, `DENY` framing, a strict referrer policy, a permissions policy and HSTS to every response. Generated pages set their own strict CSP.
-- **Localization:** interface strings are translated by text match in `i18n.js`, with templates for messages that contain a collection name or a count (`Added to "{name}"`). New labels need entries in `translations.js` for every language; `test/i18n.test.js` checks the core controls.
+- **Security headers:** `secure()` in `worker/security.js` adds `nosniff`, `DENY` framing, a strict referrer policy, a permissions policy and HSTS to every response, and the app's Content Security Policy (`PAGE_CSP`) to its pages. `public/_headers` sends the same policy for files served without the Worker. Generated pages (link previews, collection pages) set their own stricter CSP.
+- **Localization:** interface strings are translated by text match in `i18n.js`, with templates for messages that contain a collection name or a count (`Added to "{name}"`). New labels need entries in every `translations/<lang>.js`; `test/i18n.test.js` checks the core controls and every toast message.

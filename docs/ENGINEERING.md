@@ -185,13 +185,13 @@ Article links (`?a=w123&lang=es`) follow the same rules. Readers get the normal 
 
 ## Testing
 
-The suite has **176 tests** in 23 files. It runs with `node --test test/*.test.js` in about 2 seconds, with no installed dependencies and no network access. Wikimedia, the edge cache, rate-limit bindings and timers are replaced with fakes.
+The suite has **184 tests** in 23 files. It runs with `node --test test/*.test.js` in about 2 seconds, with no installed dependencies and no network access. Wikimedia, the edge cache, rate-limit bindings and timers are replaced with fakes.
 
 **What it verifies:**
 
-- Worker behavior: parameter validation, caching and stale refreshes, request coalescing, deadlines and partial answers, per-host cooldowns, pageview completion and depth ranges, vital-article sampling, topic sampling, travel search, "On this day" parsing, Help Wikipedia, collection decoding, verification and escaping, bot previews, and security headers.
+- Worker behavior: parameter validation, caching and stale refreshes, request coalescing, deadlines and partial answers, per-host cooldowns, pageview completion and depth ranges, vital-article sampling, topic sampling, travel search, "On this day" parsing, Help Wikipedia, collection decoding, verification and escaping, bot previews, security headers, the page's Content Security Policy, and the absence of CORS headers on the API.
 - Browser logic, extracted from `public/*.js` and run in `node:vm` sandboxes: supply and duplicate rejection, stale-generation handling, request budgets and cooldowns, gesture and trackpad rules, clean-up and card anchoring, persistence and migrations, statistics, localization coverage, service-worker caching, and map loading.
-- Interface rules: right-to-left layout that leaves article text in its own direction, keyboard Tab order, menu-button states, light-theme contrast ratios, storage-quota handling, and translations for every message in all 14 languages.
+- Interface rules: right-to-left layout that leaves article text in its own direction, keyboard Tab order, menu-button states, light-theme contrast ratios, storage-quota handling, collection undo and removal, translations for every message in all 14 languages, per-language dictionary loading, and no inline scripts or event handlers.
 - Project rules: identical copies of the language tables and language lists, and no unused CSS.
 
 **What it doesn't verify:**
@@ -207,13 +207,24 @@ These are known and not yet fixed. They are listed here so the notes above aren'
 | Area | Issue |
 |---|---|
 | About, Privacy Policy and page description | These are English only, while the rest of the interface is translated into 14 languages. |
-| Public API (`worker/index.js`: `json`) | API responses allow any origin (`Access-Control-Allow-Origin: *`), so other sites can call the API from browsers within the rate limits. |
-| Stylesheet (`public/styles.css`) | The stylesheet has grown by layering overrides (for example, `.panel` is redefined 40 times, with 82 `!important` declarations), which makes changes harder to predict. `test/unused-css.test.js` removes dead rules but not overridden ones. |
+| Stylesheet (`public/styles.css`) | The stylesheet has grown by layering overrides (for example, `.panel` alone is the selector of 32 rule blocks, and there are 87 `!important` declarations), which makes changes harder to predict. `test/unused-css.test.js` removes dead rules but not overridden ones. |
 | *Known* depth, first request | The first time a *Known* list is requested at a given edge location each week, it may be answered from Level 3 while Level 4 is still being assembled. That answer is intentionally not cached. |
 
-### Recently fixed
+### Changes in 1.1
 
-Each of these fixes has a regression test that fails on the previous code:
+Each of these has a test that fails on the 1.0 code:
+
+- **Content Security Policy** (`worker/security.js`, `public/_headers`). The app's pages now allow scripts only from WikiScroll itself, cdnjs (Leaflet, for the map) and Cloudflare Web Analytics, and requests only to WikiScroll, Wikimedia, Nominatim and Web Analytics. Inline scripts and inline event handlers are blocked; the few that existed (image fallbacks, the Privacy Policy links, the mobile Done button) were replaced by listeners. The Worker and `_headers` send the same policy, and a test keeps them identical.
+- **No CORS on the API** (`worker/index.js`, `worker/today.js`). The API is only called by WikiScroll's own pages, so it no longer sends `Access-Control-Allow-Origin: *`. Other sites can no longer spend its Wikimedia budget from their visitors' browsers. Preflight requests get `405`.
+- **One dictionary per reader** (`public/lang.js`, `public/translations/<lang>.js`, `public/i18n.js`). The 14 interface dictionaries were one 139 KB file that every visitor downloaded, English readers included. Each language is now its own file of about 10 KB, loaded only when needed. A small loader in `<head>` starts the reader's saved language while the page is still parsing, and the page stays hidden until the translation is applied (at most 1.5 seconds), so non-English readers no longer see the English interface for a moment first. The service worker still keeps every language for offline use.
+- **Undo for deleted collections** (`public/app.js`). Deleting a collection shows a notice with **Undo** at the top of Saved Articles for 8 seconds. It sits inside the panel, so keyboard users can reach it, and it receives focus.
+- **Remove from one collection** (`public/app.js`). Inside a collection, Remove now takes the article out of that collection only; it stays saved. In "All", Remove still unsaves.
+- **History offline** (`public/app.js`). Offline, opening a saved article from History shows its offline copy, as Saved Articles already did.
+- **Smaller changes.** The Worker's router and shared collections read one language list (`worker/languages.js`); the web app manifest declares its language, text direction and store categories.
+
+### Fixed in 1.0
+
+Each of these fixes has a regression test that fails on the code before it:
 
 - **"On this day" recovery** (`worker/today.js`). An upstream failure used to return `200` with empty data, which the browser accepted as a complete day, so badges stopped loading for the rest of the session. A failure now returns `503` with `Retry-After`, is never cached by browsers, and leaves only a two-minute marker at the edge.
 - **Popular and Known under a slow request** (`worker/vital.js`, `worker/index.js`). Vital-article batches had no partial snapshot, so if one request was still pending when the answer budget ran out, the Worker returned `503` even with complete cards ready. It now answers with the cards whose introductions have arrived.
@@ -221,7 +232,7 @@ Each of these fixes has a regression test that fails on the previous code:
 - **Collect button** (`public/app.js`). The collection chooser in Saved Articles was built but never shown, because its last statement had been commented out by accident.
 - **Right-to-left article text** (`public/styles.css`, `public/app.js`). In Arabic and Hebrew, a late stylesheet rule forced every card's text to right-to-left, so English articles (including the English Wikivoyage guides that Arabic readers receive) showed punctuation on the wrong side. Article text now keeps its own direction (`dir="auto"`), in cards and in the saved, history, collection and map views.
 - **Cut-off endings on cards** (`public/atlas.js`). On tall screens a card could end with the source's truncated fragment ("…population 11,084. In..."). Cards now drop it, as ambient mode does.
-- **Untranslated messages** (`public/translations.js`, `public/i18n.js`). About 30 notifications, empty states, errors, map messages and collection dialogs appeared in English in every language, and messages containing a collection name could not be translated at all. All are now translated in the 14 languages, with templates for messages that include a name or a count.
+- **Untranslated messages** (the interface dictionaries and `public/i18n.js`). About 30 notifications, empty states, errors, map messages and collection dialogs appeared in English in every language, and messages containing a collection name could not be translated at all. All are now translated in the 14 languages, with templates for messages that include a name or a count.
 - **Keyboard Tab order** (`public/atlas.js`). Tab walked through the buttons of every card rendered ahead (up to 16 cards) and scrolled the feed to each one. Only the card on screen is now in the Tab order.
 - **Drawer focus** (`public/atlas.js`). Opening Settings, Topics, Saved Articles or History left focus behind, and Tab could move onto the feed hidden by the backdrop. An open drawer now takes focus, keeps it out of the feed, and returns it to the button that opened it.
 - **Escape in collection dialogs** (`public/app.js`, `public/features.js`). Escape also closed the Saved Articles panel underneath and left focus nowhere. It now closes only the dialog, and focus returns to the button that opened it.

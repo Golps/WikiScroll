@@ -5,7 +5,8 @@ import vm from 'node:vm';
 function harness(){
  const document={body:{classList:{toggle(){}},nodeType:0},documentElement:{}};
  const c=vm.createContext({window:{},document,Intl,MutationObserver:class{observe(){}}});
- for(const file of ['translations.js','i18n.js'])vm.runInContext(fs.readFileSync(new URL('../public/'+file,import.meta.url),'utf8'),c);
+ const files=fs.readdirSync(new URL('../public/translations/',import.meta.url)).map(f=>'translations/'+f);
+ for(const file of [...files,'i18n.js'])vm.runInContext(fs.readFileSync(new URL('../public/'+file,import.meta.url),'utf8'),c);
  return c.window;
 }
 test('every supported non-English language translates the core controls, not user text',()=>{
@@ -66,4 +67,33 @@ test('every literal toast message in the app has a translation',()=>{
  const literals=[...code.matchAll(/toast\((['"])((?:(?!\1).)+)\1\s*[,)]/g)].map(m=>m[2].replace(/\\'/g,"'"));
  assert.ok(literals.length>=8);
  for(const lang of Object.keys(w.WS_TRANSLATIONS))for(const text of literals)assert.notEqual(api.translate(text,lang),text,lang+': '+text);
+});
+
+test('each reader downloads only their own language, and every language works offline',()=>{
+ const read=f=>fs.readFileSync(new URL('../public/'+f,import.meta.url),'utf8');
+ const html=read('index.html'),sw=read('sw.js'),loader=read('lang.js');
+ assert.doesNotMatch(html,/translations/,'the page itself loads no dictionary');
+ assert.ok(html.indexOf('/lang.js?v=')<html.indexOf('<body'),'the loader starts in <head>');
+ const version=loader.match(/const VERSION = (\d+);/)[1];
+ const langs=fs.readdirSync(new URL('../public/translations/',import.meta.url)).map(f=>f.replace('.js',''));
+ assert.equal(langs.length,14);
+ for(const lang of langs){
+  assert.ok(sw.includes(`'/translations/${lang}.js?v=${version}'`),'offline shell: '+lang);
+  assert.match(read(`translations/${lang}.js`),new RegExp(`^\\(window\\.WS_TRANSLATIONS \\|\\|= \\{\\}\\)\\["${lang}"\\] = \\{`,'m'));
+ }
+});
+test('a dictionary that arrives after the page is shown is applied to it',async()=>{
+ const loads=[];let resolveLoad;
+ const document={body:{classList:{toggle(){}},nodeType:0},documentElement:{},dispatchEvent(e){loads.push(e.type);}};
+ const c=vm.createContext({window:{},document,Intl,Event:class{constructor(type){this.type=type;}},MutationObserver:class{observe(){}}});
+ c.window.WSTranslations={load:lang=>{loads.push('load '+lang);return new Promise(r=>{resolveLoad=r;});}};
+ vm.runInContext(fs.readFileSync(new URL('../public/i18n.js',import.meta.url),'utf8'),c);
+ const api=c.window.WSI18n;
+ api.setLanguage('es');
+ assert.equal(api.translate('Settings'),'Settings','English until the dictionary arrives');
+ vm.runInContext(fs.readFileSync(new URL('../public/translations/es.js',import.meta.url),'utf8'),c);
+ resolveLoad(true);await new Promise(r=>setTimeout(r,0));
+ assert.equal(api.translate('Settings'),'Ajustes');
+ assert.deepEqual(loads,['load es','wsi18n:ready']);
+ api.setLanguage('en');assert.equal(loads.length,2,'English needs no download');
 });

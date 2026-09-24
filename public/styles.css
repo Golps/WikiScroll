@@ -8214,3 +8214,9 @@ body .mobile-settings-heading h2 { font: 400 36px/1.15 var(--serif); letter-spac
 /* Row actions on the phone settings sheet: one style, one line. */
 .burger-row .history-action { white-space: nowrap; min-height: 40px; font: 600 12px/1 var(--sans); }
 .pill.has-topics { background: color-mix(in srgb, var(--accent), transparent 88%); }
+
+/* Restoring a deleted collection (Saved Articles). */
+.coll-undo { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; padding: 8px 8px 8px 14px; border: 1px solid var(--rule); border-radius: 10px; font-size: 13px; color: var(--muted); }
+
+/* Hidden for a moment while a non-English reader's interface language loads (lang.js). */
+html.i18n-pending body { visibility: hidden; }

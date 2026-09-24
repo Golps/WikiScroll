@@ -274,17 +274,25 @@ test('changing travel filters rebuilds the feed before Settings starts closing, 
   assert.match(features, /form\.onsubmit=e=>\{[^\n]*changeFeedThenClose\(/);
 });
 
-test('the browser follows "resume" at most twice per page before moving on, so unfinished guides are not skipped', async () => {
+test('the browser follows "resume" at most 3 times per page before moving on, so unfinished guides are not skipped', async () => {
   const features = read('features.js');
-  const answers = [{articles: [{id: 'v1'}], next: 30, resume: 0}, {articles: [{id: 'v2'}], next: 30, resume: 0}, {articles: [{id: 'v3'}], next: null, resume: 0}, {articles: [{id: 'v4'}], next: null}];
+  const answers = [{articles: [{id: 'v1'}], next: 30, resume: 0}, {articles: [{id: 'v2'}], next: 30, resume: 0}, {articles: [{id: 'v3'}], next: 30, resume: 0}, {articles: [{id: 'v4'}], next: null, resume: 0}, {articles: [{id: 'v5'}], next: null}];
   const offsets = [];
   const c = vm.createContext({fillGeneration: 1, travelFilters: {place: 'Norway', style: ''}, travelOffset: 0, travelExhausted: false, travelSuggestion: '', travelRetries: {},
     articles: [], queue: [], voyageLang: () => 'en', URLSearchParams, AbortSignal: {timeout: () => undefined},
     fetch: async url => { offsets.push(new URL(url, 'https://x').searchParams.get('offset')); return {ok: true, json: async () => answers.shift()}; }});
   vm.runInContext(slice(features, 'async function fetchFilteredTravel(', '// When a travel filter runs out'), c);
-  for (let i = 0; i < 3; i++) await vm.runInContext('fetchFilteredTravel()', c);
-  assert.deepEqual(offsets, ['0', '0', '0'], 'the unfinished page is asked for again');
-  assert.equal(c.travelExhausted, true, 'after two retries the reader moves on');
+  for (let i = 0; i < 4; i++) await vm.runInContext('fetchFilteredTravel()', c);
+  assert.deepEqual(offsets, ['0', '0', '0', '0'], 'the unfinished page is asked for again, 4 answers in all');
+  assert.equal(c.travelExhausted, true, 'after three retries the reader moves on');
   assert.equal(c.travelOffset, 0);
   assert.match(features, /travelRetries=\{\};/, 'continuing starts with fresh retries');
+});
+
+test('browser tabs show just the name; link previews keep the tagline', () => {
+  const about = read('about/index.html');
+  assert.match(html, /<title>WikiScroll<\/title>/);
+  assert.match(about, /<title>About WikiScroll<\/title>/);
+  assert.match(html, /<meta property="og:title" content="WikiScroll: Turn doomscrolling into discovery">/, 'shared links still show the full line');
+  assert.match(html, /<meta name="description" content="[^"]*doomscrolling/i, 'the search description is unchanged');
 });

@@ -131,10 +131,19 @@ function lsSet(k, v) {
 
 function loadPersistedState() {
   const savedLikes = lsGet('ws_liked');
-  if (Array.isArray(savedLikes)) { savedLikes.forEach(a => liked.set(a.id, a)); updateBadge(); }
-  // Hydrate from IDB as fallback (e.g. localStorage cleared but IDB survives)
+  history = lsGet('ws_history') || [];
+  collections = lsGet('ws_collections') || [];
+  const likes = Array.isArray(savedLikes) ? savedLikes : [];
+  const moved = migrateSavedKeys(likes);
+  likes.forEach(a => liked.set(a.id, a)); updateBadge();
+  if (moved) saveLiked();
+  // Hydrate from IDB as fallback (e.g. localStorage cleared but IDB survives).
+  // Offline copies saved under an old key move to the new one.
   IDB.getAll().then(items => {
-    let changed = false;
+    const old = items.map(a => a.id);
+    const moved = migrateSavedKeys(items);
+    items.forEach((a, i) => { if (a.id !== old[i]) { IDB.delete(old[i]); IDB.put(a); } });
+    let changed = moved;
     items.forEach(a => { if (!liked.has(a.id)) { liked.set(a.id, a); changed = true; } });
     if (changed) { saveLiked(); updateBadge(); }
   });
@@ -153,13 +162,37 @@ function loadPersistedState() {
   const wantLang = urlLang || settings.lang;
   if (wantLang && LANGS.some(l => l.c === wantLang)) curLang = wantLang;
   applyLangUI();
-  history = lsGet('ws_history') || [];
-  collections = lsGet('ws_collections') || [];
   // Popular and Known no longer use the daily chart; drop its old caches.
   try { Object.keys(localStorage).filter(k => k.startsWith('ws_topchart_')).forEach(k => localStorage.removeItem(k)); } catch {}
   if (helpTopic || typeof settings.help === 'boolean') { saveTopics(); saveSettings(); }
   applyTheme();
   syncAllToggles();
+}
+
+// Saved articles, collections and history are keyed by language as well as by
+// page: Spanish w123 and English w123 are different articles. English keeps
+// the plain ID ("w123"), so English saves from earlier versions are unchanged;
+// other languages use "es:w123", with the language taken from the article's
+// address. Shared links, collection sharing and the map use the plain ID.
+function articleLang(a) { try { return new URL(a.url).hostname.split('.')[0].toLowerCase() || 'en'; } catch { return 'en'; } }
+function pageId(id) { return String(id || '').replace(/^[a-z-]+:/, ''); }
+function saveKey(a) { const id = pageId(a.id), lang = articleLang(a); return lang === 'en' ? id : lang + ':' + id; }
+function isSaved(cardId) { const a = articles.find(x => x.id === cardId); return !!a && liked.has(saveKey(a)); }
+// Earlier versions stored every save under its plain ID. Move non-English saves
+// to their language key, with their collections and history entries. Returns
+// whether anything moved; running it again changes nothing.
+function migrateSavedKeys(items) {
+  const renames = new Map();
+  items.forEach(a => { const key = saveKey(a); if (key !== a.id) { renames.set(a.id, key); a.id = key; } });
+  let moved = renames.size > 0;
+  if (moved) {
+    collections.forEach(col => { col.ids = [...new Set(col.ids.map(id => renames.get(id) || id))]; });
+    saveCollections();
+  }
+  let historyMoved = false;
+  history.forEach(h => { const key = saveKey(h); if (key !== h.id) { h.id = key; historyMoved = true; } });
+  if (historyMoved) saveHistory();
+  return moved;
 }
 function saveLiked()    { lsSet('ws_liked',    [...liked.values()]); }
 function saveTopics()   { lsSet('ws_topics',   [...curTopics]); }
@@ -328,8 +361,9 @@ function applyTheme() {
 // ── HISTORY TRACKING ──────────────────────────────────────────────────────
 function trackHistory(a) {
   // Remove duplicate if exists
-  history = history.filter(h => h.id !== a.id);
-  history.unshift({ id:a.id, src:a.src, title:a.title, body:a.body?.slice(0,150)||'', url:a.url, img:a.img||'', time:Date.now() });
+  const key = saveKey(a);
+  history = history.filter(h => h.id !== key);
+  history.unshift({ id:key, src:a.src, title:a.title, body:a.body?.slice(0,150)||'', url:a.url, img:a.img||'', time:Date.now() });
   if (history.length > 50) history.length = 50;
   saveHistory();
 }
@@ -341,7 +375,7 @@ function renderHistory() {
   }
   const now = Date.now();
   c.innerHTML = history.map(h => {
-    const image = h.img || liked.get(h.id)?.img || articles.find(a => a.id === h.id)?.img || '';
+    const image = h.img || liked.get(h.id)?.img || articles.find(a => saveKey(a) === h.id)?.img || '';
     const ago = now - h.time;
     // Localized by the browser ("5 min ago", "hace 3 h", "vor 2 Tagen").
     let timeStr = 'Just now';
@@ -928,7 +962,7 @@ function resetFeed() {
 
 // ── RENDER ─────────────────────────────────────────────────────────────────
 function renderCard(a) {
-  const isHow   = a.src==='how', isLiked=liked.has(a.id);
+  const isHow   = a.src==='how', isLiked=liked.has(saveKey(a));
   const pageid  = parseInt(a.id.slice(1));
   // The first card's photo is the page's largest paint: fetch it immediately.
   const lead    = !document.querySelector('#feed .card[data-id]');
@@ -993,15 +1027,17 @@ function showError() {
 }
 
 // ── LIKES + IDB ────────────────────────────────────────────────────────────
+// Cards use the plain page ID; saves use its language key (saveKey).
 function toggleLike(id) {
   const a = articles.find(x => x.id===id); if (!a) return;
-  const wasLiked = liked.has(id);
-  if (wasLiked) { liked.delete(id); IDB.delete(id); }
-  else          { liked.set(id, a); IDB.put(a); }
+  const key = saveKey(a);
+  const wasLiked = liked.has(key);
+  if (wasLiked) { liked.delete(key); IDB.delete(key); }
+  else          { const saved = {...a, id:key}; liked.set(key, saved); IDB.put(saved); }
   saveLiked(); updateBadge();
   const btn = document.getElementById('lb-'+id);
   if (btn) {
-    const on = liked.has(id);
+    const on = liked.has(key);
     if (on) {
       // Liking: instant class + text
       btn.className = 'act liked';
@@ -1013,9 +1049,10 @@ function toggleLike(id) {
     }
   }
 }
-function removeLike(id) {
-  liked.delete(id); IDB.delete(id); saveLiked(); updateBadge();
-  const btn = document.getElementById('lb-'+id);
+function removeLike(key) {
+  liked.delete(key); IDB.delete(key); saveLiked(); updateBadge();
+  const card = articles.find(x => saveKey(x) === key);
+  const btn = card && document.getElementById('lb-'+card.id);
   if (btn) { btn.className='act'; requestAnimationFrame(() => { btn.innerHTML=atlasIcon.bookmark + '<span>Save</span>'; }); }
   renderLikedList();
 }
@@ -1074,7 +1111,7 @@ function renderLikedList() {
       <div class="li-body" dir="auto">${esc(a.body.slice(0,130))}</div>
       <div class="li-acts">
         <button class="li-btn" data-read="${esc(a.url)}">${atlasIcon.arrow}<span>Read</span></button>
-        <button class="li-btn" data-share-url="${esc(a.url)}" data-share-title="${esc(a.title)}" data-share-id="${esc(a.id)}">${atlasIcon.share}<span>Share</span></button>
+        <button class="li-btn" data-share-url="${esc(a.url)}" data-share-title="${esc(a.title)}" data-share-id="${esc(pageId(a.id))}">${atlasIcon.share}<span>Share</span></button>
         <button class="li-btn" data-collect="${esc(a.id)}" aria-label="Save to collection">${atlasIcon.bookmark}<span>Collect</span></button>
         <button class="li-btn" ${activeCollection !== null ? `data-uncollect="${esc(a.id)}" aria-label="Remove from this collection" title="Remove from this collection"` : `data-unlike="${esc(a.id)}"`}><svg class="atlas-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7m4-7v7"/></svg><span>Remove</span></button>
       </div>
@@ -1091,7 +1128,7 @@ function undoNotice() {
 document.getElementById('likedList').addEventListener('click', ev => {
   const btn = ev.target.closest('.li-btn'); if (!btn) return;
   if (btn.dataset.read) {
-    if (!navigator.onLine) { const a = [...liked.values()].find(a => a.url === btn.dataset.read); if(a) openAmbient({dataset:{id:a.id}}); }
+    if (!navigator.onLine) { const a = [...liked.values()].find(a => a.url === btn.dataset.read); if(a) openAmbient({dataset:{id:a.id}}, a); }
     else window.open(btn.dataset.read,'_blank','noopener');
   }
   else if (btn.dataset.collect) openCollectionChooser(btn.dataset.collect);
@@ -1428,7 +1465,7 @@ document.getElementById('historyList').addEventListener('click', ev => {
   const hi = ev.target.closest('.hi'); if (!hi?.dataset.url) return;
   // Offline, a saved article opens from its offline copy, as in Saved Articles.
   const saved = !navigator.onLine && [...liked.values()].find(a => a.url === hi.dataset.url);
-  if (saved) openAmbient({dataset: {id: saved.id}});
+  if (saved) openAmbient({dataset: {id: saved.id}}, saved);
   else window.open(hi.dataset.url, '_blank', 'noopener');
 });
 
@@ -1516,8 +1553,10 @@ document.addEventListener('keydown', ev => {
 });
 
 // ── AMBIENT MODE ───────────────────────────────────────────────────────────
-function openAmbient(card) {
-  const a = articles.find(x => x.id===card.dataset.id) || liked.get(card.dataset.id); if (!a) return;
+// Saved Articles and History pass the saved copy itself: its key may match a
+// different language's card in the feed.
+function openAmbient(card, saved) {
+  const a = saved || articles.find(x => x.id===card.dataset.id) || liked.get(card.dataset.id); if (!a) return;
   document.getElementById('ambientTitle').textContent   = a.title;
   document.getElementById('ambientExcerpt').textContent = a.body;
   const bg = document.getElementById('ambientBg');
@@ -1731,7 +1770,7 @@ document.getElementById('ambientClose').addEventListener('click', closeAmbient);
 
     // Like on right: saves, never un-saves an already saved card. Guarded so
     // nothing about liking can ever jam flyLock.
-    if (dir > 0 && !liked.has(card.dataset.id)) { try { toggleLike(card.dataset.id); } catch(err) { console.error(err); } }
+    if (dir > 0 && !isSaved(card.dataset.id)) { try { toggleLike(card.dataset.id); } catch(err) { console.error(err); } }
 
     // Geometry (single upfront read pass — none inside the loop)
     const startX = fromDx || 0;
@@ -1996,7 +2035,7 @@ document.getElementById('ambientClose').addEventListener('click', closeAmbient);
     if(now-lt<340&&Math.hypot(x-lx,y-ly)<40){
       ev.preventDefault();
       // Double-tap only ever saves (the heart confirms it), like the swipe.
-      if(!liked.has(card.dataset.id))toggleLike(card.dataset.id);
+      if(!isSaved(card.dataset.id))toggleLike(card.dataset.id);
       const h=document.createElement('div');h.className='heart';h.textContent='❤️';
       h.style.cssText=`left:${x}px;top:${y}px`;
       document.body.appendChild(h);setTimeout(()=>h.remove(),750);lt=0;
@@ -2022,7 +2061,7 @@ let mapRequest = 0;
 async function geocodePlace(article) {
   const title = typeof article === 'string' ? article : String(article?.title || '');
   try {
-    const id = String(article?.id || ''), host = new URL(article?.url || '').hostname;
+    const id = String(article?.id || '').replace(/^[a-z-]+:/, ''), host = new URL(article?.url || '').hostname;
     if (/^v[1-9]\d{0,11}$/.test(id) && /^[a-z-]+\.wikivoyage\.org$/.test(host)) {
       const pageid = id.slice(1);
       const resp = await fetch(`https://${host}/w/api.php?action=query&format=json&origin=*&prop=coordinates&coprimary=primary&pageids=${pageid}`, {signal:AbortSignal.timeout(6000)});

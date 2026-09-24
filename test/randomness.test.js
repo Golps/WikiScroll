@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 
 const source=fs.readFileSync(new URL('../public/app.js',import.meta.url),'utf8');
-const likes=source.slice(source.indexOf('function toggleLike('),source.indexOf('function updateBadge('));
+const likes=source.slice(source.indexOf('function toggleLike('),source.indexOf('function updateBadge('))+source.slice(source.indexOf('function articleLang('),source.indexOf('// Earlier versions stored'));
 const workerFetch=source.slice(source.indexOf('async function fetchWorkerBatch('),source.indexOf('function fillQueue('));
 
 function likesHarness(){

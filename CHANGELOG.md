@@ -2,6 +2,32 @@
 
 Releases of this repository. Each entry describes what changed in the code; [docs/ENGINEERING.md](docs/ENGINEERING.md#known-issues) has the details and the tests behind each change.
 
+## 1.4 (September 24, 2026)
+
+### Saved articles
+
+- Saved articles no longer collide across languages. Their identifiers had the page number but not the language, so saving a Spanish article could replace an English save with the same number. English saves keep their current identifiers; other languages are stored as `es:w123`, with the language taken from the article's address.
+- The first time 1.4 loads, existing saves in other languages move to the new identifiers, with their collections and offline copies.
+- History keeps the same page in two languages as two entries. Shared links, shared collections and the map still use the plain page number.
+
+### On this day
+
+- Photos from `thumb.wikimedia.org` are accepted, like those from `upload.wikimedia.org`. Before, the same anniversary article qualified on one host and was dropped on the other.
+- Card photos are requested 960 pixels wide instead of 800. Wikimedia serves thumbnails in standard widths, and 800-pixel requests failed.
+
+### Travel search on Cloudflare's Free plan
+
+- A travel search stays well under the Free plan's 50 subrequests per request. In the worst case (three places, no guide with an introduction), 1.3 made 53 per answer; 1.4 makes 20.
+- The first paragraphs read for a results page are kept at the edge for a day in one entry, so a repeated request continues with the next 8 guides instead of reading the first ones again.
+- Searches for several places ask for 30 results in total, split between them (15 each for two places, 10 each for three).
+- The browser asks for an unfinished page up to 3 times instead of 2. At 8 guides per answer, 4 answers cover a full page of 30.
+
+### Interface
+
+- Browser tabs show "WikiScroll" and "About WikiScroll". Link previews and the search description keep the full line.
+
+207 tests (7 new). The new tests fail on the 1.3 code.
+
 ## 1.3 (September 24, 2026)
 
 ### Travel search

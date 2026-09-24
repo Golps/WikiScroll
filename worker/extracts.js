@@ -28,7 +28,7 @@ export const extractParams = ids => ({prop: 'extracts', exintro: '1', explaintex
 // (Japanese 京都市). For those, the card uses the first paragraphs of the guide's
 // text. Full-text extracts come one page per request, so only a few pages per
 // answer get this (Wikimedia rate-limits clients that send many at once).
-export const LEAD_FALLBACK_LIMIT = 8, LEAD_CACHE_LOOKUPS = 24, LEAD_FALLBACK_CONCURRENCY = 4;
+export const LEAD_FALLBACK_LIMIT = 8, LEAD_FALLBACK_CONCURRENCY = 4;
 export const leadParams = id => ({prop: 'extracts', explaintext: '1', exsectionformat: 'plain', exchars: '1200', pageids: String(id)});
 const CJK = /[぀-ヿ㐀-鿿가-힯]/;
 const isListItem = line => /​/.test(line) || /^\d+[\s　]/.test(line) || /^[^.!?。]{1,60}\s[-–—]\s/u.test(line);
@@ -51,30 +51,38 @@ export function firstParagraphs(text, max = 1000) {
   return out;
 }
 
-// Pages are taken in the order given (most important first). Text already in
-// the cache (`cached`) doesn't count toward the limit, so asking again makes
-// progress; pages that don't get their turn are marked leadSkipped and are not
-// dropped for good: the caller asks for them again (/api/travel's resume cursor).
-export async function completeLeadText(pages, fetchPage, limit = LEAD_FALLBACK_LIMIT, cached = async () => null) {
-  const all = pages.filter(p => typeof p.extract === 'string' && !p.extractMissing && p.extract.replace(/\s+/g, ' ').trim().length < 40);
-  const apply = (page, data) => {
-    const text = data?.query?.pages?.[page.pageid]?.extract;
-    if (typeof text === 'string') { const lead = firstParagraphs(text); if (lead) page.extract = lead; return true; }
-    return false;
-  };
-  // Still set if the answer budget runs out first: the page is then not cached.
-  for (const page of all) page.leadPending = true;
-  const pool = async (items, run) => { let next = 0; await Promise.all(Array.from({length: Math.min(LEAD_FALLBACK_CONCURRENCY, items.length)}, async () => { while (next < items.length) await run(items[next++]); })); };
-  const lookups = all.slice(0, LEAD_CACHE_LOOKUPS), misses = [];
-  await pool(lookups, async page => { let data = null; try { data = await cached(page.pageid); } catch {} if (apply(page, data)) delete page.leadPending; else misses.push(page); });
-  misses.sort((a, b) => all.indexOf(a) - all.indexOf(b));
-  const turn = misses.slice(0, Math.max(0, limit));
-  await pool(turn, async page => {
-    let data;
-    try { data = await fetchPage(page.pageid); } catch {}
-    if (!apply(page, data)) page.extractMissing = true;
-    delete page.leadPending;
-  });
-  for (const page of all) if (page.leadPending) { delete page.leadPending; page.leadSkipped = true; }
+// Pages are taken in the order given (most important first). `known` holds
+// text already read for this search page (pageid -> paragraphs, '' when the
+// guide has none); it costs no request and doesn't count toward the limit, so
+// asking again picks up where the last answer stopped. Newly read text is added
+// to `learned` as it arrives, for the caller to store. Pages that don't get
+// their turn are marked leadSkipped and are not dropped for good: the caller
+// asks for them again (/api/travel's resume cursor).
+export async function completeLeadText(pages, fetchPage, limit = LEAD_FALLBACK_LIMIT, known = {}, learned = {}) {
+  const todo = [];
+  for (const page of pages) {
+    if (typeof page.extract !== 'string' || page.extractMissing || page.extract.replace(/\s+/g, ' ').trim().length >= 40) continue;
+    if (!Object.hasOwn(known, page.pageid)) todo.push(page);
+    else if (typeof known[page.pageid] === 'string' && known[page.pageid]) page.extract = known[page.pageid];
+  }
+  const turn = todo.slice(0, Math.max(0, limit));
+  for (const page of todo.slice(turn.length)) page.leadSkipped = true;
+  // Still set if the answer budget runs out first: the page is then unfinished.
+  for (const page of turn) page.leadPending = true;
+  let next = 0;
+  await Promise.all(Array.from({length: Math.min(LEAD_FALLBACK_CONCURRENCY, turn.length)}, async () => {
+    while (next < turn.length) {
+      const page = turn[next++];
+      let data;
+      try { data = await fetchPage(page.pageid); } catch {}
+      const text = data?.query?.pages?.[page.pageid]?.extract;
+      if (typeof text === 'string') {
+        const lead = firstParagraphs(text);
+        learned[page.pageid] = lead;
+        if (lead) page.extract = lead;
+      } else page.extractMissing = true;
+      delete page.leadPending;
+    }
+  }));
   return pages;
 }

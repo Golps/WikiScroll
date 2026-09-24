@@ -21,12 +21,15 @@ const strip = s => String(s ?? '').replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').
 const pending = new Map();
 export const MONTH_DAY = /^(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/;
 
-// Card photos use 800px thumbnails; the feed's own thumbnails are 320px.
+// Card photos use 960px thumbnails: Wikimedia serves thumbnails only in
+// standard widths, and 800px requests fail on both image hosts. Images may come
+// from upload.wikimedia.org or thumb.wikimedia.org, like everywhere else in the app.
+export const CARD_WIDTH = 960;
 function cardImage(p) {
   const thumb = p.thumbnail?.source, original = p.originalimage;
-  if (!thumb || !/^https:\/\/upload\.wikimedia\.org\//.test(thumb)) return '';
-  if (original?.source && original.width <= 800 && !/\.svg$/i.test(original.source)) return original.source;
-  return thumb.replace(/\/\d+px-([^/]+)$/, '/800px-$1');
+  if (!thumb || !/^https:\/\/(upload|thumb)\.wikimedia\.org\//.test(thumb)) return '';
+  if (original?.source && original.width <= CARD_WIDTH && !/\.svg$/i.test(original.source)) return original.source;
+  return thumb.replace(/\/\d+px-([^/]+)$/, `/${CARD_WIDTH}px-$1`);
 }
 
 export function parseToday(feed, lang) {

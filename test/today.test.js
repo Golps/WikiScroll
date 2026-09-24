@@ -26,8 +26,16 @@ test('only each entry\'s subject is matched, with its kind and year', () => {
 test('surprise candidates need a photo and an introduction, and never come from deaths', () => {
   const {seeds} = parseToday(feed, 'en');
   assert.deepEqual(seeds.map(a => a.id).sort(), ['w1', 'w3', 'w6']);
-  assert.equal(seeds.find(a => a.id === 'w1').img, 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/ab/P1.jpg/800px-P1.jpg', 'card-size photo');
+  assert.equal(seeds.find(a => a.id === 'w1').img, 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/ab/P1.jpg/960px-P1.jpg', 'card-size photo, in a width Wikimedia serves');
   assert.equal(seeds.find(a => a.id === 'w1').title, 'Page 1');
+});
+
+test('photos from thumb.wikimedia.org qualify like upload.wikimedia.org ones', () => {
+  const thumbHost = page(7, {thumbnail: {source: 'https://thumb.wikimedia.org/wikipedia/commons/thumb/c/cd/P7.jpg/320px-P7.jpg'}, originalimage: undefined});
+  const other = page(8, {thumbnail: {source: 'https://example.org/wikipedia/commons/thumb/c/cd/P8.jpg/320px-P8.jpg'}});
+  const {seeds} = parseToday({births: [{year: 1900, pages: [thumbHost, other]}]}, 'en');
+  assert.deepEqual(seeds.map(a => a.id), ['w7'], 'the same article qualifies on either Wikimedia host; other hosts do not');
+  assert.equal(seeds[0].img, 'https://thumb.wikimedia.org/wikipedia/commons/thumb/c/cd/P7.jpg/960px-P7.jpg');
 });
 
 test('a missing or broken feed yields nothing rather than an error', () => {

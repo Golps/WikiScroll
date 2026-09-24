@@ -477,10 +477,10 @@ test('travel search keeps guides about the place, in relevance order, alternatin
     const body=await (await worker.fetch(new Request('https://wikiscroll.com/api/travel?lang=en&place='+encodeURIComponent('Japan, Tuscany')),env,ctx)).json();
     assert.deepEqual(body.articles.map(a=>a.title),['Japan','Florence','Tokyo','Siena','Kyoto'],'relevance order, alternating, without Busan or the phrasebook');
     assert.equal(body.next,'20.-','Japan continues at 20; Tuscany has no more results');
-    assert.deepEqual(searches,[['Japan','0','20'],['Tuscany','0','20']]);
+    assert.deepEqual(searches,[['Japan','0','15'],['Tuscany','0','15']],'30 results in total, split between the places');
     searches.length=0;
     await worker.fetch(new Request('https://wikiscroll.com/api/travel?lang=en&place='+encodeURIComponent('Japan, Tuscany')+'&offset=20.-'),env,ctx);
-    assert.deepEqual(searches,[['Japan','20','20']],'a finished place is not searched again');
+    assert.deepEqual(searches,[['Japan','20','15']],'a finished place is not searched again');
   });
 });
 test('a misspelled place that finds nothing comes back with a suggestion',async()=>{
@@ -605,4 +605,31 @@ test('guides past the text-fallback limit wait for the next request, and fetched
     assert.equal(leads,count,'text already fetched came from the edge cache');
     assert.equal(again.resume,undefined);
   },cache);
+});
+test('a travel search stays well under the Free plan\'s 50 subrequests, even in the worst case',async t=>{
+  // Worst case: three places, full result pages, and not one guide with an
+  // introduction, so every answer uses its full text-fallback allowance.
+  const {LEAD_FALLBACK_LIMIT}=await import('../worker/extracts.js');
+  const cache=edgeCache(),counts=[];let n=0;
+  const counted={match:async key=>{n++;return cache.match(key);},put:async(key,response)=>{n++;return cache.put(key,response);}};
+  await mocked(async url=>{
+    n++;const p=new URL(url).searchParams;
+    if(p.has('generator')){const base=Number(p.get('gsroffset'))+{Kyoto:1000,Nara:2000,Osaka:3000}[JSON.parse(p.get('gsrsearch'))];
+      return Response.json({query:{pages:Object.fromEntries(Array.from({length:Number(p.get('gsrlimit'))},(_,i)=>[base+i,{pageid:base+i,ns:0,title:'Pueblo '+(base+i),index:i}]))},continue:{gsroffset:Number(p.get('gsroffset'))+Number(p.get('gsrlimit'))}});}
+    if(p.has('exintro'))return Response.json({query:{pages:Object.fromEntries(p.get('pageids').split('|').map(id=>[id,{pageid:Number(id),extract:''}]))}});
+    return Response.json({query:{pages:{[p.get('pageids')]:{extract:'Kyoto, Nara y Osaka tienen templos, jardines y mercados que merecen una visita larga y tranquila.'}}}});
+  },async(worker,jobs)=>{
+    let offset='';const delivered=new Set();
+    for(let i=0;i<4;i++){
+      n=0;
+      const body=await (await worker.fetch(new Request('https://wikiscroll.com/api/travel?lang=es&place='+encodeURIComponent('Kyoto, Nara, Osaka')+(offset!==''?'&offset='+offset:'')),env,jobs)).json();
+      await jobs.done();counts.push(n);body.articles.forEach(a=>delivered.add(a.id));
+      offset=String(body.resume??body.next);
+      if(i<3)assert.equal(body.resume,'0.0.0','guides still waiting keep the page open');
+    }
+    assert.equal(delivered.size,30,'4 answers cover the whole page of 30 guides');
+    t.diagnostic('travel subrequests per answer (worst case): '+counts.join(', '));
+    assert.ok(Math.max(...counts)<=1+3+6+1+LEAD_FALLBACK_LIMIT+1+1,`subrequests per answer: ${counts}`);
+    assert.ok(Math.max(...counts)<50);
+  },counted);
 });

@@ -242,10 +242,10 @@ async function handle(request,env,ctx) {
         const lang=voyageLang(requested);
         // Many readers ask for the same destination and style: complete result
         // pages are shared from the edge cache for an hour, before any upstream work.
-        const key=new Request(`${url.origin}/api/travel?v=3&lang=${lang}&place=${encodeURIComponent(places.map(fold).join('|'))}&style=${style}&offset=${cursor.map(c=>c??'-').join('.')}`),cache=globalThis.caches?.default;
+        const key=new Request(`${url.origin}/api/travel?v=4&lang=${lang}&place=${encodeURIComponent(places.map(fold).join('|'))}&style=${style}&offset=${cursor.map(c=>c??'-').join('.')}`),cache=globalThis.caches?.default;
         try{const hit=await cache?.match(key);if(hit)return json(await hit.json(),200,{'X-Cache':'HIT'});}catch{}
         if(!await permit(env,'WORK_LIMIT','travel'))return limited();
-        const started=Date.now(),limit=String(places.length>1?Math.ceil(40/places.length):30);
+        const started=Date.now(),limit=String(Math.ceil(30/Math.max(1,places.length)));
         const searches=await Promise.all((places.length?places:[null]).map(async(place,i)=>{
           if(cursor[i]===null)return {place,pages:[],next:null};
           const query=[place?JSON.stringify(place):'',style?'('+styles[style]+')':''].filter(Boolean).join(' ');
@@ -258,23 +258,24 @@ async function handle(request,env,ctx) {
         if(searches.includes(null))return json({error:'Travel search temporarily unavailable'},503);
         const found=searches.flatMap(s=>s.pages);
         // Guides without a usable introduction get their first paragraphs instead,
-        // most relevant first (title names the place, then search order). Each
-        // guide's text is kept at the edge for a week, so later searches reuse it.
+        // most relevant first (title names the place, then search order), at
+        // most LEAD_FALLBACK_LIMIT per answer. The text read for this search page
+        // is kept at the edge for a day in one entry (one read, one write), so a
+        // repeated request continues with the next guides instead of re-reading
+        // the first ones. Cloudflare's Free plan allows 50 subrequests per request.
         const placeOf=new Map(searches.flatMap(s=>s.pages.map(p=>[p.pageid,s.place])));
         const titled=p=>placeOf.get(p.pageid)&&fold(p.title).includes(fold(placeOf.get(p.pageid)))?1:0;
         const byImportance=[...found].sort((a,b)=>titled(b)-titled(a)||(a.index??0)-(b.index??0));
-        const leadKey=id=>new Request(`${url.origin}/__lead/v1/${lang}/${id}`);
-        const cachedLead=async id=>{const hit=await cache?.match(leadKey(id));return hit?await hit.json():null;};
-        const fetchLead=async id=>{
-          const data=await upstream(apiURL(lang,'how',leadParams(id)));
-          const extract=data?.query?.pages?.[id]?.extract;
-          if(cache&&typeof extract==='string')ctx.waitUntil(cache.put(leadKey(id),Response.json({query:{pages:{[id]:{extract}}}},{headers:{'Cache-Control':'public, max-age=604800'}})).catch(()=>{}));
-          return data;
-        };
+        const leadsKey=new Request(key.url.replace('/api/travel?','/__leads/v1?'));
+        let known={};const learned={};
         await within((async()=>{
           await completeExtracts(found,ids=>upstream(apiURL(lang,'how',extractParams(ids))));
-          await completeLeadText(byImportance,fetchLead,undefined,cachedLead);
+          if(found.some(p=>typeof p.extract==='string'&&!p.extractMissing&&strip(p.extract).length<40)){
+            try{const hit=await cache?.match(leadsKey);if(hit)known=await hit.json()||{};}catch{}
+          }
+          await completeLeadText(byImportance,id=>upstream(apiURL(lang,'how',leadParams(id))),undefined,known,learned);
         })(),Math.max(0,TRAVEL_BUDGET_MS-(Date.now()-started)));
+        if(cache&&Object.keys(learned).length)ctx.waitUntil(cache.put(leadsKey,Response.json({...known,...learned},{headers:{'Cache-Control':'public, max-age=86400'}})).catch(()=>{}));
         // Keep guides that are about the place: named in the title or introduction.
         const ready=searches.map(s=>s.pages.filter(p=>strip(p.extract).length>=40&&(!s.place||namesPlace(p,s.place))));
         const body={articles:interleave(ready).map(p=>article(p,lang,'how')),next:formatCursor(searches.map(s=>s.next))};

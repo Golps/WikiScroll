@@ -229,18 +229,26 @@ async function handle(request,env,ctx) {
         const requested=url.searchParams.get('lang')||'en',place=(url.searchParams.get('place')||'').trim(),style=url.searchParams.get('style')||'',offset=Number(url.searchParams.get('offset')||0);
         const styles={nature:'nature OR hiking OR park',coast:'beach OR coast OR island',culture:'museum OR history OR culture',city:'city OR urban'};
         if(!LANGS.has(requested)||place.length>80||!Number.isInteger(offset)||offset<0||offset>10000||style&&!Object.hasOwn(styles,style))return json({error:'Invalid travel filters'},400);
-        if(!await permit(env,'WORK_LIMIT','travel'))return limited();
-        const started=Date.now();
-        const clean=place.replace(/[^\p{L}\p{N}\s'-]/gu,' ').trim();
+        const clean=place.replace(/[^\p{L}\p{N}\s'-]/gu,' ').replace(/\s+/g,' ').trim();
         const query=[clean?JSON.stringify(clean):'',style?'('+styles[style]+')':''].filter(Boolean).join(' ');
         if(!query)return json({error:'Choose a travel filter'},400);
         const lang=voyageLang(requested);
+        // Many readers ask for the same destination and style: complete result
+        // pages are shared from the edge cache for an hour, before any upstream work.
+        const key=new Request(`${url.origin}/api/travel?v=1&lang=${lang}&place=${encodeURIComponent(clean.toLowerCase())}&style=${style}&offset=${offset}`),cache=globalThis.caches?.default;
+        try{const hit=await cache?.match(key);if(hit)return json(await hit.json(),200,{'X-Cache':'HIT'});}catch{}
+        if(!await permit(env,'WORK_LIMIT','travel'))return limited();
+        const started=Date.now();
         const data=await upstream(apiURL(lang,'how',{generator:'search',gsrsearch:query,gsrnamespace:'0',gsrlimit:'20',gsroffset:String(offset),prop:'pageimages|info|description',piprop:'thumbnail',pithumbsize:'800',pilimit:'max',inprop:'url'}));
         if(!data||data.error)return json({error:'Travel search temporarily unavailable'},503);
         const found=Object.values(data.query?.pages||{}).filter(p=>p.pageid>0&&!DISAMBIGUATION.test(p.description||''));
         // Guides whose introduction misses the budget are left out of this page.
         await within(completeExtracts(found,ids=>upstream(apiURL(lang,'how',extractParams(ids)))),Math.max(0,TRAVEL_BUDGET_MS-(Date.now()-started)));
-        return json({articles:found.filter(p=>strip(p.extract).length>=40).map(p=>article(p,lang,'how')),next:data.continue?.gsroffset??null});
+        const body={articles:found.filter(p=>strip(p.extract).length>=40).map(p=>article(p,lang,'how')),next:data.continue?.gsroffset??null};
+        // Only a page where every guide arrived with its introduction is cached. A
+        // partial or failed page is not, so a slow moment never hides guides for an hour.
+        if(cache&&body.articles.length&&body.articles.length===found.length)ctx.waitUntil(cache.put(key,json(body,200,{'Cache-Control':'public, max-age=3600'})).catch(()=>{}));
+        return json(body,200,{'X-Cache':'MISS'});
       }
       if(url.pathname==='/api/today'){
         const response=await todayResponse(url,ctx,{langs:LANGS,permit,limited,env});

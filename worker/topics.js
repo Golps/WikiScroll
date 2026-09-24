@@ -17,7 +17,7 @@ geo:['Islands','Rivers','Mountains','Deserts','Caves','Volcanoes','Glaciers','We
 arts:['Painting','Sculpture','Architecture','Literature','Classical music','Cinema','Dance','Printmaking','Photography','Folk art','Textile arts','Theatre'],
 people:['Scientists','Explorers','Philosophers','Inventors','Artists','Writers','Mathematicians','Historians','Engineers','Educators','Composers','Humanitarians']};
 const shuffle=a=>{a=[...a];for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;};
-const lists=new Map(),pending=new Map();
+const lists=new Map(),pending=new Map(),translatedRoots=new Map();
 const FRESH_MS=120_000,RETAIN_SECONDS=86_400;
 const bands={1:[300,Infinity],2:[100,500],3:[10,300],4:[5,60],5:[0,10]};
 export function diverseDepth(pages,depth,lang='en'){
@@ -57,8 +57,16 @@ export async function topicPages(topic,lang,depth,upstream,{help=false}={}){
  const candidates=topic==='help'?[await sampleNeedyTitles(lang,params=>query(lang,params))]:await Promise.all(shuffle(roots[topic]).slice(0,6).map(async root=>{
   let title='Category:'+root;
   if(lang!=='en'){
-   const d=await query('en',{titles:title,prop:'langlinks',lllang:lang,lllimit:'1'});
-   title=Object.values(d?.query?.pages||{})[0]?.langlinks?.[0]?.['*'];if(!title)return [];
+   // Category names change rarely: translate each branch once a day per language
+   // instead of on every refill. Failed lookups are not remembered.
+   const key=lang+'|'+root,known=translatedRoots.get(key);
+   if(known&&Date.now()-known.time<RETAIN_SECONDS*1000)title=known.title;
+   else{
+    const d=await query('en',{titles:title,prop:'langlinks',lllang:lang,lllimit:'1'});
+    title=Object.values(d?.query?.pages||{})[0]?.langlinks?.[0]?.['*']||null;
+    if(d){if(translatedRoots.size>=512)translatedRoots.delete(translatedRoots.keys().next().value);translatedRoots.set(key,{title,time:Date.now()});}
+   }
+   if(!title)return [];
   }
   let entries=await members(title),selected=shuffle(entries.filter(p=>p.ns===0)).slice(0,3);
   for(let level=0;level<(depth>=4?3:2);level++){

@@ -105,7 +105,7 @@ These rules hold across the codebase, and many are enforced by tests. Changes sh
 
 ## Cross-cutting concerns
 
-- **Caching layers:** browser (queued cards in memory, saved reserves in `localStorage`, service-worker cache), then Worker (in-flight request maps, per-isolate memory for the vital-article lists), then the Cloudflare edge cache (article batches and topic batches for 24 hours, vital-article lists for 7 days, "On this day" data for 6 hours, verified metadata for 24 hours).
+- **Caching layers:** browser (queued cards in memory, saved reserves in `localStorage`, service-worker cache), then Worker (in-flight request maps, per-isolate memory for the vital-article lists), then the Cloudflare edge cache (article batches and topic batches for 24 hours, complete travel search pages for 1 hour, vital-article lists for 7 days, "On this day" data for 6 hours, verified metadata for 24 hours).
 - **Cache versioning:** cache keys include a version (`version=5` for articles, `v=5` for topics). Front-end assets use `?v=` query strings that must match the `SHELL` list and the `CACHE` name in `sw.js`.
 - **Security headers:** `secure()` in `worker/security.js` adds `nosniff`, `DENY` framing, a strict referrer policy, a permissions policy and HSTS to every response. Generated pages set their own strict CSP.
-- **Localization:** interface strings are translated by text match in `i18n.js`. New labels need entries in `translations.js` for every language; `test/i18n.test.js` checks the core controls.
+- **Localization:** interface strings are translated by text match in `i18n.js`, with templates for messages that contain a collection name or a count (`Added to "{name}"`). New labels need entries in `translations.js` for every language; `test/i18n.test.js` checks the core controls.

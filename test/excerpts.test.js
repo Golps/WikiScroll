@@ -111,3 +111,11 @@ test('ambient mode shortens an unusually long first sentence at a word boundary'
   assert.ok(view.excerpt.textContent.length <= 200 && view.excerpt.textContent.endsWith('…'));
   assert.doesNotMatch(view.excerpt.textContent, /\s…$/);
 });
+
+test('cards never end on a fragment cut off at the source length limit', () => {
+  const code = source.slice(source.indexOf('function chooseExcerpt('), source.indexOf('// Ambient mode shows'));
+  const span = {textContent: '', get scrollHeight() { return this.textContent.length; }};
+  const body = {firstElementChild: span, dataset: {fullExcerpt: 'One whole sentence here. Another whole sentence. And then the source stopped mid...'}};
+  vm.runInNewContext(code + ';chooseExcerpt(body, 10)', {body, getComputedStyle: () => ({lineHeight: '100'}), Intl, curLang: 'en'});
+  assert.equal(span.textContent, 'One whole sentence here. Another whole sentence.');
+});

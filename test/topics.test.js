@@ -155,3 +155,17 @@ test('Help Wikipedia is refused where its maintenance lists are unreliable or th
  const options={langs:new Set(['en','ja']),permit:async()=>{throw Error('should not execute');}};
  for(const query of ['topic=help&lang=ja','topic=tech&help=1&lang=ja','topic=tech&help=yes&lang=en'])assert.equal((await topicResponse(new URL('https://example.org/api/topics?'+query),{},{},options)).status,400,query);
 });
+
+test('translated topic branches are looked up once a day, not on every refill',async()=>{
+ const {topicPages}=await freshTopics();let id=0;const requests=[];
+ const upstream=async address=>{
+  const url=new URL(address);requests.push(url);const p=url.searchParams;
+  if(p.has('lllang'))return {query:{pages:{1:{langlinks:[{'*':'Kategorie:Technik '+p.get('titles')}]}}}};
+  if(p.has('cmtitle'))return {query:{categorymembers:[{pageid:++id,ns:0,title:'Thema'}]}};
+  return {query:{pages:Object.fromEntries(p.get('pageids').split('|').map(n=>[n,{...page(Number(n),'',15),title:'Thema '+n,extract:'Eine ausreichend lange Einleitung. '.repeat(5),thumbnail:{source:'https://upload.wikimedia.org/x.jpg'}}]))}};
+ };
+ for(let refill=0;refill<4;refill++)await topicPages('tech','de',3,upstream);
+ const lookups=requests.filter(u=>u.searchParams.has('lllang')).map(u=>u.searchParams.get('titles'));
+ assert.ok(lookups.length<=12,'at most one lookup per branch: '+lookups.length);
+ assert.equal(new Set(lookups).size,lookups.length,'no branch is translated twice');
+});

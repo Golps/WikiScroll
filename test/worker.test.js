@@ -400,3 +400,33 @@ test('a Known batch borrowed from Popular is served but never cached',async()=>{
     assert.equal([...cache.entries.keys()].filter(k=>k.includes('/api/articles')&&k.includes('depth=1')).length,1,'Popular is cached as usual');
   },cache);
 });
+test('every copy of the supported language list is identical',async()=>{
+  const {readFileSync}=await import('node:fs');
+  const read=f=>readFileSync(new URL('../'+f,import.meta.url),'utf8');
+  const router=[...read('worker/index.js').match(/const LANGS = new Set\(\[([^\]]+)\]\)/)[1].matchAll(/'([a-z]{2})'/g)].map(m=>m[1]).sort();
+  const collections=read('worker/collections.js').match(/const languages = new Set\('([a-z ]+)'\.split/)[1].split(' ').sort();
+  const reader=[...read('public/app.js').match(/const LANGS = \[([\s\S]*?)\];/)[1].matchAll(/c:'([a-z]{2})'/g)].map(m=>m[1]).sort();
+  assert.equal(router.length,15);
+  assert.deepEqual(collections,router);assert.deepEqual(reader,router);
+});
+test('complete travel pages are shared from the edge cache; partial pages are not cached',async t=>{
+  const cache=edgeCache();let searches=0;
+  await mocked(async url=>{const p=new URL(url).searchParams;if(p.has('generator')){searches++;return Response.json({query:{pages:{7:page(7,{title:'Kyoto',extract:undefined})}},continue:{gsroffset:20}});}
+    return Response.json({query:{pages:{7:{pageid:7,extract:'A historic city with temples, gardens and a famous market street.'}}}});},async(worker,jobs)=>{
+    const ask=place=>worker.fetch(new Request('https://wikiscroll.com/api/travel?lang=en&style=culture&place='+place),env,jobs);
+    const first=await ask('Japan');await jobs.done();
+    assert.equal(first.headers.get('X-Cache'),'MISS');
+    const again=await ask('%20japan%20%20');
+    assert.equal(again.headers.get('X-Cache'),'HIT','the same destination in other spacing or case is the same page');
+    assert.equal(searches,1);assert.equal((await again.json()).articles[0].title,'Kyoto');
+  },cache);
+  t.mock.timers.enable({apis:['setTimeout']});
+  const partial=edgeCache();
+  await mocked(async url=>{const p=new URL(url).searchParams;if(p.has('generator'))return Response.json({query:{pages:{8:page(8,{title:'Nara',extract:undefined})}}});return new Promise(()=>{});},async(worker,jobs)=>{
+    const pending=worker.fetch(new Request('https://wikiscroll.com/api/travel?lang=en&place=Nara'),env,jobs);
+    await settle();t.mock.timers.tick(8600);await settle();
+    const response=await pending;assert.equal(response.status,200);
+    assert.equal(partial.entries.size,0,'a page missing introductions is never cached');
+    t.mock.timers.tick(7000);await settle();
+  },partial);
+});

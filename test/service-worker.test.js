@@ -22,7 +22,7 @@ function harness({cache=cacheStore(),open,fetcher}={}){
   URL,Response,setTimeout,clearTimeout,
   self:{location:new URL(origin),addEventListener:(name,handler)=>handlers.set(name,handler)},
   caches:{open:open||(async()=>cache)},
-  fetch:request=>fetcher(request)
+  fetch:(request,init)=>fetcher(request,init)
  };
  vm.runInNewContext(code,scope,{filename:'sw.js'});
  return {
@@ -99,4 +99,17 @@ test('article images from both Wikimedia image hosts stay available offline',asy
  for(const url of images){const result=await sw.request(url,{navigate:false,destination:'image'});await result.done();}
  offline=true;
  for(const url of images){const result=await sw.request(url,{navigate:false,destination:'image'});assert.equal(await result.response.text(),'image bytes',url);await result.done();}
+});
+
+test('article images are cached as CORS copies, not opaque responses that inflate storage use',async()=>{
+ const calls=[];
+ const sw=harness({fetcher:async(request,init)=>{calls.push({request,init});return new Response('image bytes',{headers:{'Content-Type':'image/jpeg'}});}});
+ const url='https://upload.wikimedia.org/wikipedia/commons/thumb/b/b0/Other.jpg/640px-Other.jpg';
+ const result=await sw.request(url,{navigate:false,destination:'image'});await result.done();
+ assert.equal(calls[0].request,url);assert.equal(calls[0].init.mode,'cors');assert.equal(calls[0].init.credentials,'omit');
+ assert.ok(sw.cache.entries.has(url));
+ let fallback=0;
+ const plain=harness({fetcher:async(request,init)=>{if(init)throw TypeError('CORS blocked');fallback++;return new Response('opaque bytes');}});
+ const second=await plain.request(url,{navigate:false,destination:'image'});
+ assert.equal(await second.response.text(),'opaque bytes','an image without CORS headers still loads');assert.equal(fallback,1);
 });

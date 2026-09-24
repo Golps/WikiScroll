@@ -38,7 +38,7 @@ test('failed map lookup clears the old destination and keeps the failure visible
 test('Collect in Saved Articles opens the collection chooser as a modal dialog', () => {
   const source = fs.readFileSync(new URL('../public/app.js', import.meta.url), 'utf8');
   const code = source.slice(source.indexOf('function openCollectionChooser('));
-  const stub = () => { const found = {}; return {style: {}, hidden: false, append() {}, addEventListener() {}, setCustomValidity() {}, focus() {}, querySelector: s => (found[s] ||= stub())}; };
+  const stub = () => { const found = {}, listeners = {}; return {style: {}, hidden: false, listeners, append() {}, addEventListener(type, fn) { listeners[type] = fn; }, setCustomValidity() {}, focus() {}, querySelector: s => (found[s] ||= stub())}; };
   const dialog = Object.assign(stub(), {showModal() { this.opened = true; }});
   const appended = [];
   const c = vm.createContext({document: {createElement: () => dialog, body: {append: node => appended.push(node)}},
@@ -46,4 +46,6 @@ test('Collect in Saved Articles opens the collection chooser as a modal dialog',
   vm.runInContext(code + ';openCollectionChooser("w1")', c);
   assert.deepEqual(appended, [dialog], 'the dialog is added to the page');
   assert.equal(dialog.opened, true, 'and shown as a modal');
+  let stopped = false; dialog.listeners.keydown({stopPropagation() { stopped = true; }});
+  assert.ok(stopped, 'Escape inside the dialog does not also close the Saved Articles panel');
 });

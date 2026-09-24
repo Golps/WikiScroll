@@ -26,8 +26,6 @@
 <link rel="icon" type="image/png" sizes="192x192" href="/images/icon-192.png?v=42">
 <link rel="icon" type="image/png" sizes="512x512" href="/images/icon-512.png?v=42">
 
-<!-- Hreflang for multilingual signals -->
-
 <!-- Open Graph -->
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://wikiscroll.com/">
@@ -83,7 +81,7 @@
 
 <link rel="preconnect" href="https://thumb.wikimedia.org">
 <link rel="preconnect" href="https://upload.wikimedia.org">
-<link rel="stylesheet" href="/styles.css?v=67">
+<link rel="stylesheet" href="/styles.css?v=68">
 <link rel="stylesheet" href="/about.css?v=50">
 <link rel="describedby" href="/llms.txt" type="text/plain">
 </head>
@@ -128,7 +126,7 @@
 
 <!-- MOBILE BURGER MENU -->
 <div class="burger-backdrop" id="burgerBackdrop"></div>
-<div class="burger-menu" id="burgerMenu">
+<div class="burger-menu" id="burgerMenu" role="region" aria-label="Settings">
   <div class="mobile-settings-heading"><div><h2>Settings</h2><p id="settingsSource">Wikipedia</p></div><button type="button" onclick="closeBurger()" aria-label="Close settings">Done</button></div>
 <div class="burger-inner">
     <div class="burger-row" style="flex-direction:column;align-items:stretch;">
@@ -215,7 +213,7 @@
 
 <!-- TOPIC SHEET -->
 <div class="sheet-overlay" id="sheetOverlay"></div>
-<div class="topic-sheet" id="topicSheet">
+<div class="topic-sheet" id="topicSheet" role="region" aria-label="Topics">
   <div class="sheet-handle"></div>
   <div class="topic-sheet-header"><div class="sheet-title">Topics</div><button class="topic-close" id="topicClose" type="button" aria-label="Close topics">✕</button></div>
   <div class="sheet-sub">Select topics, or leave all off for a random mix.</div>
@@ -224,7 +222,7 @@
 </div>
 
 <!-- LIKES PANEL -->
-<div class="lp" id="lp">
+<div class="lp" id="lp" role="region" aria-label="Saved Articles">
   <div class="lp-hdr"><span>Saved Articles</span><button class="lp-x" id="lpClose" aria-label="Close saved articles">✕</button></div>
   <div class="coll-tabs" id="collTabs"></div>
   <div class="coll-new-row">
@@ -236,7 +234,7 @@
 </div>
 
 <!-- HISTORY PANEL -->
-<div class="hp" id="hp">
+<div class="hp" id="hp" role="region" aria-label="History">
   <div class="hp-hdr"><span>History</span><button class="hp-x" id="hpClose" aria-label="Close history">✕</button></div>
   <div id="historyList"></div>
 </div>
@@ -252,22 +250,22 @@
   <h2>Features</h2>
   <p>Discover Wikipedia articles in a calm, thoughtfully designed reader. Full Wikivoyage travel guide integration with interactive map explorer. Support for 15 languages including English, Spanish, French, German, Italian, Portuguese, Russian, Japanese, Chinese, Arabic, Hindi, Korean, Dutch, Polish, and Hebrew. Topic filtering across 12 categories. Swipe right to save articles, left to skip. Ambient reading mode for distraction-free learning. Reading history to find articles you've seen before. Offline support lets you read cached articles without internet. Dark and light themes. Article depth slider to control how obscure your feed gets. Collections to organize saved articles. Share articles with rich link previews. Keyboard shortcuts for desktop power users. Install as a Progressive Web App on any device.</p>
   <h2>How WikiScroll Works</h2>
-  <p>WikiScroll fetches random articles from the Wikipedia and Wikivoyage REST APIs, filters them for quality, images, and relevance, then presents them in a full-screen card format. Each card shows the article title, an excerpt, a thumbnail image, and auto-detected category tags. Swipe right or tap the heart to save articles for later. Tap "Read Full Article" to visit the original Wikipedia or Wikivoyage page. For Wikivoyage travel articles, an interactive map shows the location on a beautifully styled map powered by Leaflet and OpenStreetMap.</p>
+  <p>WikiScroll fetches random articles from the Wikipedia and Wikivoyage APIs, keeps those with a readable introduction, and presents them as full-screen cards. Each card shows the article title, an excerpt, a thumbnail image, and auto-detected category tags. Swipe right or press Save to keep articles for later. Tap "Read full article" to visit the original Wikipedia or Wikivoyage page. For Wikivoyage travel guides, an interactive map shows the location, built with Leaflet, OpenStreetMap data and CARTO map tiles.</p>
   <h2>Privacy First</h2>
-  <p>WikiScroll requires no account and sets no tracking cookies. When enabled, Cloudflare Web Analytics measures aggregate visits and performance without identifying individual visitors. Your preferences, liked articles, and reading history stay on your device unless you explicitly share a collection. WikiScroll is open, transparent, and respects your privacy completely.</p>
+  <p>WikiScroll requires no account and sets no tracking cookies. When enabled, Cloudflare Web Analytics measures aggregate visits and performance without identifying individual visitors. Your preferences, liked articles, and reading history stay on your device unless you explicitly share a collection. WikiScroll's source code is public, so anyone can see how it works.</p>
   <h2>Install WikiScroll</h2>
   <p>WikiScroll is a Progressive Web App (PWA) that works in any modern browser. Install it on your home screen for a native app-like experience. On iPhone, tap the Share button in Safari and select "Add to Home Screen." On Android, tap the menu in Chrome and select "Install app."</p>
   <p><a href="https://wikiscroll.com/">Launch WikiScroll</a>. Please enable JavaScript to use WikiScroll.</p>
   <h2>Frequently Asked Questions</h2>
   <p><strong>What is WikiScroll?</strong> WikiScroll is a free web app that presents random Wikipedia and Wikivoyage articles in a swipeable discovery reader. Follow your curiosity at your own pace.</p>
-  <p><strong>Is WikiScroll free to use?</strong> Yes, completely free with no ads, no tracking, and no account required. All data stays on your device.</p>
-  <p><strong>Does WikiScroll work offline?</strong> Yes, WikiScroll is a Progressive Web App with offline support. Previously viewed and liked articles are cached and available without an internet connection.</p>
+  <p><strong>Is WikiScroll free to use?</strong> Yes, completely free with no ads, no tracking cookies, and no account required. Your saved articles and history stay on your device.</p>
+  <p><strong>Does WikiScroll work offline?</strong> Yes, WikiScroll is a Progressive Web App with offline support. Saved articles and recently loaded cards and images stay available without an internet connection. New articles need a connection.</p>
   <p><strong>What languages does WikiScroll support?</strong> 15 languages: English, Spanish, French, German, Italian, Portuguese, Russian, Japanese, Chinese, Arabic, Hindi, Korean, Hebrew, Dutch, and Polish.</p>
 </div>
 </noscript>
 
 <!-- FEED -->
-<div class="feed" id="feed" tabindex="0" aria-label="Article discovery feed">
+<div class="feed" id="feed" role="main" tabindex="0" aria-label="Article discovery feed">
   <div class="spin-wrap" id="spinner">
     <div class="spin"></div>
     <div class="spin-lbl">Loading articles…</div>
@@ -281,7 +279,7 @@
 </button>
 
 <!-- PULL TO REFRESH -->
-<div class="ptr-indicator" id="ptrIndicator">
+<div class="ptr-indicator" id="ptrIndicator" aria-hidden="true">
   <svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
 </div>
 
@@ -323,9 +321,9 @@
     <div style="font-size:13px;line-height:1.75;color:rgba(255,255,255,.65);">
       <p style="margin-bottom:12px;font-size:11px;color:var(--dim);">Last updated: September 2026</p>
 
-      <p style="margin-bottom:14px;"><strong style="color:rgba(255,255,255,.85);">What WikiScroll is.</strong> WikiScroll is a free, client-side web application that displays random articles from Wikipedia and Wikivoyage. It is hosted on Cloudflare Workers.</p>
+      <p style="margin-bottom:14px;"><strong style="color:rgba(255,255,255,.85);">What WikiScroll is.</strong> WikiScroll is a free web application that displays random articles from Wikipedia and Wikivoyage. It is hosted on Cloudflare Workers.</p>
 
-      <p style="margin-bottom:14px;"><strong style="color:rgba(255,255,255,.85);">Data we collect.</strong> WikiScroll does not require an account or automatically upload your saved collections. If you share a collection, its selected contents are included in the link and processed by Cloudflare to display the collection and its preview image. We do not set tracking cookies or use advertising SDKs. When enabled, Cloudflare Web Analytics provides cookieless, non-identifying measurements of visits and performance; it does not receive your saved articles, collections, or reading history. We do not know who you are.</p>
+      <p style="margin-bottom:14px;"><strong style="color:rgba(255,255,255,.85);">Data we collect.</strong> WikiScroll does not require an account or automatically upload your saved collections. To load articles, your browser asks WikiScroll's server on Cloudflare for batches of cards, which it fetches from Wikimedia; these requests contain your chosen source, language, article depth, topics, Help Wikipedia setting and travel filters, plus technical details such as a batch number and today's date, but never your saved articles, collections or reading history. If you share a collection, its selected contents are included in the link and processed by Cloudflare to display the collection and its preview image. We do not set tracking cookies or use advertising SDKs. When enabled, Cloudflare Web Analytics provides cookieless, non-identifying measurements of visits and performance; it does not receive your saved articles, collections, or reading history. We do not know who you are.</p>
 
       <p style="margin-bottom:14px;"><strong style="color:rgba(255,255,255,.85);">Local storage.</strong> Your preferences (liked articles, reading history, settings, theme, and collections) are stored exclusively in your browser's localStorage and IndexedDB. This data stays on your device unless you choose to share a collection. Shared links contain the selected collection name, article titles, excerpts, and article identifiers. Anyone with the link, and the messaging service generating its preview, can read that snapshot. Links cannot be revoked; deleting a local collection does not delete a previously shared snapshot. You can clear it at any time through your browser settings.</p>
 
@@ -348,7 +346,7 @@
 
 <!-- SETTINGS PANEL (desktop) -->
 <div class="sp-backdrop" id="spBackdrop"></div>
-<div class="sp" id="settingsPanel">
+<div class="sp" id="settingsPanel" role="region" aria-label="Settings">
   <div class="sp-hdr"><span>Settings</span><button class="sp-x" id="spClose" aria-label="Close settings">✕</button></div>
 
   <div class="sp-section">
@@ -448,7 +446,7 @@
 <div class="map-overlay" id="mapOverlay">
   <div class="map-container">
     <div class="map-hdr">
-      <div class="map-title" id="mapTitle">Exploring…</div>
+      <div class="map-title" id="mapTitle" dir="auto">Exploring…</div>
       <button class="map-close" id="mapClose" aria-label="Close map">✕</button>
     </div>
     <div class="map-loading" id="mapLoading">
@@ -457,7 +455,7 @@
     <div id="mapCanvas"></div>
     <div class="map-badge" id="mapBadge">
       <span>🗺️</span>
-      <span id="mapBadgeText">Location</span>
+      <span id="mapBadgeText" dir="auto">Location</span>
       <span>·</span>
       <a href="#" id="mapReadLink" target="_blank">Read on Wikivoyage ↗</a>
     </div>
@@ -465,7 +463,7 @@
 </div>
 
 <!-- AMBIENT OVERLAY -->
-<div class="ambient-overlay" id="ambientOverlay">
+<div class="ambient-overlay" id="ambientOverlay" role="region" aria-label="Ambient Mode">
   <div class="ambient-bg" id="ambientBg"></div>
   <div class="ambient-content">
     <div class="ambient-label">✦ Ambient Mode</div>
@@ -477,7 +475,7 @@
 </div>
 
 <!-- KEYBOARD SHORTCUT BAR (desktop only) -->
-<div class="kb-bar" id="kbBar">
+<div class="kb-bar" id="kbBar" role="region" aria-label="Keyboard shortcuts">
   <div class="kb-hint"><span class="kb-key">↑</span><span class="kb-key">↓</span> Scroll</div>
   <div class="kb-hint"><span class="kb-key">←</span><span class="kb-key">→</span> Swipe</div>
   <div class="kb-hint"><span class="kb-key">L</span> Like</div>
@@ -496,13 +494,13 @@
 <section><h3>Wikivoyage <span>Explore places</span></h3><p>Community-written travel guides to places around the world.</p></section>
 <p class="source-footnote">Free knowledge. Switch sources anytime; your saved articles stay together.</p>
 </dialog>
-<script src="/translations.js?v=49"></script>
-<script src="/i18n.js?v=49"></script>
+<script src="/translations.js?v=50"></script>
+<script src="/i18n.js?v=50"></script>
 <script src="/discovery.js?v=49"></script>
-<script src="/app.js?v=71"></script>
-<script src="/atlas.js?v=55"></script>
+<script src="/app.js?v=72"></script>
+<script src="/atlas.js?v=56"></script>
 <noscript><p>WikiScroll is a free Wikipedia and Wikivoyage discovery reader. Enable JavaScript to browse articles, save favorites, and explore topics in 15 languages.</p></noscript>
-<script src="/features.js?v=61"></script>
+<script src="/features.js?v=62"></script>
 <script src="/about.js?v=47"></script>
 </body>
 </html>

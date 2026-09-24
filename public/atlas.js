@@ -24,6 +24,58 @@ for (const panel of document.querySelectorAll('#burgerMenu,#topicSheet,#lp,#hp,#
   const sync = () => { panel.inert = !panel.classList.contains('open'); };
   sync(); new MutationObserver(sync).observe(panel,{attributes:true,attributeFilter:['class']});
 }
+// An open drawer receives keyboard focus and keeps it out of the feed behind
+// its backdrop (the header stays reachable). When it closes, focus returns to
+// the control that opened it, unless the app already moved focus on purpose
+// (Escape focuses the feed so arrow keys keep working).
+{
+  const drawers = [...document.querySelectorAll('#burgerMenu,#topicSheet,#lp,#hp,#settingsPanel')];
+  const focusable = 'button:not([disabled]), a[href], input:not([disabled]), select, textarea, [tabindex]:not([tabindex="-1"])';
+  const openDrawer = () => drawers.find(drawer => drawer.classList.contains('open'));
+  let current = null, trigger = null;
+  const sync = () => {
+    const open = openDrawer() || null;
+    if (open && open !== current) {
+      if (!current) trigger = document.activeElement;
+      if (!open.contains(document.activeElement)) open.querySelector(focusable)?.focus({preventScroll: true});
+    } else if (!open && current) {
+      const active = document.activeElement;
+      const lost = !active || active === document.body || drawers.some(drawer => drawer.contains(active));
+      if (lost && trigger?.isConnected && !trigger.closest('[inert]')) trigger.focus({preventScroll: true});
+      trigger = null;
+    }
+    current = open;
+  };
+  for (const drawer of drawers) new MutationObserver(sync).observe(drawer, {attributes: true, attributeFilter: ['class']});
+  document.addEventListener('focusin', event => {
+    const open = openDrawer();
+    if (open && !open.contains(event.target) && !event.target.closest('.hdr, dialog')) open.querySelector(focusable)?.focus({preventScroll: true});
+  });
+}
+// Menu buttons tell assistive technology whether the panel they open is showing.
+for (const [buttonId, panelId] of [['langBtn','langDd'],['burgerBtn','burgerMenu'],['settingsBtn','settingsPanel'],['likesBtn','lp'],['topicsBtn','topicSheet'],['burgerLangBtn','burgerLangGrid'],['burgerTopicsBtn','burgerTopics']]) {
+  const button = document.getElementById(buttonId), panel = document.getElementById(panelId);
+  if (!button || !panel) continue;
+  button.setAttribute('aria-controls', panelId);
+  const sync = () => button.setAttribute('aria-expanded', String(panel.classList.contains('open')));
+  sync(); new MutationObserver(sync).observe(panel,{attributes:true,attributeFilter:['class']});
+}
+// Only the card on screen is in the Tab order. Otherwise Tab walks through the
+// buttons of every card rendered ahead and scrolls the feed to each of them.
+function syncCardFocus(feed = document.getElementById('feed')) {
+  const current = getCurrentFeedCard();
+  for (const card of feed.querySelectorAll('.card[data-id]'))
+    for (const control of card.querySelectorAll('button, a[href]'))
+      if (card === current) control.removeAttribute('tabindex'); else control.tabIndex = -1;
+}
+{
+  const feed = document.getElementById('feed');
+  let frame = 0;
+  const schedule = () => { if (!frame) frame = requestAnimationFrame(() => { frame = 0; syncCardFocus(feed); }); };
+  feed.addEventListener('scroll', schedule, {passive: true});
+  new MutationObserver(schedule).observe(feed, {childList: true});
+  schedule();
+}
 
 // Match excerpt length to whole lines of the available space, without inner scrolling.
 const excerptObserver = new ResizeObserver(entries => {
@@ -73,6 +125,8 @@ function chooseExcerpt(body, lines) {
   if (!span || !full || !lines) return;
   const clean=full.replace(/\s+/g,' ').trim();
   const segments=typeof Intl.Segmenter==='function' ? Array.from(new Intl.Segmenter(curLang,{granularity:'sentence'}).segment(clean),x=>x.segment.trim()) : clean.match(/[^.!?。！？]+[.!?。！？]+(?:\s|$)/g)||[clean];
+  // Introductions longer than the source limit end in a cut-off fragment ("…").
+  if(segments.length>1&&/(\.\.\.|…)$/.test(segments.at(-1)))segments.pop();
   const height=lines*parseFloat(getComputedStyle(body).lineHeight)+1;
   let best='';
   for(const sentence of segments){

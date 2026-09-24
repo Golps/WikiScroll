@@ -110,7 +110,7 @@ body.dragging {
   white-space: nowrap;
   -webkit-background-clip: text;
   background-clip: text;
-  font-family: Syne, sans-serif;
+  font-family: var(--sans);
   font-size: 22px;
   font-weight: 800;
   position: relative;
@@ -149,7 +149,7 @@ body.how .logo:after {
   border: none;
   border-radius: 50px;
   padding: 6px 14px;
-  font-family: Syne, sans-serif;
+  font-family: var(--sans);
   font-size: 12px;
   font-weight: 700;
   transition: all .22s;
@@ -539,7 +539,7 @@ body.how .toggle-sw.on {
 
 .sheet-title {
   margin-bottom: 6px;
-  font-family: Syne, sans-serif;
+  font-family: var(--sans);
   font-size: 18px;
   font-weight: 800;
 }
@@ -657,7 +657,7 @@ dialog.privacy-dialog::backdrop {
   -webkit-background-clip: text;
   background-clip: text;
   margin-bottom: 14px;
-  font-family: Syne, sans-serif;
+  font-family: var(--sans);
   font-size: 26px;
   font-weight: 800;
 }
@@ -728,7 +728,7 @@ dialog.privacy-dialog::backdrop {
   border: 4px solid;
   border-radius: 10px;
   padding: 8px 18px;
-  font-family: Syne, sans-serif;
+  font-family: var(--sans);
   font-size: 34px;
   font-weight: 800;
   position: absolute;
@@ -788,7 +788,7 @@ dialog.privacy-dialog::backdrop {
   width: fit-content;
   margin-bottom: 14px;
   padding: 3px 10px;
-  font-family: Syne, sans-serif;
+  font-family: var(--sans);
   font-size: 10px;
   font-weight: 700;
   display: inline-flex;
@@ -924,7 +924,7 @@ dialog.privacy-dialog::backdrop {
 .spin-lbl {
   letter-spacing: .5px;
   color: var(--dim);
-  font-family: Syne, sans-serif;
+  font-family: var(--sans);
   font-size: 12px;
   font-weight: 700;
 }
@@ -1068,7 +1068,7 @@ body.light .ptr-indicator.ready svg, body.light .ptr-indicator.loading svg {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 18px;
-  font-family: Syne, sans-serif;
+  font-family: var(--sans);
   font-size: 21px;
   font-weight: 800;
   display: flex;
@@ -1116,7 +1116,7 @@ body.light .ptr-indicator.ready svg, body.light .ptr-indicator.loading svg {
 
 .li-ttl {
   margin-bottom: 5px;
-  font-family: Syne, sans-serif;
+  font-family: var(--sans);
   font-size: 14px;
   font-weight: 600;
   line-height: 1.3;
@@ -1167,7 +1167,7 @@ body.light .ptr-indicator.ready svg, body.light .ptr-indicator.loading svg {
 .empty-ttl {
   color: #fff9;
   margin-bottom: 6px;
-  font-family: Syne, sans-serif;
+  font-family: var(--sans);
   font-size: 16px;
   font-weight: 700;
 }
@@ -1235,7 +1235,7 @@ body.light .ptr-indicator.ready svg, body.light .ptr-indicator.loading svg {
   text-transform: uppercase;
   color: #ffffff59;
   margin-bottom: 28px;
-  font-family: Syne, sans-serif;
+  font-family: var(--sans);
   font-size: 11px;
   font-weight: 700;
 }
@@ -1543,7 +1543,7 @@ body.how .err-btn {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 20px;
-  font-family: Syne, sans-serif;
+  font-family: var(--sans);
   font-size: 21px;
   font-weight: 800;
   display: flex;
@@ -1567,7 +1567,7 @@ body.how .err-btn {
   letter-spacing: 1px;
   text-transform: uppercase;
   margin-bottom: 10px;
-  font-family: Syne, sans-serif;
+  font-family: var(--sans);
   font-size: 11px;
   font-weight: 700;
 }
@@ -1624,7 +1624,7 @@ body.how .err-btn {
   -webkit-background-clip: text;
   background-clip: text;
   margin-bottom: 10px;
-  font-family: Syne, sans-serif;
+  font-family: var(--sans);
   font-size: 22px;
   font-weight: 800;
 }
@@ -2094,7 +2094,7 @@ body.light .lopt:hover, body.light .lopt.sel {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 18px;
-  font-family: Syne, sans-serif;
+  font-family: var(--sans);
   font-size: 21px;
   font-weight: 800;
   display: flex;
@@ -2136,7 +2136,7 @@ body.light .lopt:hover, body.light .lopt.sel {
 .hi-ttl {
   color: #fff;
   margin-bottom: 3px;
-  font-family: Syne, sans-serif;
+  font-family: var(--sans);
   font-size: 14px;
   font-weight: 600;
   line-height: 1.3;
@@ -2444,7 +2444,7 @@ body.light .depth-step.active .ds-dot {
   white-space: nowrap;
   text-overflow: ellipsis;
   max-width: 70%;
-  font-family: Syne, sans-serif;
+  font-family: var(--sans);
   font-size: 16px;
   font-weight: 700;
   overflow: hidden;
@@ -6745,7 +6745,7 @@ body.light, body.light.how {
   --surface-alt: #eef2f8;
   --rule: #dce2ec;
   --ink: #202936;
-  --muted: #637083;
+  --muted: #5e6b7e;
   --accent: #36c;
 }
 
@@ -7787,7 +7787,7 @@ body, .hdr, .burger-menu, .mobile-settings-heading, .act, .pill, .sp-about, .tbt
 .logo,body.light .logo,body.how .logo{width:220px;height:46px;line-height:1;margin:0;display:block}
 .sp-about-logo,body .sp-about-logo,body.how .sp-about-logo,body.light .sp-about-logo{width:180px;height:38px;margin:0 auto 16px;display:block}
 @media(max-width:767px){.logo,body.light .logo,body.how .logo{width:min(192px,calc(100vw - 128px));height:40px}}
-.rtl-ui .panel>.art-title,.rtl-ui .panel>.art-body,.rtl-ui .meta-row,.rtl-ui .mobile-settings-heading{direction:rtl;text-align:right}.rtl-ui .act{direction:rtl}.rtl-ui .brand{direction:ltr}
+.rtl-ui .meta-row,.rtl-ui .mobile-settings-heading{direction:rtl;text-align:right}.rtl-ui .act{direction:rtl}.rtl-ui .brand{direction:ltr}
 
 /* The discovery cue enters gently and fades away once discovery begins. */
 #hint{display:flex;flex-direction:row;align-items:center;gap:14px;min-height:32px;bottom:max(2px,env(safe-area-inset-bottom));padding:5px 16px;border:1px solid var(--rule);border-radius:999px;background:var(--surface);color:var(--ink);font:inherit;box-shadow:0 4px 18px #0002;cursor:pointer;opacity:0;visibility:hidden;pointer-events:none;transform:translate(-50%,8px);animation:none;transition:opacity .35s ease,transform .45s cubic-bezier(.22,1,.36,1),visibility 0s .45s}
@@ -7959,6 +7959,8 @@ button.hi{display:block;width:100%;font:inherit;color:inherit;text-align:start;c
 .collection-start .source-close{background:transparent;border-color:transparent}
 @media(max-width:767px){input:not([type=range]):not([type=checkbox]):not([type=radio]),textarea,select,.coll-new-input,.collection-name-input,.travel-filters input,.travel-filters select,.collection-dialog input{font-size:16px!important}}
 #likedList .li-btn[data-unlike]{border-color:#d96767;color:#e87070;background:transparent}
+body.light #likedList .li-btn[data-unlike]{border-color:#c23b3b;color:#c23b3b}
+#likedList #deleteCollBtn{color:#f87171}body.light #likedList #deleteCollBtn{color:#c23b3b}
 #likedList .li-btn[data-unlike]:hover{background:color-mix(in srgb,#e87070,transparent 90%)}
 .collection-heading{font:400 25px/1.25 var(--serif);color:var(--ink);margin:20px 0 16px;overflow-wrap:anywhere;text-align:start}
 .collection-heading[hidden]{display:none}

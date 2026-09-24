@@ -99,7 +99,16 @@ let fillGeneration = 0;
 
 // ── LOCALSTORAGE ───────────────────────────────────────────────────────────
 function lsGet(k)    { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } }
-function lsSet(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} }
+function lsSet(k, v) {
+  const value = JSON.stringify(v);
+  try { localStorage.setItem(k, value); }
+  catch {
+    // A full quota must not silently lose saves, collections or settings: the
+    // feed reserve is only a cache, so give its space back and retry once.
+    if (k === 'ws_feed_reserves') return;
+    try { localStorage.removeItem('ws_feed_reserves'); localStorage.setItem(k, value); } catch {}
+  }
+}
 
 function loadPersistedState() {
   const savedLikes = lsGet('ws_liked');
@@ -119,7 +128,7 @@ function loadPersistedState() {
   kbBarEnabled = settings.kbBar !== false;
   helpMode = helpTopic ? 'only' : HELP_MODES.includes(settings.helpMode) ? settings.helpMode : settings.help === true ? 'tags' : 'off';
   lightMode = settings.lightMode === true;
-  depthLevel = settings.depth || 3;
+  depthLevel = [1, 2, 3, 4, 5].includes(settings.depth) ? settings.depth : 3;
   // Restore language: ?lang= URL param wins, then saved setting
   const urlLang = new URLSearchParams(window.location.search).get('lang');
   const wantLang = urlLang || settings.lang;
@@ -313,7 +322,7 @@ function renderHistory() {
     return `<button type="button" class="hi" data-url="${esc(h.url)}">
       ${image && /^https:\/\//i.test(image) ? `<span class="saved-image"><img src="${esc(image)}" alt="" loading="lazy" decoding="async" onerror="this.parentElement.remove()"></span>` : ''}
       <div class="hi-time">${h.src==='wiki'?'📖':'🗺️'} ${timeStr}</div>
-      <div class="hi-ttl">${esc(h.title)}</div>
+      <div class="hi-ttl" dir="auto">${esc(h.title)}</div>
       <span class="history-read">${atlasIcon.arrow}<span>Read</span></span>
     </button>`;
   }).join('');
@@ -323,11 +332,14 @@ function renderHistory() {
 function renderCollTabs() {
   const c = document.getElementById('collTabs');
   const tabs = [{name:'All',id:null}].concat(collections.map((col,i) => ({name:col.name,id:i})));
-  c.innerHTML = tabs.map(t => `<button class="coll-tab${activeCollection===t.id?' on':''}" data-cid="${t.id}">${esc(t.name)}${t.id!==null?' ('+collections[t.id].ids.length+')':''}</button>`).join('');
+  // Count only articles still saved: unsaving keeps collection membership, so
+  // saving the article again restores it, but the tab must match what it shows.
+  c.innerHTML = tabs.map(t => `<button class="coll-tab${activeCollection===t.id?' on':''}" data-cid="${t.id}" dir="auto">${esc(t.name)}${t.id!==null?' ('+collections[t.id].ids.filter(id => liked.has(id)).length+')':''}</button>`).join('');
 }
 function createCollection(name) {
   name = name.trim();
-  if (!name || collections.some(c => c.name.toLowerCase()===name.toLowerCase())) return;
+  if (!name) return;
+  if (collections.some(c => c.name.toLowerCase()===name.toLowerCase())) { toast('A collection with this name already exists'); return; }
   collections.push({name, ids:[]});
   saveCollections();
   renderLikedList();
@@ -882,7 +894,7 @@ function renderCard(a) {
   const [likeBtn,shareBtn,readBtn] = card.querySelectorAll('.acts > .act');
   likeBtn.addEventListener('click',  () => toggleLike(a.id));
   shareBtn.addEventListener('click', () => doShare(a));
-  readBtn.addEventListener('click',  () => window.open(a.url,'_blank'));
+  readBtn.addEventListener('click',  () => window.open(a.url,'_blank','noopener'));
   // Keep the map action attached to the image, with a text-only card fallback.
   if (isHow) {
     const mapBtn = document.createElement('button');
@@ -901,7 +913,7 @@ function showError() {
   const isHow = curMode==='how';
   const offline = !navigator.onLine;
   const msg = offline
-    ? "You're offline — reconnect and try again. Saved articles are still available in your Likes."
+    ? "You're offline. Reconnect and try again. Your saved articles are still available."
     : isHow && travelExhausted && (travelFilters.place || travelFilters.style) ? 'No matching guides. Try a broader country or region, or clear your travel filters in Settings.' : `${isHow?'Wikivoyage':'Wikipedia'} didn't respond.`;
   const card = document.createElement('div'); card.className='card';
   card.innerHTML = `<div class="cbg"><div class="cveil"></div></div><div class="err"><div class="err-ico">${offline?'📡':(isHow?'🗺️':'📖')}</div><div class="err-ttl">Nothing loaded</div><div class="err-msg">${msg}</div><button class="err-btn">Try again</button></div>`;
@@ -973,12 +985,12 @@ function renderLikedList() {
   if (!items.length) {
     const msg = activeCollection !== null
       ? 'No articles in this collection yet. Add some from the "All" tab.'
-      : 'Like articles while scrolling to save them here. They\'ll be available offline too.';
+      : 'Swipe right or press Save to keep articles here. They\'ll be available offline too.';
     const ico = activeCollection !== null ? '📁' : '🔖';
     const ttl = activeCollection !== null ? 'Empty collection' : 'Nothing saved yet';
     c.innerHTML = `<div class="empty"><div class="empty-ico">${ico}</div><div class="empty-ttl">${ttl}</div><div class="empty-txt">${msg}</div></div>`;
     if (activeCollection !== null) {
-      c.innerHTML += `<div style="text-align:center;margin-top:12px;"><button class="li-btn" id="deleteCollBtn" style="color:#f87171;">Delete this collection</button></div>`;
+      c.innerHTML += `<div style="text-align:center;margin-top:12px;"><button class="li-btn" id="deleteCollBtn">Delete this collection</button></div>`;
     }
     return;
   }
@@ -991,8 +1003,8 @@ function renderLikedList() {
       <div class="li-src">${a.src==='wiki'?'Wikipedia':'Wikivoyage'}</div>
       ${offline ? '<div class="li-offline">✓ Available offline</div>' : ''}
       ${collLabel}
-      <div class="li-ttl">${esc(a.title)}</div>
-      <div class="li-body">${esc(a.body.slice(0,130))}</div>
+      <div class="li-ttl" dir="auto">${esc(a.title)}</div>
+      <div class="li-body" dir="auto">${esc(a.body.slice(0,130))}</div>
       <div class="li-acts">
         <button class="li-btn" data-read="${esc(a.url)}">${atlasIcon.arrow}<span>Read</span></button>
         <button class="li-btn" data-share-url="${esc(a.url)}" data-share-title="${esc(a.title)}" data-share-id="${esc(a.id)}">${atlasIcon.share}<span>Share</span></button>
@@ -1002,14 +1014,14 @@ function renderLikedList() {
     </div>`;
   }).join('');
   if (activeCollection !== null) {
-    c.innerHTML += `<div style="text-align:center;margin-top:12px;"><button class="li-btn" id="deleteCollBtn" style="color:#f87171;">Delete this collection</button></div>`;
+    c.innerHTML += `<div style="text-align:center;margin-top:12px;"><button class="li-btn" id="deleteCollBtn">Delete this collection</button></div>`;
   }
 }
 document.getElementById('likedList').addEventListener('click', ev => {
   const btn = ev.target.closest('.li-btn'); if (!btn) return;
   if (btn.dataset.read) {
     if (!navigator.onLine) { const a = [...liked.values()].find(a => a.url === btn.dataset.read); if(a) openAmbient({dataset:{id:a.id}}); }
-    else window.open(btn.dataset.read,'_blank');
+    else window.open(btn.dataset.read,'_blank','noopener');
   }
   else if (btn.dataset.collect) openCollectionChooser(btn.dataset.collect);
   else if (btn.dataset.unlike)   removeLike(btn.dataset.unlike);
@@ -1174,7 +1186,8 @@ document.getElementById('burgerLangBtn').addEventListener('click', ev => {
 });
 
 // ── MODE TOGGLE ─────────────────────────────────────────────────────────────
-function setMode(m) {
+// reset=false only switches the interface: used before the first feed loads.
+function setMode(m, reset = true) {
   if (curMode===m) return; curMode=m;
   const isHow = m==='how';
   document.getElementById('wBtn').className = 'tbtn'+(isHow?'':' won on');
@@ -1185,7 +1198,7 @@ function setMode(m) {
   closeTopicSheet();
   document.getElementById('burgerTopics').classList.remove('open');
   syncActivityDisplay();
-  resetFeed();
+  if (reset) resetFeed();
 }
 document.getElementById('wBtn').addEventListener('click', () => setMode('wiki'));
 document.getElementById('hBtn').addEventListener('click', () => setMode('how'));
@@ -1336,7 +1349,7 @@ document.getElementById('desktopHistoryBtn').addEventListener('click', openHisto
 document.getElementById('hpClose').addEventListener('click', closeAllPanels);
 document.getElementById('historyList').addEventListener('click', ev => {
   const hi = ev.target.closest('.hi'); if (!hi?.dataset.url) return;
-  window.open(hi.dataset.url, '_blank');
+  window.open(hi.dataset.url, '_blank', 'noopener');
 });
 
 // Desktop settings panel open/close
@@ -1460,7 +1473,7 @@ document.getElementById('ambientClose').addEventListener('click', closeAmbient);
 (function() {
   const feed = document.getElementById('feed');
   const HAS_TOUCH = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-  const REDUCED = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const reducedMotion = window.matchMedia ? matchMedia('(prefers-reduced-motion: reduce)') : null;
   let flyLock = false, flightRaf = 0, flightCard = null;
 
   // Release velocity — last 5 pointer samples (captures throw speed, not drag average)
@@ -1638,7 +1651,7 @@ document.getElementById('ambientClose').addEventListener('click', closeAmbient);
 
     // Exit speed scales with throw speed; ease-out launch always outruns the finger
     const absVel = Math.abs(vel || 0);
-    const dur = REDUCED ? 0.01 : Math.max(0.26, Math.min(0.46, 0.46 - absVel * 0.10));
+    const dur = reducedMotion?.matches ? 0.01 : Math.max(0.26, Math.min(0.46, 0.46 - absVel * 0.10));
 
     // STAMP MOMENT — a fly that starts with little or no drag (keyboard
     // arrows, micro-flicks) never showed its LIKE/SKIP stamp: the stamp
@@ -1646,7 +1659,7 @@ document.getElementById('ambientClose').addEventListener('click', closeAmbient);
     // with a small wind-up toward the exit while the stamp pops in, THEN
     // fly. Drag-triggered swipes skip this — the stamp faded in under the
     // finger already.
-    const hold = (REDUCED || Math.abs(startX) >= 60) ? 0 : 0.22;
+    const hold = (reducedMotion?.matches || Math.abs(startX) >= 60) ? 0 : 0.22;
     const windX = hold ? dir * Math.max(Math.abs(startX), 28) : startX;
     const stampFrom = stamp ? (parseFloat(stamp.style.opacity) || 0) : 1;
     if (!hold && stamp) stamp.style.opacity = '1'; // drag path: instant full flash
@@ -1839,7 +1852,7 @@ document.getElementById('ambientClose').addEventListener('click', closeAmbient);
       ensureFeedAhead();
       const cards = Array.from(feed.querySelectorAll('.card[data-id]'));
       const target = cards[cards.indexOf(curCard()) + (ev.key === 'ArrowDown' ? 1 : -1)];
-      if (target) feed.scrollTo({top: feedCardTop(target), behavior: REDUCED ? 'instant' : 'smooth'});
+      if (target) feed.scrollTo({top: feedCardTop(target), behavior: reducedMotion?.matches ? 'instant' : 'smooth'});
       return;
     }
 
@@ -1851,7 +1864,7 @@ document.getElementById('ambientClose').addEventListener('click', closeAmbient);
       case 'ArrowRight': ev.preventDefault(); flyOff(card,  1, 0.7, 0); break;
       case 'l': case 'L': toggleLike(id); break;
       case 's': case 'S': { const a = articles.find(x => x.id === id); if (a) doShare(a); break; }
-      case 'r': case 'R': { const a = articles.find(x => x.id === id); if (a) window.open(a.url, '_blank'); break; }
+      case 'r': case 'R': { const a = articles.find(x => x.id === id); if (a) window.open(a.url, '_blank', 'noopener'); break; }
 
       case 'm': case 'M': { const a = articles.find(x => x.id === id); if (a?.src === 'how') openMap(a); break; }
     }
@@ -2174,6 +2187,9 @@ document.getElementById('feed').addEventListener('scroll', () => {
 
 // ── INIT ────────────────────────────────────────────────────────────────────
 loadPersistedState();
+// A shared Wikivoyage guide opens in Wikivoyage mode, so the header and the
+// cards that follow it match the guide.
+if (/^v[1-9]\d{0,11}$/.test(new URLSearchParams(location.search).get('a') || '')) setMode('how', false);
 syncActivityDisplay();
 loadToday();
 updateOfflineBanner();
@@ -2188,19 +2204,22 @@ setTimeout(() => {
 
 function openCollectionChooser(articleId) {
   const article=liked.get(articleId);if(!article)return;
+  const trigger=document.activeElement;
   const dlg=document.createElement('dialog');dlg.className='source-dialog collection-dialog';
-  dlg.innerHTML='<h2>Save to collection</h2><p class="collection-article"></p><p class="collection-guidance">Tap a collection below to add this article immediately.</p><div class="collection-options"></div><div class="collection-start collection-dialog-actions"><button class="collection-choice collection-create" type="button">＋ Create new collection</button><button class="source-close" type="button">Cancel</button></div><form hidden><label for="collectionChoiceName">Create a new collection</label><input id="collectionChoiceName" class="collection-name-input" placeholder="New collection name…" maxlength="30" required><div class="collection-dialog-actions"><button class="feature-action" type="submit">Create and save</button><button class="source-close collection-back" type="button">Back</button></div></form>';
+  dlg.innerHTML='<h2>Save to collection</h2><p class="collection-article" dir="auto"></p><p class="collection-guidance">Tap a collection below to add this article immediately.</p><div class="collection-options"></div><div class="collection-start collection-dialog-actions"><button class="collection-choice collection-create" type="button">＋ Create new collection</button><button class="source-close" type="button">Cancel</button></div><form hidden><label for="collectionChoiceName">Create a new collection</label><input id="collectionChoiceName" class="collection-name-input" placeholder="New collection name…" maxlength="30" required><div class="collection-dialog-actions"><button class="feature-action" type="submit">Create and save</button><button class="source-close collection-back" type="button">Back</button></div></form>';
   dlg.querySelector('.collection-article').textContent=article.title;
   const choices=dlg.querySelector('.collection-options');
   collections.forEach((col,i)=>{const b=document.createElement('button');b.type='button';b.className='collection-choice';b.textContent=col.name+(col.ids.includes(articleId)?' ✓ Added':' · Add here');b.disabled=col.ids.includes(articleId);b.onclick=()=>{addToCollection(i,articleId);dlg.close()};choices.append(b)});
-  dlg.querySelector('form').onsubmit=e=>{e.preventDefault();const input=dlg.querySelector('input'),name=input.value.trim();if(!name){input.setCustomValidity('Enter a collection name');input.reportValidity();return}let idx=collections.findIndex(c=>c.name.toLowerCase()===name.toLowerCase());if(idx<0){collections.push({name,ids:[]});idx=collections.length-1}addToCollection(idx,articleId);dlg.close()};
+  dlg.querySelector('form').onsubmit=e=>{e.preventDefault();const input=dlg.querySelector('input'),name=input.value.trim();if(!name){input.setCustomValidity(window.WSI18n?.translate('Enter a collection name')||'Enter a collection name');input.reportValidity();return}let idx=collections.findIndex(c=>c.name.toLowerCase()===name.toLowerCase());if(idx<0){collections.push({name,ids:[]});idx=collections.length-1}addToCollection(idx,articleId);dlg.close()};
   dlg.querySelector('input').oninput=e=>e.target.setCustomValidity('');
   const form=dlg.querySelector('form'),start=dlg.querySelector('.collection-start');
   if(!collections.length)dlg.querySelector('.collection-guidance').textContent='Create your first collection to organize this article.';
   dlg.querySelector('.collection-create').onclick=()=>{choices.hidden=true;start.hidden=true;form.hidden=false;dlg.querySelector('input').focus()};
   dlg.querySelector('.collection-back').onclick=()=>{form.hidden=true;choices.hidden=false;start.hidden=false;dlg.querySelector('.collection-create').focus()};
   start.querySelector('.source-close').onclick=()=>dlg.close();
+  // Escape closes only this dialog, not the Saved Articles panel underneath.
+  dlg.addEventListener('keydown',e=>e.stopPropagation());
   dlg.addEventListener('click',e=>{if(e.target===dlg){const r=dlg.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)dlg.close()}});
-  dlg.addEventListener('close',()=>setTimeout(()=>dlg.remove(),400)); // let the closing fade finish
+  dlg.addEventListener('close',()=>{setTimeout(()=>dlg.remove(),400);if(trigger?.isConnected)trigger.focus({preventScroll:true});}); // let the closing fade finish
   document.body.append(dlg);dlg.showModal();
 }

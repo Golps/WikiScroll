@@ -1,5 +1,5 @@
-const CACHE='wikiscroll-atlas-v73';
-const SHELL=['/discovery.js?v=49','/about/','/about.css?v=50','/about.js?v=47','/images/wordmark-dark.svg','/images/wordmark-light.svg','/styles.css?v=67','/images/favicon.ico?v=42','/images/apple-touch-icon.png?v=42','/images/icon-192.png?v=42','/images/icon-512.png?v=42','/translations.js?v=49','/i18n.js?v=49','/data/starter-en.json','/features.js?v=61','/','/app.js?v=71','/atlas.js?v=55','/manifest.json','/images/icon-192.png','/images/icon-512.png'];
+const CACHE='wikiscroll-atlas-v74';
+const SHELL=['/discovery.js?v=49','/about/','/about.css?v=50','/about.js?v=47','/images/wordmark-dark.svg','/images/wordmark-light.svg','/styles.css?v=68','/images/favicon.ico?v=42','/images/apple-touch-icon.png?v=42','/images/icon-192.png?v=42','/images/icon-512.png?v=42','/translations.js?v=50','/i18n.js?v=50','/data/starter-en.json','/features.js?v=62','/','/app.js?v=72','/atlas.js?v=56','/manifest.json','/images/icon-192.png','/images/icon-512.png'];
 // Wikimedia serves article images from both hosts (thumb.wikimedia.org since 2026).
 const IMAGE_HOSTS=new Set(['upload.wikimedia.org','thumb.wikimedia.org']);
 self.addEventListener('install',event=>{
@@ -37,7 +37,10 @@ self.addEventListener('fetch',event=>{
     const cache=await caches.open(CACHE).catch(()=>null),cached=await cache?.match(req).catch(()=>null);
     if(cached)return cached;
     try{
-      const response=await fetch(req);
+      // Wikimedia serves images with CORS headers. A CORS copy is cached at its
+      // real size; an opaque one is charged several megabytes of storage quota
+      // each, which could crowd out the reader's saved library.
+      const response=image?await fetch(req.url,{mode:'cors',credentials:'omit'}).catch(()=>fetch(req)):await fetch(req);
       if(cache&&(response.ok||image&&response.type==='opaque')){
         event.waitUntil((async()=>{
           await cache.put(req,response.clone());

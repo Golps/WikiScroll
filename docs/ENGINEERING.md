@@ -185,13 +185,14 @@ Article links (`?a=w123&lang=es`) follow the same rules. Readers get the normal 
 
 ## Testing
 
-The suite has **157 tests** in 22 files. It runs with `node --test test/*.test.js` in about 2 seconds, with no installed dependencies and no network access. Wikimedia, the edge cache, rate-limit bindings and timers are replaced with fakes.
+The suite has **176 tests** in 23 files. It runs with `node --test test/*.test.js` in about 2 seconds, with no installed dependencies and no network access. Wikimedia, the edge cache, rate-limit bindings and timers are replaced with fakes.
 
 **What it verifies:**
 
 - Worker behavior: parameter validation, caching and stale refreshes, request coalescing, deadlines and partial answers, per-host cooldowns, pageview completion and depth ranges, vital-article sampling, topic sampling, travel search, "On this day" parsing, Help Wikipedia, collection decoding, verification and escaping, bot previews, and security headers.
 - Browser logic, extracted from `public/*.js` and run in `node:vm` sandboxes: supply and duplicate rejection, stale-generation handling, request budgets and cooldowns, gesture and trackpad rules, clean-up and card anchoring, persistence and migrations, statistics, localization coverage, service-worker caching, and map loading.
-- Project rules: identical copies of the language tables, and no unused CSS.
+- Interface rules: right-to-left layout that leaves article text in its own direction, keyboard Tab order, menu-button states, light-theme contrast ratios, storage-quota handling, and translations for every message in all 14 languages.
+- Project rules: identical copies of the language tables and language lists, and no unused CSS.
 
 **What it doesn't verify:**
 
@@ -205,6 +206,9 @@ These are known and not yet fixed. They are listed here so the notes above aren'
 
 | Area | Issue |
 |---|---|
+| About, Privacy Policy and page description | These are English only, while the rest of the interface is translated into 14 languages. |
+| Public API (`worker/index.js`: `json`) | API responses allow any origin (`Access-Control-Allow-Origin: *`), so other sites can call the API from browsers within the rate limits. |
+| Stylesheet (`public/styles.css`) | The stylesheet has grown by layering overrides (for example, `.panel` is redefined 40 times, with 82 `!important` declarations), which makes changes harder to predict. `test/unused-css.test.js` removes dead rules but not overridden ones. |
 | *Known* depth, first request | The first time a *Known* list is requested at a given edge location each week, it may be answered from Level 3 while Level 4 is still being assembled. That answer is intentionally not cached. |
 
 ### Recently fixed
@@ -215,3 +219,16 @@ Each of these fixes has a regression test that fails on the previous code:
 - **Popular and Known under a slow request** (`worker/vital.js`, `worker/index.js`). Vital-article batches had no partial snapshot, so if one request was still pending when the answer budget ran out, the Worker returned `503` even with complete cards ready. It now answers with the cards whose introductions have arrived.
 - **Ambient mode on small screens** (`public/atlas.js`). A long introduction ran past the bottom of the screen and looked cut off mid-sentence. Ambient mode now fits whole sentences to the available space, like the cards, refits on resize and rotation, and drops a fragment cut off at the source's length limit.
 - **Collect button** (`public/app.js`). The collection chooser in Saved Articles was built but never shown, because its last statement had been commented out by accident.
+- **Right-to-left article text** (`public/styles.css`, `public/app.js`). In Arabic and Hebrew, a late stylesheet rule forced every card's text to right-to-left, so English articles (including the English Wikivoyage guides that Arabic readers receive) showed punctuation on the wrong side. Article text now keeps its own direction (`dir="auto"`), in cards and in the saved, history, collection and map views.
+- **Cut-off endings on cards** (`public/atlas.js`). On tall screens a card could end with the source's truncated fragment ("…population 11,084. In..."). Cards now drop it, as ambient mode does.
+- **Untranslated messages** (`public/translations.js`, `public/i18n.js`). About 30 notifications, empty states, errors, map messages and collection dialogs appeared in English in every language, and messages containing a collection name could not be translated at all. All are now translated in the 14 languages, with templates for messages that include a name or a count.
+- **Keyboard Tab order** (`public/atlas.js`). Tab walked through the buttons of every card rendered ahead (up to 16 cards) and scrolled the feed to each one. Only the card on screen is now in the Tab order.
+- **Drawer focus** (`public/atlas.js`). Opening Settings, Topics, Saved Articles or History left focus behind, and Tab could move onto the feed hidden by the backdrop. An open drawer now takes focus, keeps it out of the feed, and returns it to the button that opened it.
+- **Escape in collection dialogs** (`public/app.js`, `public/features.js`). Escape also closed the Saved Articles panel underneath and left focus nowhere. It now closes only the dialog, and focus returns to the button that opened it.
+- **Collection counts and names** (`public/app.js`, `public/features.js`). Tabs counted unsaved articles that the collection no longer showed; a duplicate name failed silently; imported collections could duplicate a name that differed only in capitalization and were not kept in IndexedDB for offline reading.
+- **Storage quota** (`public/app.js`). When local storage was full, saves, collections and settings could fail silently. The disposable feed reserve now gives up its space first.
+- **Image caching** (`public/sw.js`). Wikimedia images were cached as opaque responses, which browsers charge at several megabytes each against the site's storage quota. They are now cached as CORS copies at their real size.
+- **Accessibility details** (`public/index.html`, `public/atlas.js`, `public/styles.css`). The page had no main landmark; menu buttons did not report whether their panel was open; two light-theme colours (secondary text on grey, the red Remove button) were below 4.5:1 contrast; seventeen rules named a web font that is never loaded.
+- **Travel search caching** (`worker/index.js`). Every filtered travel request went to Wikivoyage. Complete result pages are now shared from the edge cache for an hour (the destination is matched regardless of case and spacing), checked before any rate-limit budget is spent; partial pages are never cached.
+- **Shared Wikivoyage links** (`public/app.js`). A shared travel guide opened in Wikipedia mode, so the header said Wikipedia and the following cards were Wikipedia articles. It now opens in Wikivoyage mode.
+- **Smaller fixes.** External article pages open with `noopener`; a stored depth outside 1 to 5 is ignored; reduced motion is read when each motion starts, so changing the system setting applies without a reload; non-English topic feeds no longer re-translate the same category names on every refill; the description shown to search engines and to browsers without JavaScript now matches the app (it mentioned a heart button and offline caching of every viewed article).

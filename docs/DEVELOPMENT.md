@@ -158,7 +158,7 @@ Please use your own name and logo for a public deployment, so readers can tell y
 - **Version static assets.** When a file in `public/` changes, bump its `?v=` number in `index.html`, update the matching entry in the `SHELL` list in `sw.js`, and bump the `CACHE` name there.
 - **Keep mirrored tables identical.** `VIEW_SCALE`, the Wikivoyage language list and `HELP_LANGS` exist in both the Worker and `app.js`. Change both; tests compare them.
 - **Preserve storage keys.** The `ws_*` `localStorage` keys and the `wikiscroll` IndexedDB database hold readers' libraries. Add migrations; never rename keys.
-- **Translate new labels.** Add every new interface string to `public/translations.js` for all 14 non-English languages.
+- **Translate new labels.** Add every new interface string to `public/translations.js` for all 14 non-English languages. A message that includes a collection name or a number needs a template entry (`"Added to \"{name}\""`) and a matching pattern in `public/i18n.js`. `test/i18n.test.js` fails when a toast message has no translation.
 - **About content.** Edit `public/about/index.html`, then run `node scripts/build-about.mjs` to copy it into the in-app dialog.
 - **Branding.** Edit the sources in `branding/`, then run `node scripts/build-branding.mjs` (after `pnpm install`) to regenerate icons and the share image. With unchanged sources, it reproduces the committed images byte for byte.
 - **Wording.** Keep product copy calm and factual. Describe only what the app does today.

@@ -39,3 +39,31 @@ test('Hebrew is optional, translates controls, and returns to English',()=>{
  api.setLanguage('he'); assert.equal(api.translate('Settings'),'הגדרות');
  api.setLanguage('en'); assert.equal(api.translate('Settings'),'Settings');
 });
+
+test('messages shown after an action are translated in every language, including collection names and counts',()=>{
+ const w=harness(),api=w.WSI18n,langs=Object.keys(w.WS_TRANSLATIONS);
+ const messages=['Link copied!','✨ Feed refreshed','📎 Opened shared article','Could not share. Open the article to copy its link.','Collection deleted',
+  'No articles in this collection yet. Add some from the "All" tab.',"Swipe right or press Save to keep articles here. They'll be available offline too.",
+  'Articles you view will appear here so you can find them again.','Clear travel filters',"Wikipedia didn't respond.","Wikivoyage didn't respond.",
+  "You're offline. Reconnect and try again. Your saved articles are still available.",'No matching guides. Try a broader country or region, or clear your travel filters in Settings.',
+  '📍 Could not locate this place','Map could not load. Close it and try again.','❌ Map failed to render','Tap a collection below to add this article immediately.',
+  '＋ Create new collection','Create a new collection','Create and save','Back','Create your first collection to organize this article.',
+  'Shareable collections support up to 30 articles. Create a smaller collection to share.','Could not verify this collection. Please reopen the link to try again.',
+  'No more matching destinations. Try broadening your travel filters.','🌍 Travel','View map','📖 Just now','Enter a collection name','Read on Wikivoyage ↗',
+  "📡 You're offline. Cached articles still work",'A collection with this name already exists'];
+ for(const lang of langs)for(const message of messages)assert.notEqual(api.translate(message,lang),message,lang+': '+message);
+ const name='Sea $& life <b>';
+ for(const lang of langs)for(const message of ['📁 Collection "'+name+'" created','Added to "'+name+'"',name+' · Add here',name+' ✓ Added','Save “'+name+'”?']){
+  const result=api.translate(message,lang);
+  assert.notEqual(result,message,lang+': '+message);assert.ok(result.includes(name),lang+' keeps the collection name as typed: '+result);
+ }
+ for(const lang of langs)assert.match(api.translate('Add 12 articles to a new collection on this device.',lang),/12/,lang);
+ assert.equal(api.translate('Added to "Viaje"','es'),'Añadido a "Viaje"');
+});
+test('every literal toast message in the app has a translation',()=>{
+ const w=harness(),api=w.WSI18n;
+ const code=['app.js','features.js'].map(f=>fs.readFileSync(new URL('../public/'+f,import.meta.url),'utf8')).join('\n');
+ const literals=[...code.matchAll(/toast\((['"])((?:(?!\1).)+)\1\s*[,)]/g)].map(m=>m[2].replace(/\\'/g,"'"));
+ assert.ok(literals.length>=8);
+ for(const lang of Object.keys(w.WS_TRANSLATIONS))for(const text of literals)assert.notEqual(api.translate(text,lang),text,lang+': '+text);
+});

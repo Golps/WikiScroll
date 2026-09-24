@@ -45,16 +45,19 @@ test('messages shown after an action are translated in every language, including
  const w=harness(),api=w.WSI18n,langs=Object.keys(w.WS_TRANSLATIONS);
  const messages=['Link copied!','✨ Feed refreshed','📎 Opened shared article','Could not share. Open the article to copy its link.','Collection deleted',
   'No articles in this collection yet. Add some from the "All" tab.',"Swipe right or press Save to keep articles here. They'll be available offline too.",
-  'Articles you view will appear here so you can find them again.','Clear travel filters',"Wikipedia didn't respond.","Wikivoyage didn't respond.",
-  "You're offline. Reconnect and try again. Your saved articles are still available.",'No matching guides. Try a broader country or region, or clear your travel filters in Settings.',
+  'Articles you view will appear here so you can find them again.',"Wikipedia didn't respond.","Wikivoyage didn't respond.",
+  "You're offline. Reconnect and try again. Your saved articles are still available.",
   '📍 Could not locate this place','Map could not load. Close it and try again.','❌ Map failed to render','Tap a collection below to add this article immediately.',
   '＋ Create new collection','Create a new collection','Create and save','Back','Create your first collection to organize this article.',
   'Shareable collections support up to 30 articles. Create a smaller collection to share.','Could not verify this collection. Please reopen the link to try again.',
-  'No more matching destinations. Try broadening your travel filters.','🌍 Travel','View map','📖 Just now','Enter a collection name','Read on Wikivoyage ↗',
+  "That's every matching guide","You've seen every guide that matches your travel filters.",'No matching guides','Nothing on Wikivoyage matches your travel filters.',
+  'Try any trip style','Explore all destinations','Change filters','How place search works','Type a country, region or city, like Japan or Tuscany.',
+  'To search several places at once, separate them with commas: Japan, Tuscany. Guides from each place take turns in your feed.',
+  'A guide is included when its name or introduction mentions the place.',"When you've seen every matching guide, the feed tells you and lets you widen the search.",'🌍 Travel','View map','📖 Just now','Enter a collection name','Read on Wikivoyage ↗',
   "📡 You're offline. Cached articles still work",'A collection with this name already exists'];
  for(const lang of langs)for(const message of messages)assert.notEqual(api.translate(message,lang),message,lang+': '+message);
  const name='Sea $& life <b>';
- for(const lang of langs)for(const message of ['📁 Collection "'+name+'" created','Added to "'+name+'"',name+' · Add here',name+' ✓ Added','Save “'+name+'”?']){
+ for(const lang of langs)for(const message of ['📁 Collection "'+name+'" created','Added to "'+name+'"',name+' · Add here',name+' ✓ Added','Save “'+name+'”?','Search for “'+name+'”']){
   const result=api.translate(message,lang);
   assert.notEqual(result,message,lang+': '+message);assert.ok(result.includes(name),lang+' keeps the collection name as typed: '+result);
  }

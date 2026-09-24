@@ -8220,3 +8220,18 @@ body .mobile-settings-heading h2 { font: 400 36px/1.15 var(--serif); letter-spac
 
 /* Hidden for a moment while a non-English reader's interface language loads (lang.js). */
 html.i18n-pending body { visibility: hidden; }
+
+/* Place field in the travel filters, with an ⓘ button that explains the search. */
+.travel-place { margin: 15px 0; font-size: 12px; line-height: 1.5; }
+.travel-place-head { display: flex; align-items: center; gap: 8px; }
+.travel-info { position: relative; display: inline-grid; place-items: center; width: 18px; height: 18px; padding: 0; border: 1px solid currentColor; border-radius: 50%; background: none; color: var(--muted); font: italic 600 11px/1 var(--serif); cursor: pointer; }
+.travel-info::after { content: ''; position: absolute; inset: -13px; }
+.travel-info[aria-expanded="true"] { background: var(--accent-solid); border-color: var(--accent-solid); color: #fff; }
+.travel-help { margin: 6px 0 8px; padding: 10px 12px; border: 1px solid var(--rule); border-radius: 2px; background: var(--surface); }
+.travel-filters .travel-help p { margin: 0 0 6px; }
+.travel-filters .travel-help p:last-child { margin-bottom: 0; }
+/* End of a travel filter's results: one action per line. */
+.travel-end-filter { color: var(--ink); font-weight: 600; margin: -8px 0 18px; }
+.travel-end-actions { display: flex; flex-direction: column; gap: 10px; }
+.travel-end-actions .err-btn + .err-btn { background: none; color: var(--ink); border: 1px solid var(--rule); }
+.travel-end h2.err-ttl { margin-top: 0; }

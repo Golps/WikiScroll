@@ -2,6 +2,23 @@
 
 Releases of this repository. Each entry describes what changed in the code; [docs/ENGINEERING.md](docs/ENGINEERING.md#known-issues) has the details and the tests behind each change.
 
+## 1.2 (September 24, 2026)
+
+### Travel search
+
+- Search several places at once, separated by commas ("Japan, Tuscany"), or by "or". Each place is searched separately and their guides take turns in the feed.
+- Only guides whose title or introduction names the place are shown, in relevance order, without phrasebooks.
+- A misspelled place that finds nothing offers a correction ("Search for “Japan”").
+- When every matching guide has been shown, the feed says so and offers the same place in any trip style, all destinations, or new filters. It no longer stops silently.
+- An ⓘ button next to "Country or region" explains how the search works.
+
+### Fixes
+
+- Travel filters kept working after Wikimedia rate-limited the browser's own requests (they come from WikiScroll's server).
+- Clear filters and Explore destinations close Settings with the full close animation.
+
+192 tests (8 new). The new tests, and one updated translation test, fail on the 1.1 code.
+
 ## 1.1 (September 24, 2026)
 
 ### Security

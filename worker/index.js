@@ -8,6 +8,7 @@ import {vitalArticles} from './vital.js';
 import {completeNeeds,HELP_LANGS} from './needs.js';
 import {todayResponse} from './today.js';
 import {LANGS} from './languages.js';
+import {parsePlaces,parseCursor,formatCursor,namesPlace,interleave,fold,PHRASEBOOK} from './travel.js';
 /** WikiScroll Worker: explicit routing, static assets and article unfurls.
  * Handles article requests and social previews.
  * No GitHub integration, Pages runtime, KV or framework is required.
@@ -228,28 +229,48 @@ async function handle(request,env,ctx) {
     if(url.pathname.startsWith('/api/')){
       if(!['GET','HEAD'].includes(request.method))return json({error:'Method not allowed'},405,{'Allow':'GET, HEAD'});
       if(url.pathname==='/api/travel'){
-        const requested=url.searchParams.get('lang')||'en',place=(url.searchParams.get('place')||'').trim(),style=url.searchParams.get('style')||'',offset=Number(url.searchParams.get('offset')||0);
+        const requested=url.searchParams.get('lang')||'en',input=(url.searchParams.get('place')||'').trim(),style=url.searchParams.get('style')||'';
         const styles={nature:'nature OR hiking OR park',coast:'beach OR coast OR island',culture:'museum OR history OR culture',city:'city OR urban'};
-        if(!LANGS.has(requested)||place.length>80||!Number.isInteger(offset)||offset<0||offset>10000||style&&!Object.hasOwn(styles,style))return json({error:'Invalid travel filters'},400);
-        const clean=place.replace(/[^\p{L}\p{N}\s'-]/gu,' ').replace(/\s+/g,' ').trim();
-        const query=[clean?JSON.stringify(clean):'',style?'('+styles[style]+')':''].filter(Boolean).join(' ');
-        if(!query)return json({error:'Choose a travel filter'},400);
+        if(!LANGS.has(requested)||input.length>80||style&&!Object.hasOwn(styles,style))return json({error:'Invalid travel filters'},400);
+        // One to three places ("Japan, Tuscany"), each searched on its own so
+        // results alternate between them; the cursor keeps one offset per place.
+        const places=parsePlaces(input,requested),cursor=parseCursor(url.searchParams.get('offset'),places.length);
+        if(!cursor)return json({error:'Invalid travel filters'},400);
+        if(!places.length&&!style)return json({error:'Choose a travel filter'},400);
         const lang=voyageLang(requested);
         // Many readers ask for the same destination and style: complete result
         // pages are shared from the edge cache for an hour, before any upstream work.
-        const key=new Request(`${url.origin}/api/travel?v=1&lang=${lang}&place=${encodeURIComponent(clean.toLowerCase())}&style=${style}&offset=${offset}`),cache=globalThis.caches?.default;
+        const key=new Request(`${url.origin}/api/travel?v=2&lang=${lang}&place=${encodeURIComponent(places.map(fold).join('|'))}&style=${style}&offset=${cursor.map(c=>c??'-').join('.')}`),cache=globalThis.caches?.default;
         try{const hit=await cache?.match(key);if(hit)return json(await hit.json(),200,{'X-Cache':'HIT'});}catch{}
         if(!await permit(env,'WORK_LIMIT','travel'))return limited();
-        const started=Date.now();
-        const data=await upstream(apiURL(lang,'how',{generator:'search',gsrsearch:query,gsrnamespace:'0',gsrlimit:'20',gsroffset:String(offset),prop:'pageimages|info|description',piprop:'thumbnail',pithumbsize:'800',pilimit:'max',inprop:'url'}));
-        if(!data||data.error)return json({error:'Travel search temporarily unavailable'},503);
-        const found=Object.values(data.query?.pages||{}).filter(p=>p.pageid>0&&!DISAMBIGUATION.test(p.description||''));
+        const started=Date.now(),limit=String(places.length>1?Math.ceil(40/places.length):30);
+        const searches=await Promise.all((places.length?places:[null]).map(async(place,i)=>{
+          if(cursor[i]===null)return {place,pages:[],next:null};
+          const query=[place?JSON.stringify(place):'',style?'('+styles[style]+')':''].filter(Boolean).join(' ');
+          const data=await upstream(apiURL(lang,'how',{generator:'search',gsrsearch:query,gsrnamespace:'0',gsrlimit:limit,gsroffset:String(cursor[i]),prop:'pageimages|info|description',piprop:'thumbnail',pithumbsize:'800',pilimit:'max',inprop:'url'}));
+          if(!data||data.error)return null;
+          // Search relevance order (the generator's index), not page-ID order.
+          const pages=Object.values(data.query?.pages||{}).filter(p=>p.pageid>0&&!DISAMBIGUATION.test(p.description||'')&&!PHRASEBOOK.test(p.title||'')).sort((a,b)=>(a.index??0)-(b.index??0));
+          return {place,pages,next:data.continue?.gsroffset??null};
+        }));
+        if(searches.includes(null))return json({error:'Travel search temporarily unavailable'},503);
+        const found=searches.flatMap(s=>s.pages);
         // Guides whose introduction misses the budget are left out of this page.
         await within(completeExtracts(found,ids=>upstream(apiURL(lang,'how',extractParams(ids)))),Math.max(0,TRAVEL_BUDGET_MS-(Date.now()-started)));
-        const body={articles:found.filter(p=>strip(p.extract).length>=40).map(p=>article(p,lang,'how')),next:data.continue?.gsroffset??null};
-        // Only a page where every guide arrived with its introduction is cached. A
+        // Keep guides that are about the place: named in the title or introduction.
+        const ready=searches.map(s=>s.pages.filter(p=>strip(p.extract).length>=40&&(!s.place||namesPlace(p,s.place))));
+        const body={articles:interleave(ready).map(p=>article(p,lang,'how')),next:formatCursor(searches.map(s=>s.next))};
+        let complete=found.every(p=>typeof p.extract==='string'&&!p.extractMissing);
+        // A misspelled place finds nothing: offer the search engine's correction.
+        if(!found.length&&places.length===1&&cursor[0]===0){
+          const hint=await upstream(apiURL(lang,'how',{list:'search',srsearch:places[0],srnamespace:'0',srinfo:'suggestion',srlimit:'1',srprop:''}));
+          const suggestion=String(hint?.query?.searchinfo?.suggestion||'').replace(/[^\p{L}\p{N}\s'-]/gu,' ').replace(/\s+/g,' ').trim().slice(0,80);
+          if(suggestion&&fold(suggestion)!==fold(places[0]))body.suggestion=suggestion.charAt(0).toLocaleUpperCase(lang)+suggestion.slice(1);
+          if(!hint)complete=false;
+        }
+        // Only a page where every guide's introduction arrived is cached. A
         // partial or failed page is not, so a slow moment never hides guides for an hour.
-        if(cache&&body.articles.length&&body.articles.length===found.length)ctx.waitUntil(cache.put(key,json(body,200,{'Cache-Control':'public, max-age=3600'})).catch(()=>{}));
+        if(cache&&complete)ctx.waitUntil(cache.put(key,json(body,200,{'Cache-Control':'public, max-age=3600'})).catch(()=>{}));
         return json(body,200,{'X-Cache':'MISS'});
       }
       if(url.pathname==='/api/today'){

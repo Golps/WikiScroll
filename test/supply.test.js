@@ -33,7 +33,7 @@ function harness() {
     directRequest:async()=>{directCalls++;return [];},
   });
   vm.runInContext(`let curMode='wiki',curLang='en',depthLevel=3,curTopics=new Set(),travelFilters={place:'',style:''},helpMode='off';
-    let queue=[],articles=[],filling=false,hinted=false,fillGeneration=0,fillBudget=null,apiCooldownUntil=0,travelExhausted=false;
+    let queue=[],articles=[],filling=false,hinted=false,fillGeneration=0,fillBudget=null,apiCooldownUntil=0,travelExhausted=false,travelContinuing=false;
     const fetchWiki=()=>directRequest(),fetchWikiByTopic=()=>directRequest(),fetchVoyage=()=>directRequest();
     ${voyage}
     ${supply}
@@ -135,4 +135,15 @@ test('normal supply waits for a requested shared article before rendering', () =
   assert.equal(h.state().queue.length,40);
   h.run('pendingDeepGeneration=-1;ensureFeedAhead();');
   assert.equal(h.nodes.length,17);
+});
+
+test('a pause after Wikimedia rate-limits the browser does not stop filtered travel, which uses WikiScroll\'s own server', async () => {
+  const h=harness();
+  h.change("curMode='how';travelFilters={place:'Japan',style:''};apiCooldownUntil=Date.now()+60000;");
+  await h.run('fillQueue()');
+  assert.equal(h.directCalls,1,'the filtered travel request is still made');
+  assert.equal(h.requests.length,0,'the random-guide Worker batch is not used for filtered travel');
+  h.change("curMode='how';travelFilters={place:'',style:''};apiCooldownUntil=Date.now()+60000;");
+  const pending=h.run('fillQueue()');h.requests[0]([]);await pending;
+  assert.equal(h.directCalls,1,'direct Wikimedia calls still wait out the pause');
 });

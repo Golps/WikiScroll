@@ -21,31 +21,79 @@ function renderCollectionShare(){
  const preview=document.createElement('a');preview.textContent='Preview collection';preview.href='/collection?c='+encoded;preview.target='_blank';preview.rel='noopener';preview.className='collection-preview';
  box.append(note,button);if(!button.disabled)box.append(preview);
 }
-const TRAVEL_STYLES={nature:'nature hiking park',coast:'beach coast island',culture:'museum history culture',city:'city urban'};
 async function fetchFilteredTravel(){
- if(travelExhausted)return [];
  const generation=fillGeneration,lang=voyageLang();
- const place=String(travelFilters.place||'').replace(/[^\p{L}\p{N}\s'-]/gu,' ').trim().slice(0,80);
- const style=TRAVEL_STYLES[travelFilters.style]||'';
- const query=[place?`"${place}"`:'',style?`(${style.split(' ').join(' OR ')})`:''].filter(Boolean).join(' ');
- const params=new URLSearchParams({lang,place,style:travelFilters.style||'',offset:String(travelOffset)});
- let data;try{const response=await fetch('/api/travel?'+params,{signal:AbortSignal.timeout(10000)});if(!response.ok)return [];data=await response.json();}catch{return [];}
- if(generation!==fillGeneration)return [];
- if(!data)return [];
- travelOffset=data.next??travelOffset;travelExhausted=data.next===null;
- const seen=new Set(articles.map(a=>a.id).concat(queue.map(a=>a.id)));
- const result=(data.articles||[]).filter(a=>!seen.has(a.id));
- if(travelExhausted&&!result.length)toast('No more matching destinations. Try broadening your travel filters.');
- return result;
+ // The Worker reads the place as typed: "Japan, Tuscany" means either place.
+ const params=()=>new URLSearchParams({lang,place:String(travelFilters.place||'').trim().slice(0,80),style:travelFilters.style||'',offset:String(travelOffset)});
+ // A page of results can hold no guides about the place while later pages do,
+ // so look a little further before leaving it to the next refill.
+ for(let page=0;page<3&&!travelExhausted;page++){
+  let data;try{const response=await fetch('/api/travel?'+params(),{signal:AbortSignal.timeout(10000)});if(!response.ok)return [];data=await response.json();}catch{return [];}
+  if(generation!==fillGeneration||!data)return [];
+  travelOffset=data.next??travelOffset;travelExhausted=data.next===null;
+  if(typeof data.suggestion==='string')travelSuggestion=data.suggestion;
+  const seen=new Set(articles.map(a=>a.id).concat(queue.map(a=>a.id)));
+  const result=(data.articles||[]).filter(a=>!seen.has(a.id));
+  if(result.length)return result;
+ }
+ return [];
+}
+// When a travel filter runs out, the feed ends on a card that says so and
+// offers the next step: the same place in any style, all destinations, or new
+// filters. It never switches to unrelated guides on its own, and it never
+// just stops without a word.
+const TRAVEL_STYLE_LABELS={nature:'Nature & hiking',coast:'Coasts & islands',culture:'History & culture',city:'City breaks'};
+function showTravelEnd(){
+ const feed=document.getElementById('feed');
+ const found=!!feed.querySelector('.card[data-id]');
+ let card=feed.querySelector('.travel-end');
+ if(!card){card=document.createElement('div');card.className='card travel-end';feed.appendChild(card);}
+ const place=travelFilters.place||'',style=travelFilters.style||'';
+ card.innerHTML=`<div class="cbg"><div class="cveil"></div></div><div class="err"><div class="err-ico">🧭</div><h2 class="err-ttl">${found?"That's every matching guide":'No matching guides'}</h2><div class="err-msg">${found?"You've seen every guide that matches your travel filters.":'Nothing on Wikivoyage matches your travel filters.'}</div><p class="travel-end-filter"></p><div class="travel-end-actions"></div></div>`;
+ const filter=card.querySelector('.travel-end-filter');
+ if(place){const name=document.createElement('span');name.className='travel-end-place';name.dir='auto';name.textContent=place;filter.append(name);}
+ if(place&&style)filter.append(' · ');
+ if(style){const label=document.createElement('span');label.textContent=TRAVEL_STYLE_LABELS[style]||style;filter.append(label);}
+ const actions=card.querySelector('.travel-end-actions'),add=(label,run)=>{const b=document.createElement('button');b.type='button';b.className='err-btn';b.textContent=label;b.onclick=run;actions.append(b);};
+ if(!found&&travelSuggestion&&place)add('Search for “'+travelSuggestion+'”',()=>{setTravelFilters({place:travelSuggestion,style});resetFeed();});
+ if(place&&style)add('Try any trip style',()=>continueTravel({place,style:''}));
+ add('Explore all destinations',()=>continueTravel({place:'',style:''}));
+ add('Change filters',openTravelFilters);
+}
+function setTravelFilters(filters){travelFilters=filters;lsSet('ws_travel_filters',travelFilters);syncTravel();}
+// Keep going from where the reader is: the end card becomes a loading card,
+// and new guides are added after it (cards already seen are skipped).
+function continueTravel(filters){
+ setTravelFilters(filters);travelOffset=0;travelExhausted=false;travelSuggestion='';
+ const card=document.querySelector('#feed .travel-end');
+ if(!card||!document.querySelector('#feed .card[data-id]')){resetFeed();return;}
+ travelContinuing=true;
+ card.innerHTML=`<div class="cbg"><div class="cveil"></div></div><div class="spin-wrap"><div class="spin h"></div><div class="spin-lbl">Loading destinations…</div></div>`;
+ fillQueue().then(ensureFeedAhead);
+}
+function openTravelFilters(){
+ const desktop=document.getElementById('settingsBtn')?.offsetParent!==null;
+ if(desktop)openSettings();else openBurger();
+ setTimeout(()=>document.querySelector(`${desktop?'#settingsPanel':'.burger-inner'} .travel-filters input[name="place"]`)?.focus(),350);
+}
+// Rebuild the feed while the drawer still covers it, then close the drawer two
+// frames later. Doing both in one frame cost the close animation its first
+// frames and made the drawer jump shut.
+function changeFeedThenClose(change){
+ change();
+ requestAnimationFrame(()=>requestAnimationFrame(()=>{closeAllPanels();closeBurger();}));
 }
 function installTravelFilters(){
- const markup='<h3>Wikivoyage · Travel filters</h3><p>Choose a destination and trip style.</p><label>Country or region<input name="place" maxlength="80" placeholder="e.g. Japan, Tuscany"></label><label>Trip style<select name="style"><option value="">Any style</option><option value="nature">Nature & hiking</option><option value="coast">Coasts & islands</option><option value="culture">History & culture</option><option value="city">City breaks</option></select></label><div class="feature-buttons"><button class="feature-action" type="submit">Explore destinations</button><button type="button" class="travel-clear">Clear filters</button></div>';
- for(const parent of [document.querySelector('#settingsPanel'),document.querySelector('.burger-inner')]){
- const form=document.createElement('form');form.className='travel-filters';form.innerHTML=markup;parent.querySelector('.platform-stats').after(form);
+ const markup='<h3>Wikivoyage · Travel filters</h3><p>Choose a destination and trip style.</p><div class="travel-place"><div class="travel-place-head"><label for="travelPlace-N">Country or region</label><button type="button" class="travel-info" aria-expanded="false" aria-controls="travelHelp-N" aria-label="How place search works" title="How place search works">i</button></div><div class="travel-help" id="travelHelp-N" hidden><p>Type a country, region or city, like Japan or Tuscany.</p><p>To search several places at once, separate them with commas: Japan, Tuscany. Guides from each place take turns in your feed.</p><p>A guide is included when its name or introduction mentions the place.</p><p>When you\'ve seen every matching guide, the feed tells you and lets you widen the search.</p></div><input id="travelPlace-N" name="place" maxlength="80" placeholder="e.g. Japan, Tuscany"></div><label>Trip style<select name="style"><option value="">Any style</option><option value="nature">Nature & hiking</option><option value="coast">Coasts & islands</option><option value="culture">History & culture</option><option value="city">City breaks</option></select></label><div class="feature-buttons"><button class="feature-action" type="submit">Explore destinations</button><button type="button" class="travel-clear">Clear filters</button></div>';
+ [document.querySelector('#settingsPanel'),document.querySelector('.burger-inner')].forEach((parent,index)=>{
+ const form=document.createElement('form');form.className='travel-filters';form.innerHTML=markup.replaceAll('-N','-'+index);parent.querySelector('.platform-stats').after(form);
+ // The ⓘ button shows how place search works, including several places.
+ const info=form.querySelector('.travel-info'),help=form.querySelector('.travel-help');
+ info.onclick=()=>{help.hidden=!help.hidden;info.setAttribute('aria-expanded',String(!help.hidden));};
  form.elements.place.value=travelFilters.place||'';form.elements.style.value=travelFilters.style||'';
- form.onsubmit=e=>{e.preventDefault();travelFilters={place:form.elements.place.value.trim(),style:form.elements.style.value};lsSet('ws_travel_filters',travelFilters);syncTravel();closeAllPanels();closeBurger();if(curMode!=='how')setMode('how');else resetFeed();};
- form.querySelector('.travel-clear').onclick=()=>{travelFilters={place:'',style:''};lsSet('ws_travel_filters',travelFilters);syncTravel();if(curMode==='how'){closeAllPanels();closeBurger();resetFeed();}};
- }
+ form.onsubmit=e=>{e.preventDefault();travelFilters={place:form.elements.place.value.trim(),style:form.elements.style.value};lsSet('ws_travel_filters',travelFilters);syncTravel();changeFeedThenClose(()=>{if(curMode!=='how')setMode('how');else resetFeed();});};
+ form.querySelector('.travel-clear').onclick=()=>{travelFilters={place:'',style:''};lsSet('ws_travel_filters',travelFilters);syncTravel();if(curMode==='how')changeFeedThenClose(resetFeed);};
+ });
 }
 function syncTravel(){document.querySelectorAll('.travel-filters').forEach(f=>{f.elements.place.value=travelFilters.place||'';f.elements.style.value=travelFilters.style||'';});}
 installTravelFilters();

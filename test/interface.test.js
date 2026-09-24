@@ -209,3 +209,67 @@ test('the installable app describes its language and store categories', () => {
   assert.equal(manifest.dir, 'auto');
   assert.deepEqual(manifest.categories, ['education', 'books', 'travel']);
 });
+
+test('filtered travel sends the place as typed, skips empty pages and keeps the spelling suggestion', async () => {
+  const features = read('features.js');
+  const requests = [];
+  const pages = [{articles: [], next: 30}, {articles: [], next: 60}, {articles: [{id: 'v1'}, {id: 'v2'}], next: null, suggestion: 'Japan'}];
+  const c = vm.createContext({
+    fillGeneration: 1, travelFilters: {place: 'Japan, Tuscany', style: 'coast'}, travelOffset: 0, travelExhausted: false, travelSuggestion: '',
+    articles: [{id: 'v2'}], queue: [], voyageLang: () => 'en', URLSearchParams, AbortSignal: {timeout: () => undefined},
+    fetch: async url => { requests.push(new URL(url, 'https://wikiscroll.com').searchParams); return {ok: true, json: async () => pages.shift()}; },
+  });
+  vm.runInContext(slice(features, 'async function fetchFilteredTravel(', '// When a travel filter runs out'), c);
+  const result = await vm.runInContext('fetchFilteredTravel()', c);
+  assert.deepEqual(result.map(a => a.id), ['v1'], 'already shown guides are skipped');
+  assert.equal(requests[0].get('place'), 'Japan, Tuscany', 'commas reach the Worker');
+  assert.deepEqual(requests.map(p => p.get('offset')), ['0', '30', '60'], 'empty pages are skipped at once');
+  assert.equal(c.travelExhausted, true);
+  assert.equal(c.travelSuggestion, 'Japan');
+});
+
+test('the end of a travel filter offers the closest next step first', () => {
+  const features = read('features.js');
+  const el = (tag = 'div') => {
+    const node = {tag, children: [], dataset: {}, className: '', textContent: '', append(...items) { this.children.push(...items); }, set innerHTML(html) { this._html = html; this.children = []; }, get innerHTML() { return this._html; },
+      querySelector(sel) { return (this._parts ||= {})[sel] ||= el(); }};
+    return node;
+  };
+  const run = (filters, found, suggestion) => {
+    const feed = el(), created = [];
+    feed.querySelector = sel => sel === '.card[data-id]' ? (found ? {} : null) : null;
+    feed.appendChild = card => { feed.card = card; };
+    const c = vm.createContext({travelFilters: filters, travelSuggestion: suggestion, openTravelFilters() {}, document: {getElementById: () => feed, createElement: tag => { const n = el(tag); created.push(n); return n; }}});
+    vm.runInContext(slice(features, 'const TRAVEL_STYLE_LABELS', 'function setTravelFilters('), c);
+    vm.runInContext('showTravelEnd()', c);
+    return {buttons: created.filter(n => n.tag === 'button').map(b => b.textContent), html: feed.card._html};
+  };
+  const end = run({place: 'Japan', style: 'coast'}, true, '');
+  assert.deepEqual(end.buttons, ['Try any trip style', 'Explore all destinations', 'Change filters']);
+  assert.match(end.html, /That's every matching guide/);
+  assert.deepEqual(run({place: 'Japn', style: ''}, false, 'Japan').buttons, ['Search for “Japan”', 'Explore all destinations', 'Change filters']);
+  assert.match(run({place: 'Japn', style: ''}, false, 'Japan').html, /No matching guides/);
+  assert.deepEqual(run({place: '', style: 'city'}, true, '').buttons, ['Explore all destinations', 'Change filters']);
+  // The feed shows the end card rather than an error when a filter has no results.
+  assert.match(app, /if \(!offline && isHow && travelExhausted && \(travelFilters\.place \|\| travelFilters\.style\)\) \{ showTravelEnd\(\); return; \}/);
+});
+
+test('the place field explains, behind an ⓘ button, that places can be separated with commas', () => {
+  const features = read('features.js');
+  assert.match(features, /class="travel-info" aria-expanded="false" aria-controls="travelHelp-N" aria-label="How place search works"/);
+  assert.match(features, /separate them with commas: Japan, Tuscany/);
+  assert.match(features, /<label for="travelPlace-N">Country or region<\/label>/, 'the label still names the input');
+  assert.match(features, /info\.setAttribute\('aria-expanded',String\(!help\.hidden\)\)/);
+});
+
+test('changing travel filters rebuilds the feed before Settings starts closing, so the close animation plays in full', () => {
+  const features = read('features.js'), calls = [], frames = [];
+  const c = vm.createContext({requestAnimationFrame: fn => frames.push(fn), closeAllPanels: () => calls.push('close panels'), closeBurger: () => calls.push('close menu')});
+  vm.runInContext(slice(features, 'function changeFeedThenClose(', 'function installTravelFilters('), c);
+  c.changeFeedThenClose(() => calls.push('reset feed'));
+  assert.deepEqual(calls, ['reset feed'], 'the drawer is still open while the feed is rebuilt');
+  frames.shift()(); assert.equal(calls.length, 1);
+  frames.shift()(); assert.deepEqual(calls, ['reset feed', 'close panels', 'close menu']);
+  assert.match(features, /travel-clear'\)\.onclick=\(\)=>\{[^\n]*changeFeedThenClose\(resetFeed\)/);
+  assert.match(features, /form\.onsubmit=e=>\{[^\n]*changeFeedThenClose\(/);
+});

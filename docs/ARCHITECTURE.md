@@ -39,7 +39,7 @@ The browser asks the Worker for batches and keeps a reserve queued ahead of the 
 | `index.html` | App shell: header, feed container, settings drawers, dialogs, the crawlable text shown without JavaScript, and a copy of the About page. |
 | `app.js` | The core: constants, state and persistence, the supply queue, card rendering, likes and collections, settings, gestures (touch, mouse, trackpad, keyboard), maps and "On this day". |
 | `atlas.js` | Presentation only: fitting excerpts to the space available, making closed drawers `inert`, keeping the current card in place across resizes, dialog dismissal, theme metadata. |
-| `features.js` | Wikivoyage travel filters, and sharing and importing collection snapshots. |
+| `features.js` | Wikivoyage travel filters (including the end-of-results card), and sharing and importing collection snapshots. |
 | `discovery.js` | The dismissible "follow your curiosity" hint for first-time readers. |
 | `lang.js`, `i18n.js` + `translations/<lang>.js` | Interface localization. `lang.js` loads the reader's dictionary (one small file per language) as early as possible; `i18n.js` applies it through a `MutationObserver`. Article text is excluded. |
 | `sw.js` | Service worker: offline app shell, network-first page loads with a 2.5-second fallback to cache, and a cache of up to 80 Wikimedia images. |
@@ -63,6 +63,7 @@ The browser asks the Worker for batches and keeps a reserve queued ahead of the 
 | `collection-image.js` | Converts the collection SVG to PNG with `resvg-wasm` and the bundled font. It loads only when needed. |
 | `security.js` | Rate-limit checks that fail closed, the `429` response, security headers on every response, and the page's Content Security Policy (`PAGE_CSP`). |
 | `languages.js` | The 15 supported languages, shared by the router and shared collections. |
+| `travel.js` | Travel search rules: reading one or more places, matching guides to a place, alternating between places, and the per-place pagination cursor. |
 | `wordmark.js` | The logo as SVG path data, for generated images. |
 
 ### Everything else

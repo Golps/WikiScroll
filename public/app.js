@@ -87,7 +87,7 @@ const BAD_TITLE_RE  = /^(list of|lists of|timeline|history of|geography of|demog
 let curMode = 'wiki', curLang = 'en';
 let curTopics = new Set();
 let travelFilters = lsGet('ws_travel_filters') || {place:'',style:''};
-let travelOffset=0, travelExhausted=false;
+let travelOffset=0, travelExhausted=false, travelSuggestion='', travelContinuing=false;
 let swipeEnabled = true, kbBarEnabled = true, helpMode = 'off';
 let lightMode = false, depthLevel = 3;
 let history = [];
@@ -655,7 +655,10 @@ function fillQueue() {
         let added=0;
         if(useWorker)added=acceptSupply(await fetchWorkerBatch(gen),gen);
         if(gen!==fillGeneration)return;
-        if(!added&&budget.remaining>0&&Date.now()>=apiCooldownUntil)added=acceptSupply(await direct(),gen,!topical);
+        // Filtered travel is served by WikiScroll's own /api/travel, so a pause
+        // after Wikimedia rate-limited the browser's direct calls doesn't apply.
+        const ownServer=curMode==='how'&&!useWorker;
+        if(!added&&(ownServer||budget.remaining>0&&Date.now()>=apiCooldownUntil))added=acceptSupply(await direct(),gen,!topical);
         if(gen!==fillGeneration)return;
         // Render each successful batch immediately, not after a chain of API calls.
         ensureFeedAhead();
@@ -665,6 +668,7 @@ function fillQueue() {
       if(fillBudget===budget)fillBudget=null;
       if(supplyTask===task){supplyTask=null;filling=false;}
       if(gen===fillGeneration&&queue.length<QUEUE_MIN)scheduleRefill();
+      if(gen===fillGeneration)syncTravelEnd();
     }
   })();
   return task.promise;
@@ -705,7 +709,17 @@ function ensureFeedAhead() {
   const ahead=cards.length-Math.max(0,cards.indexOf(current))-1;
   if(ahead<CARDS_AHEAD&&queue.length)flushQueue(Math.min(queue.length,CARDS_AHEAD-ahead));
   if(queue.length<QUEUE_MIN&&!supplyTask)scheduleRefill();
+  syncTravelEnd();
   persistFeedReserve();
+}
+// A filtered travel feed that has run out ends on a card (features.js). Once
+// the reader chooses to continue, the card goes away when new guides arrive.
+function syncTravelEnd() {
+  const ended=curMode==='how'&&(travelFilters.place||travelFilters.style)&&travelExhausted&&!queue.length&&!supplyTask&&articles.length;
+  if(!ended&&!travelContinuing)return;
+  const end=document.querySelector('#feed .travel-end');
+  if(travelContinuing&&end?.nextElementSibling?.matches('.card[data-id]')){end.remove();travelContinuing=false;return;}
+  if(ended&&(!end||travelContinuing)){travelContinuing=false;showTravelEnd();}
 }
 function attachSentinel() { ensureFeedAhead(); }
 // Look ahead on every scroll, including trackpad flings that leap over observers.
@@ -832,7 +846,7 @@ async function boot() {
 }
 function resetFeed() {
   window.dispatchEvent(new Event('feed-reset'));
-  travelOffset=0;travelExhausted=false;sentinel?.disconnect();
+  travelOffset=0;travelExhausted=false;travelSuggestion='';travelContinuing=false;sentinel?.disconnect();
   fillGeneration++;pendingDeepGeneration=-1;
   supplyControllers.forEach(controller=>controller.abort());
   articles=[];queue=[];feedSeen.clear();filling=false;supplyTask=null;
@@ -948,17 +962,14 @@ function renderCard(a) {
 function showError() {
   const isHow = curMode==='how';
   const offline = !navigator.onLine;
+  // A travel filter with no results is an answer, not an error.
+  if (!offline && isHow && travelExhausted && (travelFilters.place || travelFilters.style)) { showTravelEnd(); return; }
   const msg = offline
     ? "You're offline. Reconnect and try again. Your saved articles are still available."
-    : isHow && travelExhausted && (travelFilters.place || travelFilters.style) ? 'No matching guides. Try a broader country or region, or clear your travel filters in Settings.' : `${isHow?'Wikivoyage':'Wikipedia'} didn't respond.`;
+    : `${isHow?'Wikivoyage':'Wikipedia'} didn't respond.`;
   const card = document.createElement('div'); card.className='card';
   card.innerHTML = `<div class="cbg"><div class="cveil"></div></div><div class="err"><div class="err-ico">${offline?'📡':(isHow?'🗺️':'📖')}</div><div class="err-ttl">Nothing loaded</div><div class="err-msg">${msg}</div><button class="err-btn">Try again</button></div>`;
   card.querySelector('.err-btn').addEventListener('click', resetFeed);
-  if(isHow&&(travelFilters.place||travelFilters.style)){
-    const clear=document.createElement('button');clear.className='err-btn';clear.textContent='Clear travel filters';
-    clear.onclick=()=>{travelFilters={place:'',style:''};lsSet('ws_travel_filters',travelFilters);syncTravel();resetFeed();};
-    card.querySelector('.err').appendChild(clear);
-  }
   document.getElementById('feed').appendChild(card);
 }
 
@@ -1681,7 +1692,13 @@ document.getElementById('ambientClose').addEventListener('click', closeAmbient);
     const nextCard = allCards[allCards.indexOf(card) + 1];
     // A loading connection is allowed to pause a gesture; it is never allowed
     // to throw away the only visible content or snap back to an older card.
-    if (!nextCard) { springBack(card); return; }
+    if (!nextCard) {
+      springBack(card);
+      // At the end of a travel filter, show the card that says so.
+      const end = travelExhausted && feed.querySelector('.travel-end');
+      if (end) feed.scrollTo({top: feedCardTop(end), behavior: reducedMotion?.matches ? 'instant' : 'smooth'});
+      return;
+    }
     const generation = fillGeneration;
     flyLock = true;
     feedMotionLocked = true;
@@ -1905,7 +1922,8 @@ document.getElementById('ambientClose').addEventListener('click', closeAmbient);
       ev.preventDefault();
       ensureFeedAhead();
       const cards = Array.from(feed.querySelectorAll('.card[data-id]'));
-      const target = cards[cards.indexOf(curCard()) + (ev.key === 'ArrowDown' ? 1 : -1)];
+      const index = cards.indexOf(curCard());
+      const target = cards[index + (ev.key === 'ArrowDown' ? 1 : -1)] || (ev.key === 'ArrowDown' && index === cards.length - 1 && travelExhausted ? feed.querySelector('.travel-end') : null);
       if (target) feed.scrollTo({top: feedCardTop(target), behavior: reducedMotion?.matches ? 'instant' : 'smooth'});
       return;
     }

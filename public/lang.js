@@ -4,7 +4,7 @@
    dictionary as soon as it arrives. Bump VERSION when any dictionary changes, and
    update the matching entries in the service worker's SHELL. */
 (() => {
-  const VERSION = 1;
+  const VERSION = 2;
   const pending = {};
   function load(lang) {
     if (lang === 'en' || !/^[a-z]{2}$/.test(lang)) return Promise.resolve(false);

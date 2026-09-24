@@ -57,7 +57,7 @@ function harness(count, height = 700) {
     createElement: element, body: {classList: classList()},
   };
   const context = vm.createContext({
-    console, document: doc,
+    console, document: doc, travelExhausted: false,
     window: {innerWidth: 1000, innerHeight: 800, addEventListener: listen('window')},
     navigator: {maxTouchPoints: 0},
     performance: {now: () => now},

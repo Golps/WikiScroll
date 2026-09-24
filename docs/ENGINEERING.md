@@ -185,11 +185,11 @@ Article links (`?a=w123&lang=es`) follow the same rules. Readers get the normal 
 
 ## Testing
 
-The suite has **184 tests** in 23 files. It runs with `node --test test/*.test.js` in about 2 seconds, with no installed dependencies and no network access. Wikimedia, the edge cache, rate-limit bindings and timers are replaced with fakes.
+The suite has **192 tests** in 23 files. It runs with `node --test test/*.test.js` in about 2 seconds, with no installed dependencies and no network access. Wikimedia, the edge cache, rate-limit bindings and timers are replaced with fakes.
 
 **What it verifies:**
 
-- Worker behavior: parameter validation, caching and stale refreshes, request coalescing, deadlines and partial answers, per-host cooldowns, pageview completion and depth ranges, vital-article sampling, topic sampling, travel search, "On this day" parsing, Help Wikipedia, collection decoding, verification and escaping, bot previews, security headers, the page's Content Security Policy, and the absence of CORS headers on the API.
+- Worker behavior: parameter validation, caching and stale refreshes, request coalescing, deadlines and partial answers, per-host cooldowns, pageview completion and depth ranges, vital-article sampling, topic sampling, travel search (several places, relevance, pagination, spelling suggestions), "On this day" parsing, Help Wikipedia, collection decoding, verification and escaping, bot previews, security headers, the page's Content Security Policy, and the absence of CORS headers on the API.
 - Browser logic, extracted from `public/*.js` and run in `node:vm` sandboxes: supply and duplicate rejection, stale-generation handling, request budgets and cooldowns, gesture and trackpad rules, clean-up and card anchoring, persistence and migrations, statistics, localization coverage, service-worker caching, and map loading.
 - Interface rules: right-to-left layout that leaves article text in its own direction, keyboard Tab order, menu-button states, light-theme contrast ratios, storage-quota handling, collection undo and removal, translations for every message in all 14 languages, per-language dictionary loading, and no inline scripts or event handlers.
 - Project rules: identical copies of the language tables and language lists, and no unused CSS.
@@ -209,6 +209,17 @@ These are known and not yet fixed. They are listed here so the notes above aren'
 | About, Privacy Policy and page description | These are English only, while the rest of the interface is translated into 14 languages. |
 | Stylesheet (`public/styles.css`) | The stylesheet has grown by layering overrides (for example, `.panel` alone is the selector of 32 rule blocks, and there are 87 `!important` declarations), which makes changes harder to predict. `test/unused-css.test.js` removes dead rules but not overridden ones. |
 | *Known* depth, first request | The first time a *Known* list is requested at a given edge location each week, it may be answered from Level 3 while Level 4 is still being assembled. That answer is intentionally not cached. |
+
+### Changes in 1.2
+
+Travel search (`worker/travel.js`, `worker/index.js`, `public/features.js`, `public/app.js`). Each change has a test that fails on the 1.1 code.
+
+- **Several places.** "Japan, Tuscany" used to find nothing, because the whole text was searched as one phrase, even though the placeholder suggests typing it. Places can now be separated by commas, semicolons, slashes or the word "or" (in English and in the reader's language). "and" is never a separator, so "Trinidad and Tobago" stays one place. Up to 3 places are searched separately, and their guides take turns in the feed.
+- **Guides about the place.** Full-text search also returned guides that mention the place only in passing: Korean cities for "Japan", or "Wine" and "Naturism" for "Tuscany". A guide is now kept only when its title or introduction names the place, ignoring case, accents and apostrophes. Results follow the search engine's relevance order instead of page-ID order, and phrasebooks are left out.
+- **Spelling.** When a single place finds nothing, the Worker asks Wikivoyage's search for a correction, and the feed offers it ("Search for “Japan”").
+- **The end of the results.** The feed used to stop silently at the last matching guide. It now ends on a card that says so and offers the next step, closest first: the same place in any trip style (when a style is set), all destinations, or new filters. Continuing keeps the reader's place in the feed and skips guides already shown. The feed never switches to unrelated guides by itself: the filter was the reader's choice, so broadening it is too.
+- **Explaining the field.** An ⓘ button next to "Country or region" explains how place search works, including separating places with commas.
+- **Two fixes found while testing.** After Wikimedia rate-limited the browser's direct calls, the pause also blocked filtered travel, which comes from WikiScroll's own server; it no longer does. Clear filters and Explore destinations now change the feed before closing Settings, so the drawer's close animation plays in full instead of jumping shut.
 
 ### Changes in 1.1
 

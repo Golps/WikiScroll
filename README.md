@@ -56,7 +56,7 @@ Random articles with a photo and a readable introduction.
 
 Community-written travel guides to destinations around the world.
 
-- **Travel filters:** a country or region, and a trip style (nature and hiking, coasts and islands, history and culture, city breaks).
+- **Travel filters:** one or more places separated by commas ("Japan, Tuscany"), and a trip style (nature and hiking, coasts and islands, history and culture, city breaks). Guides must name the place in their title or introduction, and the places take turns in the feed. When every match has been shown, the feed says so and offers the next step: the same place in any style, all destinations, or new filters.
 - **Map:** open any guide on a map. WikiScroll uses the guide's own coordinates and falls back to a place-name search.
 - **12 editions:** in languages without a large Wikivoyage (Arabic, Korean, Hindi), guides are shown in English with a note.
 

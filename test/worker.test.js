@@ -193,7 +193,7 @@ test('bot deep links get article-specific metadata',async()=>{
 });
 test('travel filters are relayed to Wikivoyage and preserve pagination without requiring photos',async()=>{
  let upstreamURL;
- await mocked(async url=>{upstreamURL=new URL(url);return Response.json({query:{pages:{7:page(7,{thumbnail:undefined,title:'Kyoto'})}},continue:{gsroffset:20}});},async worker=>{
+ await mocked(async url=>{upstreamURL=new URL(url);return Response.json({query:{pages:{7:page(7,{thumbnail:undefined,title:'Kyoto',extract:'Kyoto is a city in Japan, famous for its temples, gardens and old wooden streets.'})}},continue:{gsroffset:20}});},async worker=>{
  const response=await worker.fetch(new Request('https://wikiscroll.com/api/travel?lang=en&place=Japan&style=culture'),env,ctx);
  assert.equal(response.status,200);const body=await response.json();assert.equal(body.articles[0].src,'how');assert.equal(body.articles[0].img,'');assert.equal(body.next,20);
  assert.equal(upstreamURL.hostname,'en.wikivoyage.org');assert.match(upstreamURL.searchParams.get('gsrsearch'),/Japan/);
@@ -367,7 +367,7 @@ test('filtered travel answers within its budget, leaving out guides whose text i
     const p=new URL(url).searchParams;
     if(p.has('generator'))return later(3000,data(Array.from({length:10},(_,i)=>({pageid:i+1,title:'Town '+(i+1)}))));
     const ids=p.get('pageids').split('|');
-    return later(chunk++===0?500:5800,data(ids.map(id=>({pageid:Number(id),extract:'A harbour town with ferries to the islands and a busy fish market.'}))));
+    return later(chunk++===0?500:5800,data(ids.map(id=>({pageid:Number(id),extract:'A harbour town in Norway with ferries to the islands and a busy fish market.'}))));
   },async(api,jobs)=>{
     let response;const pending=api.fetch(new Request('https://wikiscroll.com/api/travel?lang=en&place=Norway'),env,jobs).then(r=>response=r);
     await settle();
@@ -428,7 +428,7 @@ test('the API sends no CORS headers, so other sites cannot spend its budget',asy
 test('complete travel pages are shared from the edge cache; partial pages are not cached',async t=>{
   const cache=edgeCache();let searches=0;
   await mocked(async url=>{const p=new URL(url).searchParams;if(p.has('generator')){searches++;return Response.json({query:{pages:{7:page(7,{title:'Kyoto',extract:undefined})}},continue:{gsroffset:20}});}
-    return Response.json({query:{pages:{7:{pageid:7,extract:'A historic city with temples, gardens and a famous market street.'}}}});},async(worker,jobs)=>{
+    return Response.json({query:{pages:{7:{pageid:7,extract:'A historic city of Japan with temples, gardens and a famous market street.'}}}});},async(worker,jobs)=>{
     const ask=place=>worker.fetch(new Request('https://wikiscroll.com/api/travel?lang=en&style=culture&place='+place),env,jobs);
     const first=await ask('Japan');await jobs.done();
     assert.equal(first.headers.get('X-Cache'),'MISS');
@@ -445,4 +445,51 @@ test('complete travel pages are shared from the edge cache; partial pages are no
     assert.equal(partial.entries.size,0,'a page missing introductions is never cached');
     t.mock.timers.tick(7000);await settle();
   },partial);
+});
+test('a travel place filter can name one place or several',async()=>{
+  const {parsePlaces,parseCursor,formatCursor,namesPlace}=await import('../worker/travel.js');
+  assert.deepEqual(parsePlaces('Japan, Tuscany'),['Japan','Tuscany']);
+  assert.deepEqual(parsePlaces('Japan or Tuscany / Crete'),['Japan','Tuscany','Crete']);
+  assert.deepEqual(parsePlaces('Trinidad and Tobago'),['Trinidad and Tobago'],'"and" is part of names');
+  assert.deepEqual(parsePlaces('Oregon'),['Oregon']);
+  assert.deepEqual(parsePlaces('México o Perú','es'),['México','Perú'],'"or" in the reader\'s language');
+  assert.deepEqual(parsePlaces('日本、イタリア','ja'),['日本','イタリア']);
+  assert.deepEqual(parsePlaces('japan, Japan ,, JAPAN'),['japan'],'duplicates and empty entries are dropped');
+  assert.equal(parsePlaces('A, B, C, D, E').length,3);
+  assert.deepEqual(parseCursor(null,2),[0,0]);assert.deepEqual(parseCursor('20.-',2),[20,null]);
+  assert.equal(parseCursor('20.5',1),null);assert.equal(parseCursor('-1',1),null);assert.equal(parseCursor('1.2.3.4',3),null);
+  assert.equal(formatCursor([20]),20);assert.equal(formatCursor([20,null]),'20.-');assert.equal(formatCursor([null,null]),null);
+  assert.ok(namesPlace({title:'Nice',extract:''},'nice'));
+  assert.ok(namesPlace({title:'Cannes',extract:'A resort on the Côte d’Azur.'},"Cote d'Azur"),'accents and apostrophes are ignored');
+  assert.ok(!namesPlace({title:'Busan',extract:'Busan is the second-largest city of South Korea.'},'Japan'));
+});
+test('travel search keeps guides about the place, in relevance order, alternating between places',async()=>{
+  const searches=[];
+  const intro=text=>text+' It has old streets, markets, museums and a long history worth exploring.';
+  const pages={
+    Japan:[page(11,{title:'Tokyo',index:2,extract:intro('Tokyo is the capital of Japan.')}),page(12,{title:'Busan',index:1,extract:intro('Busan is a port city in South Korea.')}),page(13,{title:'Kyoto',index:3,extract:intro('Kyoto is a city in western Japan.')}),page(14,{title:'Japanese phrasebook',index:4,extract:intro('Japanese is the language of Japan.')}),page(15,{title:'Japan',index:1.5,extract:intro('Japan is an island nation in East Asia.')})],
+    Tuscany:[page(21,{title:'Florence',index:1,extract:intro('Florence is the capital of Tuscany.')}),page(22,{title:'Siena',index:2,extract:intro('Siena is a hill town in Tuscany.')})],
+  };
+  await mocked(async url=>{
+    const p=new URL(url).searchParams,place=JSON.parse(p.get('gsrsearch'));searches.push([place,p.get('gsroffset'),p.get('gsrlimit')]);
+    return Response.json({query:{pages:Object.fromEntries(pages[place].map(x=>[x.pageid,x]))},...(place==='Japan'?{continue:{gsroffset:20}}:{})});
+  },async worker=>{
+    const body=await (await worker.fetch(new Request('https://wikiscroll.com/api/travel?lang=en&place='+encodeURIComponent('Japan, Tuscany')),env,ctx)).json();
+    assert.deepEqual(body.articles.map(a=>a.title),['Japan','Florence','Tokyo','Siena','Kyoto'],'relevance order, alternating, without Busan or the phrasebook');
+    assert.equal(body.next,'20.-','Japan continues at 20; Tuscany has no more results');
+    assert.deepEqual(searches,[['Japan','0','20'],['Tuscany','0','20']]);
+    searches.length=0;
+    await worker.fetch(new Request('https://wikiscroll.com/api/travel?lang=en&place='+encodeURIComponent('Japan, Tuscany')+'&offset=20.-'),env,ctx);
+    assert.deepEqual(searches,[['Japan','20','20']],'a finished place is not searched again');
+  });
+});
+test('a misspelled place that finds nothing comes back with a suggestion',async()=>{
+  await mocked(async url=>{
+    const p=new URL(url).searchParams;
+    if(p.get('list')==='search'){assert.equal(p.get('srsearch'),'Japn');return Response.json({query:{searchinfo:{totalhits:0,suggestion:'japan'},search:[]}});}
+    return Response.json({batchcomplete:''});
+  },async worker=>{
+    const body=await (await worker.fetch(new Request('https://wikiscroll.com/api/travel?lang=en&place=Japn'),env,ctx)).json();
+    assert.deepEqual(body,{articles:[],next:null,suggestion:'Japan'});
+  });
 });

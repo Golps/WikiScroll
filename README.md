@@ -157,7 +157,7 @@ The interface is meant to feel calm and predictable. A lot of that comes from sm
 
 - **The visible card is protected.** Swipes, resizes, rotations and background clean-up never move you away from the article you are reading. If the next card isn't ready, a swipe springs back instead of showing an empty screen.
 - **Gestures do one thing.** A trackpad swipe and its momentum count as one action. Swiping right or double-tapping only ever saves; it never removes a save. Vertical scrolling, pinch-zoom and small movements don't trigger anything.
-- **Text fits the card.** Introductions are measured against the space available and cut at sentence boundaries (using `Intl.Segmenter` where available), so there is no scrolling inside cards and no text cut mid-line.
+- **Text fits the space.** Introductions are measured against the room available and cut at sentence boundaries (using `Intl.Segmenter` where available), in cards and in ambient mode, so there is no hidden scrolling and no text cut mid-line.
 - **Accessibility.** Native `<dialog>` modals with Escape and outside-click dismissal. Closed drawers are made `inert`. Switches and radio groups use proper ARIA roles and states. Notifications are announced with `role="status"`. Form inputs are at least 16 px, and pinch-zoom is never disabled.
 - **Reduced motion.** With `prefers-reduced-motion`, transitions, card flights, smooth scrolling and map fly-to animations are replaced by instant changes.
 - **Translations stay local.** Interface labels are translated from bundled dictionaries in the browser. Article text is never sent to a translation service.
@@ -239,7 +239,6 @@ This repository is a snapshot of the code behind wikiscroll.com. It isn't finish
 - **Shared collections can't be revoked.** A shared link contains its snapshot. Deleting the collection locally doesn't disable a link that was already shared.
 - **Coverage varies by language.** Help Wikipedia is available in 4 languages. Category labels on cards are English-only. Wikivoyage covers 12 editions.
 - **Built for wikiscroll.com.** Share links, preview URLs and cache keys use that domain. See [Make it your own](docs/DEVELOPMENT.md#make-it-your-own) before deploying elsewhere.
-- **Ambient text on small screens.** On a phone, a long introduction can run past the bottom of ambient mode and be cut off.
 - **Testing limits.** The automated tests run in Node. They don't cover real browsers or physical iOS and Android devices; see [what the tests cover](docs/ENGINEERING.md#testing).
 
 ## Forking and contributing

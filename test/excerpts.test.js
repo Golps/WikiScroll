@@ -72,3 +72,42 @@ test('moving or reinserting an excerpt preserves its original text and observes 
   assert.equal(body.firstElementChild, text);
   assert.equal(body.dataset.fullExcerpt, 'Original complete article excerpt');
 });
+
+const ambientCode = source.slice(source.indexOf('// Ambient mode shows'), source.indexOf('// Dismiss only genuine backdrop clicks'));
+// Simulated layout: the ambient panel holds 200 characters of excerpt.
+function ambient() {
+  let open = false, onChange;
+  const excerpt = {textContent: ''};
+  const content = {clientHeight: 400, get scrollHeight() { return 200 + excerpt.textContent.length; }};
+  const overlay = {classList: {contains: name => name === 'open' && open}, querySelector: () => content};
+  vm.runInNewContext(ambientCode, {
+    document: {getElementById: id => id === 'ambientOverlay' ? overlay : excerpt},
+    MutationObserver: class { constructor(callback) { onChange = callback; } observe() {} },
+    addEventListener() {}, Intl, curLang: 'en',
+  });
+  return {excerpt, show(text) { excerpt.textContent = text; open = true; onChange(); }, close() { open = false; onChange(); }};
+}
+const sentence = n => `Sentence number ${n} is about forty-five characters.`;
+
+test('ambient mode keeps whole sentences that fit instead of hiding the rest behind a scroll', () => {
+  const view = ambient(), text = Array.from({length: 12}, (_, i) => sentence(i + 1)).join(' ');
+  view.show(text);
+  assert.ok(view.excerpt.textContent.length <= 200, 'fits the panel');
+  assert.ok(text.startsWith(view.excerpt.textContent) && view.excerpt.textContent.endsWith('characters.'), 'ends on a whole sentence');
+});
+
+test('ambient mode drops a fragment cut off by the source and refits for the next article', () => {
+  const view = ambient();
+  view.show(`${sentence(1)} ${sentence(2)} The source stopped in the middle of this...`);
+  assert.equal(view.excerpt.textContent, `${sentence(1)} ${sentence(2)}`);
+  view.close();
+  view.show(sentence(3));
+  assert.equal(view.excerpt.textContent, sentence(3), 'a new article starts from its own full text');
+});
+
+test('ambient mode shortens an unusually long first sentence at a word boundary', () => {
+  const view = ambient();
+  view.show('An extraordinarily long opening sentence ' + 'that keeps going '.repeat(30) + 'until it ends.');
+  assert.ok(view.excerpt.textContent.length <= 200 && view.excerpt.textContent.endsWith('…'));
+  assert.doesNotMatch(view.excerpt.textContent, /\s…$/);
+});

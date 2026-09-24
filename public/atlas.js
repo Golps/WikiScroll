@@ -87,6 +87,40 @@ function chooseExcerpt(body, lines) {
   span.textContent=words.slice(0,lo).join('').trimEnd().replace(/[,;:]$/,'')+'…';
 }
 
+// Ambient mode shows the whole sentences that fit the screen, like the cards:
+// no hidden scrolling and no text cut off mid-line on small screens.
+const ambientOverlay = document.getElementById('ambientOverlay');
+const ambientContent = ambientOverlay.querySelector('.ambient-content');
+const ambientExcerpt = document.getElementById('ambientExcerpt');
+let ambientFull = '';
+function fitAmbient() {
+  if (!ambientOverlay.classList.contains('open') || !ambientFull) return;
+  const overflows = () => ambientContent.scrollHeight > ambientContent.clientHeight + 1;
+  const clean = ambientFull.replace(/\s+/g, ' ').trim();
+  const sentences = typeof Intl.Segmenter === 'function' ? Array.from(new Intl.Segmenter(curLang, {granularity: 'sentence'}).segment(clean), x => x.segment.trim()) : clean.match(/[^.!?。！？]+[.!?。！？]+(?:\s|$)/g) || [clean];
+  // Introductions longer than the source limit end in a cut-off fragment ("…").
+  if (sentences.length > 1 && /(\.\.\.|…)$/.test(sentences.at(-1))) sentences.pop();
+  ambientExcerpt.textContent = sentences.join(' ');
+  if (!overflows()) return;
+  let best = '';
+  for (const sentence of sentences) {
+    ambientExcerpt.textContent = (best + ' ' + sentence).trim();
+    if (overflows()) break;
+    best = ambientExcerpt.textContent;
+  }
+  if (best) { ambientExcerpt.textContent = best; return; }
+  // An unusually long first sentence: keep whole words and end with an ellipsis.
+  const words = clean.split(' ');
+  let lo = 0, hi = words.length;
+  while (lo < hi) { const mid = Math.ceil((lo + hi) / 2); ambientExcerpt.textContent = words.slice(0, mid).join(' ') + '…'; if (overflows()) hi = mid - 1; else lo = mid; }
+  ambientExcerpt.textContent = words.slice(0, lo).join(' ').replace(/[,;:]$/, '') + '…';
+}
+new MutationObserver(() => {
+  if (!ambientOverlay.classList.contains('open')) { ambientFull = ''; return; }
+  if (!ambientFull) { ambientFull = ambientExcerpt.textContent; fitAmbient(); }
+}).observe(ambientOverlay, {attributes: true, attributeFilter: ['class']});
+addEventListener('resize', fitAmbient);
+
 // Dismiss only genuine backdrop clicks, preserving interaction inside the dialog.
 const sourceDialog = document.getElementById('sourceDialog');
 sourceDialog.addEventListener('click', event => {

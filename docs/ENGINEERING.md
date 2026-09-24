@@ -185,7 +185,7 @@ Article links (`?a=w123&lang=es`) follow the same rules. Readers get the normal 
 
 ## Testing
 
-The suite has **154 tests** in 22 files. It runs with `node --test test/*.test.js` in about 2 seconds, with no installed dependencies and no network access. Wikimedia, the edge cache, rate-limit bindings and timers are replaced with fakes.
+The suite has **157 tests** in 22 files. It runs with `node --test test/*.test.js` in about 2 seconds, with no installed dependencies and no network access. Wikimedia, the edge cache, rate-limit bindings and timers are replaced with fakes.
 
 **What it verifies:**
 
@@ -205,7 +205,6 @@ These are known and not yet fixed. They are listed here so the notes above aren'
 
 | Area | Issue |
 |---|---|
-| Ambient mode on phones | A long introduction can run past the bottom of the screen and be cut off mid-sentence. The card view fits text to whole sentences; ambient mode doesn't yet. |
 | *Known* depth, first request | The first time a *Known* list is requested at a given edge location each week, it may be answered from Level 3 while Level 4 is still being assembled. That answer is intentionally not cached. |
 
 ### Recently fixed
@@ -214,4 +213,5 @@ Each of these fixes has a regression test that fails on the previous code:
 
 - **"On this day" recovery** (`worker/today.js`). An upstream failure used to return `200` with empty data, which the browser accepted as a complete day, so badges stopped loading for the rest of the session. A failure now returns `503` with `Retry-After`, is never cached by browsers, and leaves only a two-minute marker at the edge.
 - **Popular and Known under a slow request** (`worker/vital.js`, `worker/index.js`). Vital-article batches had no partial snapshot, so if one request was still pending when the answer budget ran out, the Worker returned `503` even with complete cards ready. It now answers with the cards whose introductions have arrived.
+- **Ambient mode on small screens** (`public/atlas.js`). A long introduction ran past the bottom of the screen and looked cut off mid-sentence. Ambient mode now fits whole sentences to the available space, like the cards, refits on resize and rotation, and drops a fragment cut off at the source's length limit.
 - **Collect button** (`public/app.js`). The collection chooser in Saved Articles was built but never shown, because its last statement had been commented out by accident.

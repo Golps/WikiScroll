@@ -1,5 +1,5 @@
-const CACHE='wikiscroll-atlas-v72';
-const SHELL=['/discovery.js?v=49','/about/','/about.css?v=50','/about.js?v=47','/images/wordmark-dark.svg','/images/wordmark-light.svg','/styles.css?v=67','/images/favicon.ico?v=42','/images/apple-touch-icon.png?v=42','/images/icon-192.png?v=42','/images/icon-512.png?v=42','/translations.js?v=49','/i18n.js?v=49','/data/starter-en.json','/features.js?v=61','/','/app.js?v=71','/atlas.js?v=54','/manifest.json','/images/icon-192.png','/images/icon-512.png'];
+const CACHE='wikiscroll-atlas-v73';
+const SHELL=['/discovery.js?v=49','/about/','/about.css?v=50','/about.js?v=47','/images/wordmark-dark.svg','/images/wordmark-light.svg','/styles.css?v=67','/images/favicon.ico?v=42','/images/apple-touch-icon.png?v=42','/images/icon-192.png?v=42','/images/icon-512.png?v=42','/translations.js?v=49','/i18n.js?v=49','/data/starter-en.json','/features.js?v=61','/','/app.js?v=71','/atlas.js?v=55','/manifest.json','/images/icon-192.png','/images/icon-512.png'];
 // Wikimedia serves article images from both hosts (thumb.wikimedia.org since 2026).
 const IMAGE_HOSTS=new Set(['upload.wikimedia.org','thumb.wikimedia.org']);
 self.addEventListener('install',event=>{

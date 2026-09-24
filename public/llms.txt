@@ -10,5 +10,6 @@ Features include saved articles, shareable collections, reading history, separat
 
 - [About WikiScroll](https://wikiscroll.com/about/): Purpose, features, source attribution, and local-storage limitations.
 - [Open WikiScroll](https://wikiscroll.com/): The discovery reader. About and Privacy Policy are linked at the bottom of settings.
+- [Source code](https://github.com/Golps/WikiScroll): The MIT-licensed source code, architecture and engineering notes.
 
 For facts quoted from an article, follow its original Wikipedia or Wikivoyage link for attribution and current content. WikiScroll is best described as a knowledge-discovery and reading tool.

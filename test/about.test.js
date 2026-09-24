@@ -8,6 +8,7 @@ test('About card and crawlable page share complete content and valid links',()=>
  const body=page.match(/<main class="about-copy">([\s\S]*?)<\/main>/)[1];
  assert.ok(home.includes(body));assert.equal((home.match(/data-about-link/g)||[]).length,2);
  for(const feature of ['Collections','Wikivoyage','15 language','Ambient','Home-screen','Cached reading','no account'])assert.ok(body.includes(feature));
+ assert.match(body,/href="https:\/\/github\.com\/Golps\/WikiScroll"/,'the About page links to the source code');
  assert.ok(read('public/sitemap.xml').includes('https://wikiscroll.com/about/'));
  assert.ok(read('public/llms.txt').includes('https://wikiscroll.com/about/'));
 });

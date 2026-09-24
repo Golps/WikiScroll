@@ -1,11 +1,11 @@
 {
   "name": "wikiscroll",
-  "version": "4.0.0",
+  "version": "1.4.0",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "wrangler dev --config wrangler.jsonc",
-    "check": "node --check public/app.js && node --check public/atlas.js && node --check worker/index.js && node --test test/*.test.js",
+    "check": "for f in public/*.js public/translations/*.js worker/*.js scripts/*.mjs; do node --check \"$f\" || exit 1; done && node --test test/*.test.js",
     "deploy": "bash scripts/deploy.sh"
   },
   "devDependencies": {

@@ -1,0 +1,22 @@
+# Runs the syntax checks and the test suite. It never deploys: wikiscroll.com
+# is deployed to Cloudflare by hand (docs/DEVELOPMENT.md#deploying).
+name: Tests
+on:
+  push:
+    branches: [main]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+      # The suite has no dependencies to install.
+      - name: Syntax check
+        run: for f in public/*.js public/translations/*.js worker/*.js scripts/*.mjs; do node --check "$f" || exit 1; done
+      - name: Test suite
+        run: node --test test/*.test.js

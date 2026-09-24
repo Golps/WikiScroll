@@ -31,7 +31,7 @@ If you build on WikiScroll, these principles explain many of its design decision
 ## If you do open a pull request
 
 - Keep it focused on one change, and explain what it does and how you tested it.
-- Run `node --test test/*.test.js`, and check the change on a phone-sized viewport and on desktop.
+- Run `pnpm check` (or `node --test test/*.test.js`), and check the change on a phone-sized viewport and on desktop. The same checks run automatically on your pull request.
 - Follow the [conventions](docs/DEVELOPMENT.md#conventions): remove leftovers, bump asset versions and translate new labels.
 - Don't include API keys, account IDs, personal data or screenshots of dashboards.
 

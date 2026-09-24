@@ -54,8 +54,10 @@ Maps work out of the box: with an empty `CARTO_BASEMAP_KEY`, tiles load from CAR
 
 ```bash
 node --test test/*.test.js   # the full suite, ~2 seconds, no network needed
-pnpm check                   # syntax check of the main scripts, then the suite
+pnpm check                   # syntax check of every script, then the suite
 ```
+
+The same checks run on GitHub for every push to `main` and every pull request (`.github/workflows/test.yml`). They only test; nothing is deployed.
 
 [ENGINEERING.md](ENGINEERING.md#testing) explains what the suite covers and what it doesn't. Please also check changes by hand in a real browser, on a phone-sized viewport and on desktop. Test with reduced motion enabled and in a right-to-left language (Hebrew or Arabic) when your change affects layout.
 

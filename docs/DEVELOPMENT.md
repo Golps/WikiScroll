@@ -135,6 +135,17 @@ jobs:
 
 This workflow isn't included in this repository, because wikiscroll.com is deployed to Cloudflare by hand. It's an example for your own fork.
 
+**Turning it on, step by step (in your fork):**
+
+1. Add the workflow above as `.github/workflows/pages.yml`.
+2. In **Settings → Pages → Build and deployment**, set **Source** to **GitHub Actions**.
+3. For a custom domain, enter it under **Settings → Pages → Custom domain** and follow GitHub's DNS instructions. Without one, the repository must be named `username.github.io` (see "Serve it from the root of a domain" above).
+4. Run **Deploy static site** from the **Actions** tab. Run it again after each change you want to publish.
+
+**Don't use the "Deploy from a branch → /docs" option.** In this repository `docs/` holds documentation, not the app. Publishing it would put these Markdown files online instead of WikiScroll, and GitHub already displays them in the repository.
+
+**Maps.** Maps work without a key. If you add one, restrict it to your own domain and set it in `CARTO_BASEMAP_KEY` (see [Configuration](#configuration)). Every visitor can see it.
+
 Before publishing a static copy, also apply the relevant items in [Make it your own](#make-it-your-own). In particular, the collection share button builds `wikiscroll.com` links.
 
 ## Make it your own

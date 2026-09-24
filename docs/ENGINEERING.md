@@ -185,11 +185,11 @@ Article links (`?a=w123&lang=es`) follow the same rules. Readers get the normal 
 
 ## Testing
 
-The suite has **192 tests** in 23 files. It runs with `node --test test/*.test.js` in about 2 seconds, with no installed dependencies and no network access. Wikimedia, the edge cache, rate-limit bindings and timers are replaced with fakes.
+The suite has **200 tests** in 23 files. It runs with `node --test test/*.test.js` in about 2 seconds, with no installed dependencies and no network access. Wikimedia, the edge cache, rate-limit bindings and timers are replaced with fakes.
 
 **What it verifies:**
 
-- Worker behavior: parameter validation, caching and stale refreshes, request coalescing, deadlines and partial answers, per-host cooldowns, pageview completion and depth ranges, vital-article sampling, topic sampling, travel search (several places, relevance, pagination, spelling suggestions), "On this day" parsing, Help Wikipedia, collection decoding, verification and escaping, bot previews, security headers, the page's Content Security Policy, and the absence of CORS headers on the API.
+- Worker behavior: parameter validation, caching and stale refreshes, request coalescing, deadlines and partial answers, per-host cooldowns, pageview completion and depth ranges, vital-article sampling, topic sampling, travel search (several places, relevance, pagination, resuming unfinished guides, first-paragraph fallback, phrasebooks in every edition, spelling suggestions), "On this day" parsing, Help Wikipedia, collection decoding, verification and escaping, bot previews, security headers, the page's Content Security Policy, and the absence of CORS headers on the API.
 - Browser logic, extracted from `public/*.js` and run in `node:vm` sandboxes: supply and duplicate rejection, stale-generation handling, request budgets and cooldowns, gesture and trackpad rules, clean-up and card anchoring, persistence and migrations, statistics, localization coverage, service-worker caching, and map loading.
 - Interface rules: right-to-left layout that leaves article text in its own direction, keyboard Tab order, menu-button states, light-theme contrast ratios, storage-quota handling, collection undo and removal, translations for every message in all 14 languages, per-language dictionary loading, and no inline scripts or event handlers.
 - Project rules: identical copies of the language tables and language lists, and no unused CSS.
@@ -208,7 +208,17 @@ These are known and not yet fixed. They are listed here so the notes above aren'
 |---|---|
 | About, Privacy Policy and page description | These are English only, while the rest of the interface is translated into 14 languages. |
 | Stylesheet (`public/styles.css`) | The stylesheet has grown by layering overrides (for example, `.panel` alone is the selector of 32 rule blocks, and there are 87 `!important` declarations), which makes changes harder to predict. `test/unused-css.test.js` removes dead rules but not overridden ones. |
+| Travel search, loose matches | A guide is kept when its title or introduction names the place, so a guide that only mentions it can still appear: "Elba" with *Coasts & islands* can also show Lake Placid, and "Asia" can show "Silk Road". |
 | *Known* depth, first request | The first time a *Known* list is requested at a given edge location each week, it may be answered from Level 3 while Level 4 is still being assembled. That answer is intentionally not cached. |
+
+### Changes in 1.3
+
+Travel search (`worker/index.js`, `worker/extracts.js`, `worker/phrasebooks.js`, `public/features.js`, `public/app.js`). Each change has a test that fails on the 1.2 code.
+
+- **Unfinished guides are asked for again.** Travel search answers within 8.5 seconds with the guides that are ready. Its `next` cursor used to move every place past its whole page of results, so guides whose text had not arrived were skipped for the rest of the session, and the feed could say it had shown every matching guide when it had not. When a place's page has unfinished guides (still loading, failed, or left for a later request), the answer now also carries `resume`, which keeps that place on the same page. The browser follows `resume` at most twice for the same page, then moves on with `next`, so a guide that keeps failing cannot stall the feed. Guides already shown are not shown again. Pages with unfinished guides are still never cached.
+- **Guides without an introduction.** Many guides on the Spanish and Japanese Wikivoyage (for example Spanish "Japón") start directly with sections, so their introduction is empty and they were left out. For these, the Worker asks for the guide's opening text (one guide per request, which is how Wikimedia's TextExtracts serves longer text) and keeps its first paragraphs: headings, list items, lines that introduce a list and lines ending in "..." are skipped. Guides whose title names the place go first, then search order. At most 8 are fetched per answer, 4 at a time, to stay within Wikimedia's rate limits and Cloudflare's per-request subrequest limit; the rest are marked unfinished and come on the next request. Each guide's text is kept at the edge for a week and doesn't count toward the 8 when it is reused.
+- **Phrasebooks in every edition.** Only English titles containing "phrasebook" were recognized, so phrasebooks appeared as destinations in other languages. Each edition's phrasebook category was found from the language links of the English "Category:Phrasebooks" (`worker/phrasebooks.js`). Search and the random feed now request that category flag in the same call and skip members, and also skip titles that follow the edition's real naming ("Sprachführer Englisch", "Guía de húngaro", "Японский разговорник", "英語会話集"). Italian titles carry no marker ("Cinese"), so Italian relies on the category. Look-alikes such as "Cina", "Cucina cinese" or "Guía de Madrid" are kept. The browser's direct-request fallback uses an identical copy of the tables, and a test keeps them identical.
+- **Edge cache.** Travel result pages are cached under a new key (`v=3`), so pages cached by 1.2 are not reused.
 
 ### Changes in 1.2
 

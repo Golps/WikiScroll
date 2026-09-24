@@ -30,7 +30,11 @@ async function fetchFilteredTravel(){
  for(let page=0;page<3&&!travelExhausted;page++){
   let data;try{const response=await fetch('/api/travel?'+params(),{signal:AbortSignal.timeout(10000)});if(!response.ok)return [];data=await response.json();}catch{return [];}
   if(generation!==fillGeneration||!data)return [];
-  travelOffset=data.next??travelOffset;travelExhausted=data.next===null;
+  // Guides that were still loading come back through "resume": ask for the
+  // same page again (twice at most), then move on with "next".
+  const tried=String(travelOffset);
+  if(data.resume!=null&&(travelRetries[tried]||0)<2){travelRetries[tried]=(travelRetries[tried]||0)+1;travelOffset=data.resume;travelExhausted=false;}
+  else{travelOffset=data.next??travelOffset;travelExhausted=data.next===null;}
   if(typeof data.suggestion==='string')travelSuggestion=data.suggestion;
   const seen=new Set(articles.map(a=>a.id).concat(queue.map(a=>a.id)));
   const result=(data.articles||[]).filter(a=>!seen.has(a.id));
@@ -64,7 +68,7 @@ function setTravelFilters(filters){travelFilters=filters;lsSet('ws_travel_filter
 // Keep going from where the reader is: the end card becomes a loading card,
 // and new guides are added after it (cards already seen are skipped).
 function continueTravel(filters){
- setTravelFilters(filters);travelOffset=0;travelExhausted=false;travelSuggestion='';
+ setTravelFilters(filters);travelOffset=0;travelExhausted=false;travelSuggestion='';travelRetries={};
  const card=document.querySelector('#feed .travel-end');
  if(!card||!document.querySelector('#feed .card[data-id]')){resetFeed();return;}
  travelContinuing=true;

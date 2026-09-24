@@ -3,12 +3,13 @@ import {topicResponse} from './topics.js';
 import {verifiedArticle} from './verified.js';
 import { collectionResponse } from './collections.js';
 import {averageViews,lagDays,completePageviews,scaleBand} from './pageviews.js';
-import {completeExtracts,extractParams} from './extracts.js';
+import {completeExtracts,extractParams,completeLeadText,leadParams} from './extracts.js';
 import {vitalArticles} from './vital.js';
 import {completeNeeds,HELP_LANGS} from './needs.js';
 import {todayResponse} from './today.js';
 import {LANGS} from './languages.js';
-import {parsePlaces,parseCursor,formatCursor,namesPlace,interleave,fold,PHRASEBOOK} from './travel.js';
+import {parsePlaces,parseCursor,formatCursor,namesPlace,interleave,fold} from './travel.js';
+import {isPhrasebook,phrasebookParams} from './phrasebooks.js';
 /** WikiScroll Worker: explicit routing, static assets and article unfurls.
  * Handles article requests and social previews.
  * No GitHub integration, Pages runtime, KV or framework is required.
@@ -138,7 +139,7 @@ function startBatch(key,lang,mode,depth,cache,ctx) {
     // Candidates first, text second: the random call carries no extracts, so
     // it returns in a fraction of a second; introductions are then fetched in
     // parallel chunks for the readable candidates only (extracts.js).
-    const params={generator:'random',grnnamespace:'0',grnlimit:'20',prop:'pageimages|info|description'+(mode==='wiki'?'|pageviews':''),pvipdays:'14',piprop:'thumbnail',pithumbsize:'800',pilimit:'max',inprop:'url'};
+    const params={generator:'random',grnnamespace:'0',grnlimit:'20',prop:'pageimages|info|description'+(mode==='wiki'?'|pageviews':'|categories'),pvipdays:'14',piprop:'thumbnail',pithumbsize:'800',pilimit:'max',inprop:'url',...(mode==='how'?phrasebookParams(lang):{})};
     // Two concurrent Wikipedia samples yield up to 40 candidates. Wikivoyage
     // needs one: its guides need no photo, so most of the 20 are usable.
     // Publish the first usable response immediately; cache the merged result
@@ -148,9 +149,10 @@ function startBatch(key,lang,mode,depth,cache,ctx) {
       const fresh=[];
       for(const p of Object.values(data?.query?.pages||{})){
         if(!Number.isSafeInteger(p.pageid)||p.pageid<1||(mode==='wiki'&&!p.thumbnail?.source)||!p.title||BAD_TITLE.test(p.title))continue;
-        // Wikivoyage includes travel topics as well as destinations. Avoid
-        // obvious non-destination pages without rejecting non-English guides.
-        if(mode==='how'&&/^(?:phrasebook|travel topics?|itineraries|phrasebooks)(?:[ :/]|$)/i.test(p.title))continue;
+        // Wikivoyage includes travel topics as well as destinations. Skip
+        // phrasebooks in every edition (phrasebooks.js) and obvious English
+        // index pages, without rejecting other non-English guides.
+        if(mode==='how'&&(isPhrasebook(p,lang)||/^(?:travel topics?|itineraries)(?:[ :/]|$)/i.test(p.title)))continue;
         if(DISAMBIGUATION.test(p.description||''))continue;
         if(!pages.has(p.pageid))fresh.push(p);
       }
@@ -240,27 +242,49 @@ async function handle(request,env,ctx) {
         const lang=voyageLang(requested);
         // Many readers ask for the same destination and style: complete result
         // pages are shared from the edge cache for an hour, before any upstream work.
-        const key=new Request(`${url.origin}/api/travel?v=2&lang=${lang}&place=${encodeURIComponent(places.map(fold).join('|'))}&style=${style}&offset=${cursor.map(c=>c??'-').join('.')}`),cache=globalThis.caches?.default;
+        const key=new Request(`${url.origin}/api/travel?v=3&lang=${lang}&place=${encodeURIComponent(places.map(fold).join('|'))}&style=${style}&offset=${cursor.map(c=>c??'-').join('.')}`),cache=globalThis.caches?.default;
         try{const hit=await cache?.match(key);if(hit)return json(await hit.json(),200,{'X-Cache':'HIT'});}catch{}
         if(!await permit(env,'WORK_LIMIT','travel'))return limited();
         const started=Date.now(),limit=String(places.length>1?Math.ceil(40/places.length):30);
         const searches=await Promise.all((places.length?places:[null]).map(async(place,i)=>{
           if(cursor[i]===null)return {place,pages:[],next:null};
           const query=[place?JSON.stringify(place):'',style?'('+styles[style]+')':''].filter(Boolean).join(' ');
-          const data=await upstream(apiURL(lang,'how',{generator:'search',gsrsearch:query,gsrnamespace:'0',gsrlimit:limit,gsroffset:String(cursor[i]),prop:'pageimages|info|description',piprop:'thumbnail',pithumbsize:'800',pilimit:'max',inprop:'url'}));
+          const data=await upstream(apiURL(lang,'how',{generator:'search',gsrsearch:query,gsrnamespace:'0',gsrlimit:limit,gsroffset:String(cursor[i]),prop:'pageimages|info|description|categories',piprop:'thumbnail',pithumbsize:'800',pilimit:'max',inprop:'url',...phrasebookParams(lang)}));
           if(!data||data.error)return null;
           // Search relevance order (the generator's index), not page-ID order.
-          const pages=Object.values(data.query?.pages||{}).filter(p=>p.pageid>0&&!DISAMBIGUATION.test(p.description||'')&&!PHRASEBOOK.test(p.title||'')).sort((a,b)=>(a.index??0)-(b.index??0));
+          const pages=Object.values(data.query?.pages||{}).filter(p=>p.pageid>0&&!DISAMBIGUATION.test(p.description||'')&&!isPhrasebook(p,lang)).sort((a,b)=>(a.index??0)-(b.index??0));
           return {place,pages,next:data.continue?.gsroffset??null};
         }));
         if(searches.includes(null))return json({error:'Travel search temporarily unavailable'},503);
         const found=searches.flatMap(s=>s.pages);
-        // Guides whose introduction misses the budget are left out of this page.
-        await within(completeExtracts(found,ids=>upstream(apiURL(lang,'how',extractParams(ids)))),Math.max(0,TRAVEL_BUDGET_MS-(Date.now()-started)));
+        // Guides without a usable introduction get their first paragraphs instead,
+        // most relevant first (title names the place, then search order). Each
+        // guide's text is kept at the edge for a week, so later searches reuse it.
+        const placeOf=new Map(searches.flatMap(s=>s.pages.map(p=>[p.pageid,s.place])));
+        const titled=p=>placeOf.get(p.pageid)&&fold(p.title).includes(fold(placeOf.get(p.pageid)))?1:0;
+        const byImportance=[...found].sort((a,b)=>titled(b)-titled(a)||(a.index??0)-(b.index??0));
+        const leadKey=id=>new Request(`${url.origin}/__lead/v1/${lang}/${id}`);
+        const cachedLead=async id=>{const hit=await cache?.match(leadKey(id));return hit?await hit.json():null;};
+        const fetchLead=async id=>{
+          const data=await upstream(apiURL(lang,'how',leadParams(id)));
+          const extract=data?.query?.pages?.[id]?.extract;
+          if(cache&&typeof extract==='string')ctx.waitUntil(cache.put(leadKey(id),Response.json({query:{pages:{[id]:{extract}}}},{headers:{'Cache-Control':'public, max-age=604800'}})).catch(()=>{}));
+          return data;
+        };
+        await within((async()=>{
+          await completeExtracts(found,ids=>upstream(apiURL(lang,'how',extractParams(ids))));
+          await completeLeadText(byImportance,fetchLead,undefined,cachedLead);
+        })(),Math.max(0,TRAVEL_BUDGET_MS-(Date.now()-started)));
         // Keep guides that are about the place: named in the title or introduction.
         const ready=searches.map(s=>s.pages.filter(p=>strip(p.extract).length>=40&&(!s.place||namesPlace(p,s.place))));
         const body={articles:interleave(ready).map(p=>article(p,lang,'how')),next:formatCursor(searches.map(s=>s.next))};
-        let complete=found.every(p=>typeof p.extract==='string'&&!p.extractMissing);
+        // Guides still loading, failed, or left for later must not be skipped:
+        // "resume" keeps each such place on its page, and the browser asks again
+        // (a few times at most) before moving on with "next".
+        const unfinished=p=>typeof p.extract!=='string'||p.extractMissing||p.leadPending||p.leadSkipped;
+        const resume=searches.map((s,i)=>s.pages.some(unfinished)?cursor[i]:s.next);
+        if(resume.some((r,i)=>r!==searches[i].next))body.resume=formatCursor(resume);
+        let complete=!found.some(unfinished);
         // A misspelled place finds nothing: offer the search engine's correction.
         if(!found.length&&places.length===1&&cursor[0]===0){
           const hint=await upstream(apiURL(lang,'how',{list:'search',srsearch:places[0],srnamespace:'0',srinfo:'suggestion',srlimit:'1',srprop:''}));

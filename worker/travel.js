@@ -34,9 +34,6 @@ export function namesPlace(page, place) {
   return fold(page.title).includes(name) || fold(page.extract).includes(name);
 }
 
-// Phrasebooks are language guides, not destinations.
-export const PHRASEBOOK = /\bphrasebook\b/i;
-
 // Alternate between places so one never crowds out another. A guide that
 // matches two places appears once.
 export function interleave(lists) {

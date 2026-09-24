@@ -493,3 +493,116 @@ test('a misspelled place that finds nothing comes back with a suggestion',async(
     assert.deepEqual(body,{articles:[],next:null,suggestion:'Japan'});
   });
 });
+test('a guide without an introduction uses its first paragraphs, never headings or lists',async()=>{
+  const {firstParagraphs,completeLeadText}=await import('../worker/extracts.js');
+  // Shapes taken from Spanish and Japanese Wikivoyage (September 2026).
+  const japon='\nRegiones\nJapón está formado por cuatro islas principales y muchas islas menores, siendo la más notable Okinawa. Honshu, la isla principal, es la más poblada.\n\n\nCiudades\nJapón tiene miles de ciudades; estas son nueve de las más importantes para el viajero.\n\nTokio - la moderna capital de Japón y la ciudad más densamente poblada de todas.\n1 Roma     ​  41.912.5 — La Ciudad Eterna ha sobrevivido a saqueos y fascistas, desastres de planificación urbana.\nSendai - la mayor ciudad de…';
+  assert.equal(firstParagraphs(japon),'Japón está formado por cuatro islas principales y muchas islas menores, siendo la más notable Okinawa. Honshu, la isla principal, es la más poblada.','the sentence that only introduces the city list is left out');
+  assert.equal(firstParagraphs('Regiones\nJapón está formado por cuatro islas principales y muchas islas menores, siendo la más notable Okinawa. Honshu se divide en estas regiones:\n\nCiudades'),'Japón está formado por cuatro islas principales y muchas islas menores, siendo la más notable Okinawa.','a paragraph ending in a colon keeps its complete sentences');
+  const kyoto='京都市（きょうとし）は日本の京都府の市であり、同府の府庁所在地です。\n\n\n地区\n京都市は11の区からなる。これらを5つの地域に分けて説明します。\n\n\n知る\n1　東京​　    ​  35.683333139.683333 - 首都であり、政治や金融などの一大中心地。\n平安時代から1869年（明治元年）に東京へ遷都するまでの間、日本の首都でした。';
+  assert.equal(firstParagraphs(kyoto),'京都市（きょうとし）は日本の京都府の市であり、同府の府庁所在地です。京都市は11の区からなる。これらを5つの地域に分けて説明します。平安時代から1869年（明治元年）に東京へ遷都するまでの間、日本の首都でした。');
+  assert.equal(firstParagraphs('Ciudades\nHay cientos de ciudades italianas. Aquí están nueve de las más famosas...'),'','a line cut off by the length limit is not used');
+  // Only short introductions are completed, at most `limit` per answer; a failed request is remembered.
+  const pages=[{pageid:1,extract:''},{pageid:2,extract:'Una introducción suficientemente larga para mostrarse en una tarjeta de viaje.'},{pageid:3,extract:'短い。'},{pageid:4,extract:''}];
+  const asked=[];
+  await completeLeadText(pages,async id=>{asked.push(id);if(id===3)throw Error('timeout');return {query:{pages:{[id]:{extract:japon}}}};},2);
+  assert.deepEqual(asked,[1,3]);
+  assert.match(pages[0].extract,/^Japón está formado/);
+  assert.equal(pages[2].extractMissing,true);assert.equal(pages[3].extract,'','over the limit: left for a later page');
+  assert.ok(pages.every(p=>!p.leadPending));
+});
+test('Spanish "Japón", which has no introduction, becomes a card from its first paragraph',async()=>{
+  const requests=[];
+  await mocked(async url=>{
+    const p=new URL(url).searchParams;requests.push(p.has('generator')?'search':p.has('exintro')?'intro':'lead');
+    if(p.has('generator'))return Response.json({query:{pages:{9:{pageid:9,ns:0,title:'Japón',index:1,fullurl:'https://es.wikivoyage.org/wiki/Jap%C3%B3n'}}}});
+    if(p.has('exintro'))return Response.json({query:{pages:{9:{pageid:9,extract:''}}}});
+    return Response.json({query:{pages:{9:{pageid:9,extract:'Regiones\nJapón está formado por cuatro islas principales y muchas islas menores, siendo la más notable Okinawa.'}}}});
+  },async worker=>{
+    const body=await (await worker.fetch(new Request('https://wikiscroll.com/api/travel?lang=es&place='+encodeURIComponent('Japón')),env,ctx)).json();
+    assert.deepEqual(body.articles.map(a=>[a.title,a.body.slice(0,26)]),[['Japón','Japón está formado por cua']]);
+    assert.deepEqual(requests,['search','intro','lead']);
+  });
+});
+test('phrasebooks are recognized in every Wikivoyage edition by category or real title pattern, not look-alikes',async()=>{
+  const {isPhrasebook,phrasebookParams,PHRASEBOOK_CATEGORY}=await import('../worker/phrasebooks.js');
+  // Real titles from each edition's phrasebook category (September 2026).
+  const real={en:'Japanese phrasebook',es:'Guía de húngaro',fr:'Guide linguistique allemand',de:'Sprachführer Englisch',pt:'Guia de conversação japonês',
+    ru:'Японский разговорник',ja:'英語会話集',zh:'世界语会话手册',he:'שיחון אנגלי',nl:'Taalgids Engels',pl:'Rozmówki angielskie'};
+  for(const [lang,title] of Object.entries(real))assert.ok(isPhrasebook({title},lang),lang+': '+title);
+  assert.ok(isPhrasebook({title:'土耳其語會話手冊'},'zh'),'traditional Chinese titles');
+  assert.ok(isPhrasebook({title:'Английский разговорник (США)'},'ru'));
+  // Look-alikes that are destinations or topics.
+  for(const [lang,title] of [['it','Cina'],['it','Cucina cinese'],['es','Guía de Madrid'],['he','שיחונים ישנים'],['en','Phrasebook Bay'],['de','Sprachführerin'],['ja','会話']])
+    assert.equal(isPhrasebook({title},lang),false,lang+': '+title);
+  // Italian titles are just the language, so the category flag decides.
+  assert.equal(isPhrasebook({title:'Cinese'},'it'),false);
+  assert.ok(isPhrasebook({title:'Cinese',categories:[{ns:14,title:'Categoria:Frasari'}]},'it'));
+  assert.deepEqual(phrasebookParams('it'),{clcategories:'Categoria:Frasari',cllimit:'max'});
+  assert.equal(Object.keys(PHRASEBOOK_CATEGORY).length,12,'every Wikivoyage edition the app reads');
+});
+test('the random Wikivoyage feed and travel search request the phrasebook flag and skip phrasebooks',async()=>{
+  const seen=[];
+  const pages=[{pageid:31,ns:0,title:'Cinese',categories:[{ns:14,title:'Categoria:Frasari'}]},{pageid:32,ns:0,title:'Roma',index:1}];
+  await mocked(async url=>{
+    const p=new URL(url).searchParams;
+    if(p.has('generator')){seen.push([p.get('generator'),p.get('clcategories'),p.get('prop').includes('categories')]);return Response.json({query:{pages:Object.fromEntries(pages.map(x=>[x.pageid,{...x,fullurl:'https://it.wikivoyage.org/wiki/'+x.title}]))}});}
+    return Response.json({query:{pages:Object.fromEntries(p.get('pageids').split('|').map(id=>[id,{pageid:Number(id),extract:'Roma è la capitale d\'Italia, con monumenti, musei e piazze famose in tutto il mondo.'}]))}});
+  },async worker=>{
+    const random=await (await worker.fetch(request('mode=how&lang=it&n=20&batch=2'),env,ctx)).json();
+    assert.deepEqual(random.articles.map(a=>a.title),['Roma']);
+    const travel=await (await worker.fetch(new Request('https://wikiscroll.com/api/travel?lang=it&place=Roma'),env,ctx)).json();
+    assert.deepEqual(travel.articles.map(a=>a.title),['Roma']);
+    assert.deepEqual(seen,[['random','Categoria:Frasari',true],['search','Categoria:Frasari',true]]);
+  });
+});
+test('the browser keeps an identical copy of the phrasebook tables',async()=>{
+  const {readFileSync}=await import('node:fs');
+  const read=f=>readFileSync(new URL('../'+f,import.meta.url),'utf8');
+  const worker=read('worker/phrasebooks.js'),app=read('public/app.js');
+  for(const name of ['PHRASEBOOK_CATEGORY','PHRASEBOOK_TITLE']){
+    const table=source=>source.match(new RegExp(`const ${name} = (\\{[\\s\\S]*?\\});`))[1];
+    assert.equal(table(app),table(worker),name);
+  }
+  assert.match(app,/!isPhrasebook\(p, lang\)/);
+  assert.match(app,/clcategories='\+encodeURIComponent\(PHRASEBOOK_CATEGORY\[lang\]\)/);
+});
+test('guides still loading when time runs out are asked for again, not skipped',async t=>{
+  t.mock.timers.enable({apis:['setTimeout','Date']});
+  const later=(ms,value)=>new Promise(resolve=>setTimeout(()=>resolve(value),ms));
+  let chunk=0;
+  await mocked(async url=>{
+    const p=new URL(url).searchParams;
+    if(p.has('generator'))return Response.json({query:{pages:Object.fromEntries(Array.from({length:10},(_,i)=>[i+1,{pageid:i+1,ns:0,title:'Town '+(i+1),index:i}]))},continue:{gsroffset:30}});
+    const ids=p.get('pageids').split('|');
+    return later(chunk++===0?500:9000,Response.json({query:{pages:Object.fromEntries(ids.map(id=>[id,{pageid:Number(id),extract:'A harbour town in Norway with ferries to the islands and a busy fish market.'}]))}}));
+  },async(api,jobs)=>{
+    let response;const pending=api.fetch(new Request('https://wikiscroll.com/api/travel?lang=en&place=Norway'),env,jobs).then(r=>response=r);
+    await settle();for(const ms of [500,8100])t.mock.timers.tick(ms),await settle();
+    await pending;const body=await response.json();
+    assert.equal(body.articles.length,5);
+    assert.equal(body.next,30,'the search itself has more pages');
+    assert.equal(body.resume,0,'but this page still has guides to deliver');
+    t.mock.timers.tick(2000);await settle();
+  });
+});
+test('guides past the text-fallback limit wait for the next request, and fetched text is reused',async()=>{
+  const {LEAD_FALLBACK_LIMIT}=await import('../worker/extracts.js');
+  const cache=edgeCache(),count=LEAD_FALLBACK_LIMIT+4;let leads=0;
+  const pages=Object.fromEntries(Array.from({length:count},(_,i)=>[i+1,{pageid:i+1,ns:0,title:'Pueblo '+(i+1),index:i}]));
+  await mocked(async url=>{
+    const p=new URL(url).searchParams;
+    if(p.has('generator'))return Response.json({query:{pages}});
+    if(p.has('exintro'))return Response.json({query:{pages:Object.fromEntries(p.get('pageids').split('|').map(id=>[id,{pageid:Number(id),extract:''}]))}});
+    leads++;return Response.json({query:{pages:{[p.get('pageids')]:{extract:'Regiones\nEste pueblo de Galicia tiene un puerto, una playa larga y un mercado de pescado muy animado.'}}}});
+  },async(worker,jobs)=>{
+    const first=await (await worker.fetch(new Request('https://wikiscroll.com/api/travel?lang=es&place=Galicia'),env,jobs)).json();
+    await jobs.done();
+    assert.equal(first.articles.length,LEAD_FALLBACK_LIMIT);assert.equal(leads,LEAD_FALLBACK_LIMIT);
+    assert.equal(first.next,null);assert.equal(first.resume,0,'the remaining guides are not lost');
+    const again=await (await worker.fetch(new Request('https://wikiscroll.com/api/travel?lang=es&place=Galicia&offset=0'),env,jobs)).json();
+    assert.equal(again.articles.length,count,'every guide on the page arrives');
+    assert.equal(leads,count,'text already fetched came from the edge cache');
+    assert.equal(again.resume,undefined);
+  },cache);
+});

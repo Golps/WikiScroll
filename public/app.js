@@ -72,6 +72,25 @@ const TOPIC_MAP     = Object.fromEntries(TOPICS.map(t => [t.id, t]));
 // Hindi about 200 guides). Matches VOYAGE_LANGS in worker/index.js.
 const VOYAGE_LANGS  = new Set(['en','es','fr','de','it','pt','ru','ja','zh','he','nl','pl']);
 const VOYAGE_NOTE   = "Wikivoyage isn't available in this language, so travel guides are shown in English.";
+// Phrasebooks are skipped in every Wikivoyage edition: by category, or by each
+// edition's title pattern. Identical to worker/phrasebooks.js (tested), which
+// explains where they come from.
+const PHRASEBOOK_CATEGORY = {
+  en: 'Category:Phrasebooks', es: 'Categoría:Guías de conversación', fr: 'Catégorie:Guides linguistiques',
+  de: 'Kategorie:Sprachführer', it: 'Categoria:Frasari', pt: 'Categoria:Guias de conversação',
+  ru: 'Категория:Разговорники', ja: 'カテゴリ:会話集', zh: 'Category:会话手册',
+  he: 'קטגוריה:שיחונים', nl: 'Categorie:Taalgids', pl: 'Kategoria:Rozmówki',
+};
+const PHRASEBOOK_TITLE = {
+  en: / phrasebook$|^Phrasebooks?$/i, es: /^Guía de \p{Ll}/u, fr: /^Guide linguistique /u, de: /^Sprachführer(\s|$)/u,
+  pt: /^Guia de conversação(\s|$)/u, ru: /разговорник(\s*\(.*\))?$/iu, ja: /会話集$/u, zh: /(会话手册|會話手冊)$/u,
+  he: /^שיחון(\s|$)/u, nl: /^Taalgids(\s|$)/u, pl: /^Rozmówki(\s|$)/u,
+};
+function isPhrasebook(page, lang) {
+  const category = PHRASEBOOK_CATEGORY[lang];
+  if (category && (page.categories || []).some(c => c.title === category)) return true;
+  return !!PHRASEBOOK_TITLE[lang]?.test(String(page.title || ''));
+}
 // Help Wikipedia: Wikipedia editions with reliable maintenance categories
 // (identical to HELP_LANGS in worker/needs.js). Labels follow NEED_ORDER.
 const HELP_LANGS    = new Set(['en','de','fr','es']);
@@ -87,7 +106,7 @@ const BAD_TITLE_RE  = /^(list of|lists of|timeline|history of|geography of|demog
 let curMode = 'wiki', curLang = 'en';
 let curTopics = new Set();
 let travelFilters = lsGet('ws_travel_filters') || {place:'',style:''};
-let travelOffset=0, travelExhausted=false, travelSuggestion='', travelContinuing=false;
+let travelOffset=0, travelExhausted=false, travelSuggestion='', travelContinuing=false, travelRetries={};
 let swipeEnabled = true, kbBarEnabled = true, helpMode = 'off';
 let lightMode = false, depthLevel = 3;
 let history = [];
@@ -528,14 +547,14 @@ async function fetchVoyage() {
     // Random fallback — ONE Action API call for 20 candidates. The previous
     // REST approach fired 16 parallel requests per call (up to 80 per fill),
     // which tripped Wikimedia's per-IP rate limiting and killed the feed.
-    const url = [`https://${lang}.wikivoyage.org/w/api.php`,'?action=query','&generator=random','&grnnamespace=0','&grnlimit=20','&prop=extracts%7Cpageimages','&exintro=1','&exchars=600','&explaintext=1','&exlimit=max','&piprop=thumbnail','&pithumbsize=640','&pilimit=max','&format=json','&origin=*'].join('');
+    const url = [`https://${lang}.wikivoyage.org/w/api.php`,'?action=query','&generator=random','&grnnamespace=0','&grnlimit=20','&prop=extracts%7Cpageimages%7Ccategories','&exintro=1','&exchars=600','&explaintext=1','&exlimit=max','&piprop=thumbnail','&pithumbsize=640','&pilimit=max','&format=json','&origin=*',PHRASEBOOK_CATEGORY[lang]?'&cllimit=max&clcategories='+encodeURIComponent(PHRASEBOOK_CATEGORY[lang]):''].join('');
     const data = await fetchOne(url);
     if(requestGen!==fillGeneration)return [];
     if (data?.query?.pages) {
       const good = Object.values(data.query.pages).filter(p => {
         if (!Number.isSafeInteger(p.pageid) || p.pageid<1 || !isValidTitle(p.title)) return false;
         const s = stripHtml(p.extract||'').slice(0,500);
-        return s.length >= 40 && !/^(phrasebooks?|travel topics?|itineraries)(?:[ :/]|$)/i.test(p.title);
+        return s.length >= 40 && !isPhrasebook(p, lang) && !/^(travel topics?|itineraries)(?:[ :/]|$)/i.test(p.title);
       }).slice(0,20).map(p => ({
         id:'v'+p.pageid, src:'how', title:p.title, body:stripHtml(p.extract||''), img:p.thumbnail?.source||'',
         url:`https://${lang}.wikivoyage.org/wiki/${encodeURIComponent(p.title.replace(/ /g,'_'))}`,
@@ -846,7 +865,7 @@ async function boot() {
 }
 function resetFeed() {
   window.dispatchEvent(new Event('feed-reset'));
-  travelOffset=0;travelExhausted=false;travelSuggestion='';travelContinuing=false;sentinel?.disconnect();
+  travelOffset=0;travelExhausted=false;travelSuggestion='';travelContinuing=false;travelRetries={};sentinel?.disconnect();
   fillGeneration++;pendingDeepGeneration=-1;
   supplyControllers.forEach(controller=>controller.abort());
   articles=[];queue=[];feedSeen.clear();filling=false;supplyTask=null;

@@ -2,6 +2,16 @@
 
 Releases of this repository. Each entry describes what changed in the code; [docs/ENGINEERING.md](docs/ENGINEERING.md#known-issues) has the details and the tests behind each change.
 
+## 1.3 (September 24, 2026)
+
+### Travel search
+
+- Guides that were still loading when the server answered are no longer skipped. The server says where to resume (`resume`), and the browser asks for the same results again (twice at most) before moving on. Before, it moved past them, so a slow answer could hide guides for the rest of the session and end the feed on "every matching guide" too early.
+- Guides with no introduction, common on the Spanish and Japanese Wikivoyage, now show their first paragraphs instead of being left out. Headings, lists and unfinished sentences are skipped. The text is kept at the edge for a week.
+- Phrasebooks are left out in every Wikivoyage edition, by the edition's phrasebook category or by how its phrasebooks are really titled ("Sprachführer Englisch", "Guía de húngaro", "英語会話集"). Before, only English titles were recognized. Guides that only look similar, such as "Guía de Madrid", are kept. The random Wikivoyage feed skips them too.
+
+200 tests (8 new). The new tests fail on the 1.2 code.
+
 ## 1.2 (September 24, 2026)
 
 ### Travel search

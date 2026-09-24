@@ -1,0 +1,17 @@
+{
+  "name": "wikiscroll",
+  "version": "4.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev --config wrangler.jsonc",
+    "check": "node --check public/app.js && node --check public/atlas.js && node --check worker/index.js && node --test test/*.test.js",
+    "deploy": "bash scripts/deploy.sh"
+  },
+  "devDependencies": {
+    "wrangler": "4.134.0"
+  },
+  "dependencies": {
+    "@resvg/resvg-wasm": "2.6.2"
+  }
+}

@@ -1,0 +1,14 @@
+# WikiScroll
+
+> An independent, free discovery reader for Wikipedia and Wikivoyage. Replace doomscrolling with discovery, and follow curiosity at your own pace.
+
+WikiScroll is a tool for discovering and saving open knowledge, not the original publisher of its articles and not an official Wikimedia Foundation product. English is the default, with 15 selectable languages. Likes save articles without personalizing discovery around previous likes. Wikipedia has topic and article-depth controls; Wikivoyage has destination and trip-style filters and maps.
+
+Features include saved articles, shareable collections, reading history, separate activity counts for each source without streak goals, ambient reading, dark and light themes, desktop and touch controls, and home-screen installation. Previously cached content can work offline; new content needs a connection. Personal preferences and libraries are stored in the browser, not synced through an account. Shared collection links expose their selected snapshot to recipients.
+
+## Learn more
+
+- [About WikiScroll](https://wikiscroll.com/about/): Purpose, features, source attribution, and local-storage limitations.
+- [Open WikiScroll](https://wikiscroll.com/): The discovery reader. About and Privacy Policy are linked at the bottom of settings.
+
+For facts quoted from an article, follow its original Wikipedia or Wikivoyage link for attribution and current content. WikiScroll is best described as a knowledge-discovery and reading tool.

@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
+<title>WikiScroll: Turn doomscrolling into discovery</title>
+<meta name="description" content="Replace doomscrolling with mindful discovery. Explore surprising Wikipedia knowledge and Wikivoyage destinations, save what matters, and learn at your own pace.">
+<meta name="keywords" content="Wikipedia reader, Wikivoyage, mindful reading, random Wikipedia articles, learn something new, mindful discovery, Wikipedia app, educational app, knowledge discovery, free learning, random knowledge, Wikipedia browser, travel articles">
+<meta name="author" content="WikiScroll">
+<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">
+<meta name="googlebot" content="index, follow, max-image-preview:large, max-snippet:-1">
+<meta name="bingbot" content="index, follow">
+<link rel="canonical" href="https://wikiscroll.com/">
+<meta name="theme-color" content="#101418" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<meta name="color-scheme" content="dark light">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="WikiScroll">
+<meta name="application-name" content="WikiScroll">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="format-detection" content="telephone=no">
+<link rel="icon" href="/images/favicon.ico?v=42" sizes="32x32">
+<link rel="manifest" href="/manifest.json">
+<link rel="apple-touch-icon" href="/images/apple-touch-icon.png?v=42">
+<link rel="icon" type="image/png" sizes="192x192" href="/images/icon-192.png?v=42">
+<link rel="icon" type="image/png" sizes="512x512" href="/images/icon-512.png?v=42">
+
+<!-- Hreflang for multilingual signals -->
+
+<!-- Open Graph -->
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://wikiscroll.com/">
+<meta property="og:title" content="WikiScroll: Turn doomscrolling into discovery">
+<meta property="og:description" content="Replace doomscrolling with mindful discovery. Explore surprising Wikipedia knowledge and Wikivoyage destinations, save what matters, and learn at your own pace.">
+<meta property="og:image" content="https://wikiscroll.com/images/og-discovery-v7.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="WikiScroll: Replace doomscrolling with discovery">
+<meta property="og:site_name" content="WikiScroll">
+<meta property="og:locale" content="en_US">
+<meta property="og:locale:alternate" content="es_ES">
+<meta property="og:locale:alternate" content="fr_FR">
+<meta property="og:locale:alternate" content="de_DE">
+<meta property="og:locale:alternate" content="ja_JP">
+
+<!-- Twitter Card -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="WikiScroll: Turn doomscrolling into discovery">
+<meta name="twitter:description" content="Replace doomscrolling with mindful discovery. Explore surprising Wikipedia knowledge and Wikivoyage destinations, save what matters, and learn at your own pace.">
+<meta name="twitter:image" content="https://wikiscroll.com/images/og-discovery-v7.png">
+<meta name="twitter:image:alt" content="WikiScroll: Replace doomscrolling with discovery">
+
+
+<!-- Structured Data -->
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebApplication",
+  "name": "WikiScroll",
+  "alternateName": "WikiScroll: Random Wikipedia Reader",
+  "url": "https://wikiscroll.com",
+  "description": "Replace doomscrolling with mindful discovery. Explore surprising Wikipedia knowledge and Wikivoyage destinations, save what matters, and learn at your own pace.",
+  "applicationCategory": "EducationalApplication",
+  "applicationSubCategory": "Knowledge Discovery",
+  "operatingSystem": "Any",
+  "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD", "availability": "https://schema.org/InStock" },
+  "author": { "@type": "Organization", "name": "WikiScroll", "url": "https://wikiscroll.com" },
+  "publisher": { "@type": "Organization", "name": "WikiScroll", "url": "https://wikiscroll.com", "logo": { "@type": "ImageObject", "url": "https://wikiscroll.com/images/icon-512.png" } },
+  "browserRequirements": "Requires JavaScript. Works in Chrome, Firefox, Safari, Edge.",
+  "softwareVersion": "4.0",
+  "screenshot": "https://wikiscroll.com/images/og-discovery-v7.png",
+  "image": "https://wikiscroll.com/images/og-discovery-v7.png",
+  "featureList": "Mindful discovery of Wikipedia articles, Wikivoyage travel guides, 15 languages, 12 topic categories, swipe gestures, ambient reading mode, offline support, reading history, collections, share with rich link previews, interactive map explorer, article depth slider, keyboard shortcuts, Progressive Web App",
+  "keywords": "Wikipedia, Wikivoyage, mindful reading, random articles, learning, discovery, knowledge, educational app, PWA, mindful discovery",
+  "inLanguage": ["en","es","fr","de","it","pt","ru","ja","zh","ar","hi","ko","he","nl","pl"],
+  "isAccessibleForFree": true,
+  "permissions": "no special permissions required"
+}
+</script>
+
+
+
+<link rel="preconnect" href="https://thumb.wikimedia.org">
+<link rel="preconnect" href="https://upload.wikimedia.org">
+<link rel="stylesheet" href="/styles.css?v=67">
+<link rel="stylesheet" href="/about.css?v=50">
+<link rel="describedby" href="/llms.txt" type="text/plain">
+</head>
+<body>
+
+<!-- HEADER -->
+<header class="hdr">
+  <div class="hdr-left"><div class="brand"><h1 class="logo" data-text="WikiScroll" style="margin:0"><img class="wordmark wordmark-dark" src="/images/wordmark-dark.svg" alt="WikiScroll"><img class="wordmark wordmark-light" src="/images/wordmark-light.svg" alt="WikiScroll"></h1><span class="brand-note">The discovery reader</span></div></div>
+  <div class="hdr-mid" aria-label="Article source">
+    <div class="toggle">
+      <button class="tbtn won on" id="wBtn"><span>Wikipedia</span><small>Discover knowledge</small></button>
+      <button class="tbtn" id="hBtn"><span>Wikivoyage</span><small>Explore places</small></button>
+
+    </div>
+  </div>
+  <div class="hdr-tools-left"><button id="headerTheme" class="pill" type="button" aria-label="Toggle light mode"><svg class="atlas-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/></svg></button>
+    <div class="lang-wrap">
+      <button class="pill" id="langBtn"><svg class="atlas-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><ellipse cx="12" cy="12" rx="4" ry="9"/><path d="M3 12h18"/></svg><span id="langTxt">English</span></button>
+      <div class="lang-dd" id="langDd"></div>
+    </div>
+
+  </div>
+  <div class="hdr-right">
+    <button class="pill" id="likesBtn">
+      <svg class="atlas-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h12v18l-6-4-6 4z"/></svg><span>Saved</span>
+      <span class="badge" id="badge" style="display:none">0</span>
+    </button>
+    <button class="pill wikipedia-only" id="topicsBtn">
+      <svg class="atlas-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg><span>Topics</span>
+      <span class="badge topic-badge" id="topicBadge" style="display:none">0</span>
+    </button>
+    <button class="pill" id="settingsBtn"><svg class="atlas-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h6m4 0h8M3 12h12m4 0h2M3 18h2m4 0h12"/><circle cx="11" cy="6" r="2"/><circle cx="17" cy="12" r="2"/><circle cx="7" cy="18" r="2"/></svg><span>Settings</span></button>
+    <button class="burger-btn" id="burgerBtn" title="Menu" aria-label="Menu">
+      <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+        <line x1="2" y1="4.5" x2="16" y2="4.5"/>
+        <line x1="2" y1="9" x2="16" y2="9"/>
+        <line x1="2" y1="13.5" x2="16" y2="13.5"/>
+      </svg>
+    </button>
+  </div>
+</header>
+
+<!-- MOBILE BURGER MENU -->
+<div class="burger-backdrop" id="burgerBackdrop"></div>
+<div class="burger-menu" id="burgerMenu">
+  <div class="mobile-settings-heading"><div><h2>Settings</h2><p id="settingsSource">Wikipedia</p></div><button type="button" onclick="closeBurger()" aria-label="Close settings">Done</button></div>
+<div class="burger-inner">
+    <div class="burger-row" style="flex-direction:column;align-items:stretch;">
+      <div class="burger-row-label"><span class="ico">📊</span><span>Today's Stats</span></div>
+      <div class="streak-display" style="margin-top:6px;">
+        <div class="streak-main">
+          <span><span class="streak-num" id="streakCount">0</span> <span class="streak-unit">articles today</span></span>
+        </div>
+        <div class="week-heatmap" id="weekHeatmap"></div>
+      </div>
+    </div>
+    <div class="burger-row saved-row">
+      <div class="burger-row-label"><span class="ico">❤️</span><div><div>Saved Articles</div><div class="burger-row-sub">Your personal discovery library</div></div></div>
+      <button class="burger-action history-action" id="burgerLikesBtn">View saved <span class="badge" id="burgerBadge" style="display:none">0</span><span aria-hidden="true">›</span></button>
+    </div>
+    <div class="burger-row history-row">
+      <div class="burger-row-label"><span class="ico">📜</span><div><div>History</div><div class="burger-row-sub">Revisit articles you have discovered</div></div></div>
+      <button class="burger-action history-action" id="burgerHistoryBtn">View history <span aria-hidden="true">›</span></button>
+    </div>
+
+    <div class="burger-row">
+      <div class="burger-row-label"><span class="ico">🌍</span><div><div>Language</div><div class="burger-row-sub" id="burgerLangTxt">English</div></div></div>
+      <button class="burger-action history-action" id="burgerLangBtn">Change ›</button>
+    </div>
+    <div class="burger-lang-grid" id="burgerLangGrid"></div>
+    <div class="burger-row wikipedia-only">
+      <div class="burger-row-label"><span class="ico">🎯</span><div><div>Topics</div><div class="burger-row-sub" id="burgerTopicsSub"><span class="topics-mix">Random mix</span><span class="topics-count" hidden><span class="topics-n">0</span> <span>selected</span></span></div></div></div>
+      <button class="burger-action history-action" id="burgerTopicsBtn">Filter ›</button>
+    </div>
+    <div class="burger-topics wikipedia-only" id="burgerTopics">
+      <div class="burger-topic-grid" id="burgerTopicGrid"></div>
+    </div>
+    <div class="burger-row">
+      <div class="burger-row-label">
+        <span class="ico">👆</span>
+        <div><div>Swipe Gestures</div><div class="burger-row-sub">Left to skip · Right to like</div></div>
+      </div>
+      <button class="toggle-sw on" id="swipeToggle" role="switch" aria-label="Toggle swipe gestures"></button>
+    </div>
+
+    <div class="burger-row wikipedia-only">
+      <div class="burger-row-label">
+        <span class="ico">🔬</span>
+        <div><div>Article Depth</div><div class="burger-row-sub">Popular to obscure, based on readership.</div></div>
+      </div>
+    </div>
+    <div class="burger-row wikipedia-only" style="padding-top:0;border:none;">
+      <div class="depth-wrap">
+        <div class="depth-track">
+          <input type="range" class="depth-slider" aria-label="Article depth" id="depthSlider" min="1" max="5" value="3" step="1">
+        </div>
+        <div class="depth-steps" id="depthSteps">
+          <div class="depth-step" data-d="1"><div class="ds-dot"></div><span>Popular</span></div>
+          <div class="depth-step" data-d="2"><div class="ds-dot"></div><span>Known</span></div>
+          <div class="depth-step active" data-d="3"><div class="ds-dot"></div><span>Balanced</span></div>
+          <div class="depth-step" data-d="4"><div class="ds-dot"></div><span>Niche</span></div>
+          <div class="depth-step" data-d="5"><div class="ds-dot"></div><span>Obscure</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="burger-row wikipedia-only help-only help-row">
+      <div class="burger-row-label">
+        <span class="ico">📝</span>
+        <div><div id="mHelpLabel">Help Wikipedia</div><div class="burger-row-sub help-sub"><span data-for="off">Find articles that need citations or updates.</span><span data-for="tags">Labels articles that need citations or updates.</span><span data-for="only">Shows only articles that need citations or updates.</span></div></div>
+      </div>
+      <div class="help-seg" role="radiogroup" aria-labelledby="mHelpLabel">
+        <button type="button" role="radio" data-help-choice="off" aria-checked="true" class="on">Off</button><button type="button" role="radio" data-help-choice="tags" aria-checked="false" tabindex="-1">Show tags</button><button type="button" role="radio" data-help-choice="only" aria-checked="false" tabindex="-1">Only these articles</button>
+      </div>
+    </div>
+
+    <div class="burger-row" style="flex-direction:column;align-items:stretch;gap:0;padding:14px 0 0 0;border-bottom:none;">
+      <div class="sp-about" style="margin:0;">
+        <div class="sp-about-logo"><img class="wordmark wordmark-dark" src="/images/wordmark-dark.svg" alt="WikiScroll"><img class="wordmark wordmark-light" src="/images/wordmark-light.svg" alt="WikiScroll"></div>
+        <div class="sp-about-body">
+          Replace doomscrolling with discovery. Explore unexpected ideas and remarkable places, and leave with something worth knowing.<br><br>
+          Swipe right to like · Left to skip · Long-press for Ambient Mode.
+        </div>
+        <div class="sp-about-contact">contact@example.com</div>
+        <div style="margin-top:12px;text-align:center;"><a class="about-link" href="/about/" data-about-link>About WikiScroll</a><button class="privacy-link-btn" onclick="closeBurger();setTimeout(openPrivacy,350)" style="font-size:12px;color:rgba(255,255,255,.35);text-decoration:underline;text-underline-offset:3px;padding:8px 16px;display:inline-block;background:none;border:none;cursor:pointer;font-family:inherit;">Privacy Policy</button></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- TOPIC SHEET -->
+<div class="sheet-overlay" id="sheetOverlay"></div>
+<div class="topic-sheet" id="topicSheet">
+  <div class="sheet-handle"></div>
+  <div class="topic-sheet-header"><div class="sheet-title">Topics</div><button class="topic-close" id="topicClose" type="button" aria-label="Close topics">✕</button></div>
+  <div class="sheet-sub">Select topics, or leave all off for a random mix.</div>
+  <div class="topic-grid" id="topicGrid"></div>
+  <button class="sheet-reset" id="sheetReset">Clear all topics</button>
+</div>
+
+<!-- LIKES PANEL -->
+<div class="lp" id="lp">
+  <div class="lp-hdr"><span>Saved Articles</span><button class="lp-x" id="lpClose" aria-label="Close saved articles">✕</button></div>
+  <div class="coll-tabs" id="collTabs"></div>
+  <div class="coll-new-row">
+    <input class="coll-new-input" aria-label="New collection name" id="collNewInput" placeholder="New collection name…" maxlength="30">
+    <button class="coll-new-btn" id="collNewBtn">+ Create</button>
+  </div>
+  <h2 id="collectionHeading" class="collection-heading" translate="no" aria-live="polite" hidden></h2>
+  <div id="likedList"></div>
+</div>
+
+<!-- HISTORY PANEL -->
+<div class="hp" id="hp">
+  <div class="hp-hdr"><span>History</span><button class="hp-x" id="hpClose" aria-label="Close history">✕</button></div>
+  <div id="historyList"></div>
+</div>
+
+<!-- OFFLINE BANNER -->
+<div class="offline-banner" id="offlineBanner">📡 You're offline. Cached articles still work</div>
+
+<!-- SEO FALLBACK -->
+<noscript>
+<div style="max-width:700px;margin:60px auto;padding:20px;font-family:sans-serif;color:#333;line-height:1.8;">
+  <h1>WikiScroll: Turn doomscrolling into discovery</h1>
+  <p>WikiScroll is a free Progressive Web App that lets you discover random Wikipedia and Wikivoyage articles in a calm, swipeable discovery reader. Turn doomscrolling into discovery. Each card introduces an article about science, history, geography, food, arts, technology, sports, or fascinating people from around the world.</p>
+  <h2>Features</h2>
+  <p>Discover Wikipedia articles in a calm, thoughtfully designed reader. Full Wikivoyage travel guide integration with interactive map explorer. Support for 15 languages including English, Spanish, French, German, Italian, Portuguese, Russian, Japanese, Chinese, Arabic, Hindi, Korean, Dutch, Polish, and Hebrew. Topic filtering across 12 categories. Swipe right to save articles, left to skip. Ambient reading mode for distraction-free learning. Reading history to find articles you've seen before. Offline support lets you read cached articles without internet. Dark and light themes. Article depth slider to control how obscure your feed gets. Collections to organize saved articles. Share articles with rich link previews. Keyboard shortcuts for desktop power users. Install as a Progressive Web App on any device.</p>
+  <h2>How WikiScroll Works</h2>
+  <p>WikiScroll fetches random articles from the Wikipedia and Wikivoyage REST APIs, filters them for quality, images, and relevance, then presents them in a full-screen card format. Each card shows the article title, an excerpt, a thumbnail image, and auto-detected category tags. Swipe right or tap the heart to save articles for later. Tap "Read Full Article" to visit the original Wikipedia or Wikivoyage page. For Wikivoyage travel articles, an interactive map shows the location on a beautifully styled map powered by Leaflet and OpenStreetMap.</p>
+  <h2>Privacy First</h2>
+  <p>WikiScroll requires no account and sets no tracking cookies. When enabled, Cloudflare Web Analytics measures aggregate visits and performance without identifying individual visitors. Your preferences, liked articles, and reading history stay on your device unless you explicitly share a collection. WikiScroll is open, transparent, and respects your privacy completely.</p>
+  <h2>Install WikiScroll</h2>
+  <p>WikiScroll is a Progressive Web App (PWA) that works in any modern browser. Install it on your home screen for a native app-like experience. On iPhone, tap the Share button in Safari and select "Add to Home Screen." On Android, tap the menu in Chrome and select "Install app."</p>
+  <p><a href="https://wikiscroll.com/">Launch WikiScroll</a>. Please enable JavaScript to use WikiScroll.</p>
+  <h2>Frequently Asked Questions</h2>
+  <p><strong>What is WikiScroll?</strong> WikiScroll is a free web app that presents random Wikipedia and Wikivoyage articles in a swipeable discovery reader. Follow your curiosity at your own pace.</p>
+  <p><strong>Is WikiScroll free to use?</strong> Yes, completely free with no ads, no tracking, and no account required. All data stays on your device.</p>
+  <p><strong>Does WikiScroll work offline?</strong> Yes, WikiScroll is a Progressive Web App with offline support. Previously viewed and liked articles are cached and available without an internet connection.</p>
+  <p><strong>What languages does WikiScroll support?</strong> 15 languages: English, Spanish, French, German, Italian, Portuguese, Russian, Japanese, Chinese, Arabic, Hindi, Korean, Hebrew, Dutch, and Polish.</p>
+</div>
+</noscript>
+
+<!-- FEED -->
+<div class="feed" id="feed" tabindex="0" aria-label="Article discovery feed">
+  <div class="spin-wrap" id="spinner">
+    <div class="spin"></div>
+    <div class="spin-lbl">Loading articles…</div>
+  </div>
+</div>
+
+<!-- HINT -->
+<button class="hint" id="hint" type="button" aria-hidden="true" tabindex="-1">
+  <span class="hint-txt">Scroll to discover</span>
+  <span class="hint-arr" aria-hidden="true"></span>
+</button>
+
+<!-- PULL TO REFRESH -->
+<div class="ptr-indicator" id="ptrIndicator">
+  <svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+</div>
+
+<!-- SETTINGS PANEL (desktop) -->
+
+<!-- ABOUT CONTENT START -->
+<dialog class="privacy-dialog" id="aboutDialog" aria-labelledby="aboutTitle"><button class="modal-close" id="aboutClose" aria-label="Close About WikiScroll">✕</button><div class="about-copy" lang="en"><h1 id="aboutTitle">Replace doomscrolling with discovery</h1>
+<p class="about-lead">A spare moment can leave you with something worth knowing. WikiScroll turns Wikipedia knowledge and Wikivoyage travel guides into a thoughtful, swipeable reader.</p>
+<p>Instead of another stream of reactions and headlines, discover an unfamiliar idea, a surprising life, or a place you have never considered visiting. Read a short introduction, follow the original article when something catches your attention, and stop whenever you like.</p>
+<h2>Follow your curiosity, not an engagement score</h2>
+<p>Your likes save what matters to you. They do not train a feed around your last swipe. Explore broadly or choose topics deliberately. There are no daily targets or streaks to protect, and no account is required.</p>
+<h2>Two ways to explore</h2>
+<ul><li><strong>Wikipedia:</strong> discover people, science, history, nature, technology, culture, and more. Select topics to focus your discovery. Adjust article depth to favor familiar subjects or more obscure finds.</li>
+<li><strong>Wikivoyage:</strong> discover destinations through travel guides. Filter by country or region and trip style, then open the map to put a place in context. Travel controls are separate from Wikipedia topics and depth.</li></ul>
+<h2>Keep what stays with you</h2>
+<ul><li><strong>Saved articles:</strong> swipe right or press Save to keep an interesting discovery. Swipe left to pass.</li>
+<li><strong>Collections:</strong> organize discoveries into reading lists and share a collection through a link, with a preview designed for messages and social apps.</li>
+<li><strong>Reading history:</strong> find articles you have already encountered.</li>
+<li><strong>Gentle activity stats:</strong> see today's article count and a weekly activity chart, tracked separately for Wikipedia and Wikivoyage, without streaks or daily goals.</li></ul>
+<h2>A reader that fits your day</h2>
+<ul><li><strong>15 language choices:</strong> English is the default. Also choose Spanish, French, German, Italian, Portuguese, Russian, Japanese, Chinese, Arabic, Hindi, Korean, Hebrew, Dutch, or Polish. Article availability depends on the source language.</li>
+<li><strong>Dark and light themes:</strong> choose the appearance that suits you.</li>
+<li><strong>Ambient reading:</strong> press Spacebar on desktop or long-press a card on mobile to focus on a discovery with fewer distractions. Press Spacebar again, or tap the background or text, to return.</li>
+<li><strong>Phone, tablet, and desktop:</strong> responsive cards, touch gestures, desktop keyboard controls, and two-finger horizontal trackpad swipes.</li>
+<li><strong>Home-screen installation:</strong> install WikiScroll as a Progressive Web App for quick access.</li>
+<li><strong>Cached reading:</strong> previously cached content can remain available offline. New discoveries and maps need a connection.</li>
+<li><strong>Ready for the next discovery:</strong> cards load ahead as you read to keep moving between articles smooth.</li></ul>
+<h2>Your discoveries stay yours</h2>
+<p>Preferences, saved articles, collections, and reading history are stored in your browser. There is no account-based sync. If you share a collection, anyone with its link can read that snapshot. Clearing browser data may remove your local library.</p>
+<h2>Built on open knowledge</h2>
+<p>WikiScroll is an independent reader, not an official Wikimedia Foundation product. Article content comes from Wikipedia and Wikivoyage. Every card links to its original article for the full story, attribution, and licensing information.</p>
+<p>Questions or suggestions? Contact <a href="mailto:contact@example.com">contact@example.com</a>.</p></div></dialog>
+<!-- ABOUT CONTENT END -->
+<!-- PRIVACY POLICY MODAL -->
+<dialog class="privacy-dialog" id="privacyDialog" aria-labelledby="privacyTitle">
+  <div style="position:relative;">
+    <button class="modal-close" id="privacyClose" aria-label="Close privacy policy">✕</button>
+    <div class="modal-logo" id="privacyTitle" style="text-align:center;">Privacy Policy</div>
+    <div style="font-size:13px;line-height:1.75;color:rgba(255,255,255,.65);">
+      <p style="margin-bottom:12px;font-size:11px;color:var(--dim);">Last updated: September 2026</p>
+
+      <p style="margin-bottom:14px;"><strong style="color:rgba(255,255,255,.85);">What WikiScroll is.</strong> WikiScroll is a free, client-side web application that displays random articles from Wikipedia and Wikivoyage. It is hosted on Cloudflare Workers.</p>
+
+      <p style="margin-bottom:14px;"><strong style="color:rgba(255,255,255,.85);">Data we collect.</strong> WikiScroll does not require an account or automatically upload your saved collections. If you share a collection, its selected contents are included in the link and processed by Cloudflare to display the collection and its preview image. We do not set tracking cookies or use advertising SDKs. When enabled, Cloudflare Web Analytics provides cookieless, non-identifying measurements of visits and performance; it does not receive your saved articles, collections, or reading history. We do not know who you are.</p>
+
+      <p style="margin-bottom:14px;"><strong style="color:rgba(255,255,255,.85);">Local storage.</strong> Your preferences (liked articles, reading history, settings, theme, and collections) are stored exclusively in your browser's localStorage and IndexedDB. This data stays on your device unless you choose to share a collection. Shared links contain the selected collection name, article titles, excerpts, and article identifiers. Anyone with the link, and the messaging service generating its preview, can read that snapshot. Links cannot be revoked; deleting a local collection does not delete a previously shared snapshot. You can clear it at any time through your browser settings.</p>
+
+      <p style="margin-bottom:14px;"><strong style="color:rgba(255,255,255,.85);">Third-party services.</strong> WikiScroll loads content from the following external services:
+      </p>
+      <ul style="margin:0 0 14px 18px;padding:0;">
+        <li style="margin-bottom:6px;"><strong>Wikipedia / Wikivoyage / Wikimedia APIs</strong>: Article content, images, and pageview statistics. Subject to the Wikimedia Foundation's privacy policy.</li>
+        <li style="margin-bottom:6px;"><strong>Cloudflare Workers</strong>: Hosting and CDN delivery. Cloudflare may collect standard web server logs (IP address, user agent, timestamps) as part of their infrastructure. Subject to Cloudflare's privacy policy.</li>
+        <li>Leaflet, OpenStreetMap / Nominatim, CARTO and cdnjs: map software, map tiles and delivery. Maps use Wikivoyage's own coordinates; when a guide has none, its place name is sent to Nominatim to locate it. Requests are subject to each provider’s privacy policy.</li>
+      </ul>
+
+      <p style="margin-bottom:14px;"><strong style="color:rgba(255,255,255,.85);">Service Worker.</strong> WikiScroll registers a service worker to cache articles for offline use. This caching is entirely local to your device.</p>
+
+      <p style="margin-bottom:14px;"><strong style="color:rgba(255,255,255,.85);">Changes to this policy.</strong> WikiScroll reserves the right to update, modify, or replace this privacy policy at any time and for any reason. Any changes will be reflected on this page with an updated revision date. Your continued use of WikiScroll after changes constitutes acceptance of the revised policy. We recommend reviewing this policy periodically.</p>
+
+      <p style="margin-bottom:0;"><strong style="color:rgba(255,255,255,.85);">Contact.</strong> If you have questions about this policy, contact us at contact@example.com.</p>
+    </div>
+  </div>
+</dialog>
+
+<!-- SETTINGS PANEL (desktop) -->
+<div class="sp-backdrop" id="spBackdrop"></div>
+<div class="sp" id="settingsPanel">
+  <div class="sp-hdr"><span>Settings</span><button class="sp-x" id="spClose" aria-label="Close settings">✕</button></div>
+
+  <div class="sp-section">
+    <div class="sp-section-title">Stats</div>
+    <div class="sp-row" style="flex-direction:column;align-items:stretch;gap:8px;">
+      <div class="streak-display" style="margin-top:4px;">
+        <div class="streak-main">
+          <span><span class="streak-num" id="dkStreakCount">0</span> <span class="streak-unit">articles today</span></span>
+        </div>
+        <div class="week-heatmap" id="dkWeekHeatmap"></div>
+      </div>
+    </div>
+    <div class="sp-library-actions" aria-label="Your library">
+      <button class="sp-history-action" id="desktopLikesBtn" type="button">
+        <span class="sp-row-label"><span class="ico">❤️</span><span><strong>Saved Articles</strong><small>Your personal discovery library</small></span></span>
+        <span class="sp-history-arrow" aria-hidden="true">›</span>
+      </button>
+      <button class="sp-history-action" id="desktopHistoryBtn" type="button">
+        <span class="sp-row-label"><span class="ico">📜</span><span><strong>History</strong><small>Revisit articles you have discovered</small></span></span>
+        <span class="sp-history-arrow" aria-hidden="true">›</span>
+      </button>
+    </div>
+  </div>
+
+
+  <div class="sp-section">
+    <div class="sp-section-title">Gestures</div>
+    <div class="sp-row">
+      <div class="sp-row-label">
+        <span class="ico">👆</span>
+        <div><div>Swipe Gestures</div><div class="sp-row-sub">Left to skip · Right to like</div></div>
+      </div>
+      <button class="toggle-sw on" id="dkSwipeToggle" role="switch" aria-label="Toggle swipe gestures"></button>
+    </div>
+  </div>
+
+  <div class="sp-section wikipedia-only">
+    <div class="sp-section-title">Discovery</div>
+
+    <div class="sp-row">
+      <div class="sp-row-label">
+        <span class="ico">🔬</span>
+        <div><div>Article Depth</div><div class="sp-row-sub">Popular to obscure, based on readership.</div></div>
+      </div>
+    </div>
+    <div class="sp-row" style="padding-top:0;border:none;">
+      <div class="depth-wrap">
+        <div class="depth-track">
+          <input type="range" class="depth-slider" aria-label="Article depth" id="dkDepthSlider" min="1" max="5" value="3" step="1">
+        </div>
+        <div class="depth-steps" id="dkDepthSteps">
+          <div class="depth-step" data-d="1"><div class="ds-dot"></div><span>Popular</span></div>
+          <div class="depth-step" data-d="2"><div class="ds-dot"></div><span>Known</span></div>
+          <div class="depth-step active" data-d="3"><div class="ds-dot"></div><span>Balanced</span></div>
+          <div class="depth-step" data-d="4"><div class="ds-dot"></div><span>Niche</span></div>
+          <div class="depth-step" data-d="5"><div class="ds-dot"></div><span>Obscure</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="sp-row help-only help-row">
+      <div class="sp-row-label">
+        <span class="ico">📝</span>
+        <div><div id="dkHelpLabel">Help Wikipedia</div><div class="sp-row-sub help-sub"><span data-for="off">Find articles that need citations or updates.</span><span data-for="tags">Labels articles that need citations or updates.</span><span data-for="only">Shows only articles that need citations or updates.</span></div></div>
+      </div>
+      <div class="help-seg" role="radiogroup" aria-labelledby="dkHelpLabel">
+        <button type="button" role="radio" data-help-choice="off" aria-checked="true" class="on">Off</button><button type="button" role="radio" data-help-choice="tags" aria-checked="false" tabindex="-1">Show tags</button><button type="button" role="radio" data-help-choice="only" aria-checked="false" tabindex="-1">Only these articles</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="sp-section">
+    <div class="sp-section-title">Features</div>
+    <div class="sp-row">
+      <div class="sp-row-label">
+        <span class="ico">⌨️</span>
+        <div><div>Show Keyboard Hints</div><div class="sp-row-sub">Navigation bar at the bottom of the screen</div></div>
+      </div>
+      <button class="toggle-sw on" id="dkKbToggle" role="switch" aria-label="Toggle keyboard hints"></button>
+    </div>
+  </div>
+
+  <div class="sp-section">
+    <div class="sp-section-title">About</div>
+    <div class="sp-about">
+      <div class="sp-about-logo"><img class="wordmark wordmark-dark" src="/images/wordmark-dark.svg" alt="WikiScroll"><img class="wordmark wordmark-light" src="/images/wordmark-light.svg" alt="WikiScroll"></div>
+      <div class="sp-about-body">
+        Replace doomscrolling with discovery. Explore unexpected ideas and remarkable places, and leave with something worth knowing.<br><br>
+        Swipe right to like · Left to skip · Spacebar for Ambient Mode.
+      </div>
+      <div class="sp-about-contact">contact@example.com</div>
+      <div style="margin-top:12px;text-align:center;"><a class="about-link" href="/about/" data-about-link>About WikiScroll</a><button class="privacy-link-btn" onclick="closeSettings();setTimeout(openPrivacy,100)" style="font-size:12px;color:rgba(255,255,255,.35);text-decoration:underline;text-underline-offset:3px;padding:8px 16px;display:inline-block;background:none;border:none;cursor:pointer;font-family:inherit;">Privacy Policy</button></div>
+    </div>
+  </div>
+</div>
+
+<!-- WIKIVOYAGE MAP EXPLORER -->
+<div class="map-overlay" id="mapOverlay">
+  <div class="map-container">
+    <div class="map-hdr">
+      <div class="map-title" id="mapTitle">Exploring…</div>
+      <button class="map-close" id="mapClose" aria-label="Close map">✕</button>
+    </div>
+    <div class="map-loading" id="mapLoading">
+      <div class="map-loading-text">🗺️ Loading map…</div>
+    </div>
+    <div id="mapCanvas"></div>
+    <div class="map-badge" id="mapBadge">
+      <span>🗺️</span>
+      <span id="mapBadgeText">Location</span>
+      <span>·</span>
+      <a href="#" id="mapReadLink" target="_blank">Read on Wikivoyage ↗</a>
+    </div>
+  </div>
+</div>
+
+<!-- AMBIENT OVERLAY -->
+<div class="ambient-overlay" id="ambientOverlay">
+  <div class="ambient-bg" id="ambientBg"></div>
+  <div class="ambient-content">
+    <div class="ambient-label">✦ Ambient Mode</div>
+    <div class="ambient-title" id="ambientTitle" dir="auto"></div>
+    <div class="ambient-excerpt" id="ambientExcerpt" dir="auto"></div>
+  </div>
+  <button class="ambient-close" id="ambientClose" aria-label="Close ambient mode">✕</button>
+  <div class="ambient-hint">Tap anywhere to exit</div>
+</div>
+
+<!-- KEYBOARD SHORTCUT BAR (desktop only) -->
+<div class="kb-bar" id="kbBar">
+  <div class="kb-hint"><span class="kb-key">↑</span><span class="kb-key">↓</span> Scroll</div>
+  <div class="kb-hint"><span class="kb-key">←</span><span class="kb-key">→</span> Swipe</div>
+  <div class="kb-hint"><span class="kb-key">L</span> Like</div>
+  <div class="kb-hint"><span class="kb-key">S</span> Share</div>
+  <div class="kb-hint"><span class="kb-key">R</span> Read</div>
+
+  <div class="kb-hint" id="kbMapHint" style="display:none"><span class="kb-key">M</span> Map</div>
+  <div class="kb-hint"><span class="kb-key">Space</span> Ambient</div>
+  <div class="kb-hint"><span class="kb-key">Esc</span> Close</div>
+</div>
+
+<dialog id="sourceDialog" class="source-dialog" aria-labelledby="sourceTitle">
+<form method="dialog"><button class="modal-close" aria-label="Close source guide">✕</button></form>
+<p class="source-eyebrow">Two ways to explore</p><h2 id="sourceTitle">Where will curiosity take you?</h2>
+<section><h3>Wikipedia <span>Discover knowledge</span></h3><p>Knowledge about people, science, history, and culture.</p></section>
+<section><h3>Wikivoyage <span>Explore places</span></h3><p>Community-written travel guides to places around the world.</p></section>
+<p class="source-footnote">Free knowledge. Switch sources anytime; your saved articles stay together.</p>
+</dialog>
+<script src="/translations.js?v=49"></script>
+<script src="/i18n.js?v=49"></script>
+<script src="/discovery.js?v=49"></script>
+<script src="/app.js?v=71"></script>
+<script src="/atlas.js?v=54"></script>
+<noscript><p>WikiScroll is a free Wikipedia and Wikivoyage discovery reader. Enable JavaScript to browse articles, save favorites, and explore topics in 15 languages.</p></noscript>
+<script src="/features.js?v=61"></script>
+<script src="/about.js?v=47"></script>
+</body>
+</html>

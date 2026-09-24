@@ -1,0 +1,8 @@
+# Worker variables for `pnpm dev` (wrangler dev). Copy to .dev.vars (git-ignored).
+# Production values are set in the Cloudflare dashboard; wrangler.jsonc keeps them
+# across deploys with "keep_vars": true.
+
+# Optional. Cloudflare Web Analytics site token (32 hex characters). It is
+# browser-visible once injected, but keep your own out of the repository.
+# Leave empty to serve pages without the analytics beacon.
+WEB_ANALYTICS_TOKEN=

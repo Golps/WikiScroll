@@ -7,7 +7,7 @@
   </picture>
 </a>
 
-**Replace doomscrolling with discovery.**<br>
+**Turn doomscrolling into discovery.**<br>
 A calm, swipeable reader for Wikipedia and Wikivoyage, with no engagement-driven recommendations.
 
 [**Open wikiscroll.com →**](https://wikiscroll.com)

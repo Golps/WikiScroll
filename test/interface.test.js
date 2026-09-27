@@ -296,3 +296,10 @@ test('browser tabs show just the name; link previews keep the tagline', () => {
   assert.match(html, /<meta property="og:title" content="WikiScroll: Turn doomscrolling into discovery">/, 'shared links still show the full line');
   assert.match(html, /<meta name="description" content="[^"]*doomscrolling/i, 'the search description is unchanged');
 });
+
+test('the tagline is "Turn doomscrolling into discovery" everywhere, in every language file', () => {
+  const files = ['index.html', 'about/index.html', 'manifest.json', 'llms.txt', ...fs.readdirSync(new URL('../public/translations/', import.meta.url)).map(f => 'translations/' + f)];
+  for (const file of files) assert.doesNotMatch(read(file), /Replace doomscrolling/, file);
+  assert.doesNotMatch(fs.readFileSync(new URL('../README.md', import.meta.url), 'utf8'), /Replace doomscrolling/, 'README');
+  assert.match(html, /og-discovery-v8\.png/, 'link previews use the image with the new line');
+});

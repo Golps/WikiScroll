@@ -185,7 +185,7 @@ Article links (`?a=w123&lang=es`) follow the same rules. Readers get the normal 
 
 ## Testing
 
-The suite has **207 tests** in 24 files. It runs with `node --test test/*.test.js` in about 2 seconds, with no installed dependencies and no network access. Wikimedia, the edge cache, rate-limit bindings and timers are replaced with fakes.
+The suite has **208 tests** in 24 files. It runs with `node --test test/*.test.js` in about 2 seconds, with no installed dependencies and no network access. Wikimedia, the edge cache, rate-limit bindings and timers are replaced with fakes.
 
 **What it verifies:**
 

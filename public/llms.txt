@@ -1,6 +1,6 @@
 # WikiScroll
 
-> An independent, free discovery reader for Wikipedia and Wikivoyage. Replace doomscrolling with discovery, and follow curiosity at your own pace.
+> An independent, free discovery reader for Wikipedia and Wikivoyage. Turn doomscrolling into discovery, and follow curiosity at your own pace.
 
 WikiScroll is a tool for discovering and saving open knowledge, not the original publisher of its articles and not an official Wikimedia Foundation product. English is the default, with 15 selectable languages. Likes save articles without personalizing discovery around previous likes. Wikipedia has topic and article-depth controls; Wikivoyage has destination and trip-style filters and maps.
 

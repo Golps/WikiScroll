@@ -2,6 +2,13 @@
 
 Releases of this repository. Each entry describes what changed in the code; [docs/ENGINEERING.md](docs/ENGINEERING.md#known-issues) has the details and the tests behind each change.
 
+## 1.4.1 (September 27, 2026)
+
+- The tagline is now "Turn doomscrolling into discovery" everywhere: the welcome screen in all 15 languages, the About page, the page and app descriptions, and the link-preview image (`og-discovery-v8.png`, built by `scripts/build-branding.mjs`).
+- The description shown to browsers without JavaScript is shorter and leads with the tagline.
+
+208 tests (1 new).
+
 ## 1.4 (September 24, 2026)
 
 ### Saved articles

@@ -18,7 +18,9 @@ A calm, swipeable reader for Wikipedia and Wikivoyage, with no engagement-driven
 
 <br>
 
-https://github.com/user-attachments/assets/b2f61e26-a11e-4290-9bec-f4442c706ed2
+
+https://github.com/user-attachments/assets/36856d63-83cb-46d5-bf04-8f07e34db6c4
+
 
 <picture>
   <source media="(prefers-color-scheme: light)" srcset="docs/images/hero-desktop-light.jpg">

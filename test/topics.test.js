@@ -20,13 +20,13 @@ test('translated topic branches stay in the selected Wikipedia edition',async()=
  let id=0;const requests=[];
  const result=await topicPages('tech','es',3,async address=>{
   const url=new URL(address);requests.push(url);const p=url.searchParams;
-  if(p.has('lllang'))return {query:{pages:{1:{langlinks:[{'*':'Categoría:Tecnología '+(++id)}]}}}};
+  if(p.has('lllang'))return {query:{pages:Object.fromEntries(p.get('titles').split('|').map(title=>[++id,{title,langlinks:[{'*':'Categoría:Tecnología '+id}]}]))}};
   assert.equal(url.hostname,'es.wikipedia.org');
   if(p.has('cmtitle'))return {query:{categorymembers:[{pageid:++id,ns:0,title:'Tema'}]}};
   return {query:{pages:Object.fromEntries(p.get('pageids').split('|').map(n=>[n,{...page(Number(n),'',15),title:'Tema '+n,extract:'Una introducción suficientemente larga. '.repeat(5),thumbnail:{source:'https://upload.wikimedia.org/example.jpg'}}]))}};
  });
  assert.ok(result.length>1);assert.ok(result.every(a=>a.url.startsWith('https://es.wikipedia.org/')));
- assert.equal(requests.filter(u=>u.searchParams.has('lllang')).length,6);
+ assert.equal(requests.filter(u=>u.searchParams.has('lllang')).length,1);
 });
 test('invalid topic inputs do not trigger upstream work',async()=>{
  const options={langs:new Set(['en']),permit:async()=>{throw Error('should not execute');}};
@@ -36,7 +36,7 @@ test('invalid topic inputs do not trigger upstream work',async()=>{
 let topicModule=0;
 const freshTopics=()=>import('../worker/topics.js?test='+topicModule++);
 const topicUrl=()=>new URL('https://wikiscroll.com/api/topics?topic=tech&lang=en&depth=3&batch=8');
-const topicKey=()=>new Request('https://wikiscroll.com/api/topics?v=5&topic=tech&lang=en&depth=3&batch=8');
+const topicKey=()=>new Request('https://wikiscroll.com/api/topics?v=6&topic=tech&lang=en&depth=3&batch=8');
 function edgeCache(){
  const entries=new Map();
  return {entries,async match(key){return entries.get(key.url)?.clone();},async put(key,response){entries.set(key.url,response.clone());}};
@@ -72,7 +72,7 @@ test('stale topic cards arrive immediately and remain available after an upstrea
    assert.equal(response.status,200);assert.equal(response.headers.get('X-Cache'),'STALE');
    const payload=await response.json();assert.equal(payload.stale,true);assert.equal(payload.articles[0].id,'w90');
    const again=await api.topicResponse(topicUrl(),{},jobs,settings);
-   assert.equal((await again.json()).articles[0].id,'w90');assert.equal(calls,6);
+   assert.equal((await again.json()).articles[0].id,'w90');assert.ok(calls<=3);
   }finally{finish(null);}
   await jobs.done();
   const retained=await (await cache.match(topicKey())).json();assert.equal(retained.articles[0].id,'w90');
@@ -106,7 +106,7 @@ test('failed category refresh reuses its last good list and retries the same con
   return fixture(address);
  };
  const first=await api.topicPages('tech','en',3,upstream);assert.equal(first.length,6);assert.equal(calls,6);
- now+=180_000;failed=true;
+ now+=900_001;failed=true;
  assert.deepEqual(await api.topicPages('tech','en',3,upstream),first);assert.equal(calls,12);
  assert.deepEqual(await api.topicPages('tech','en',3,upstream),first);assert.equal(calls,18);
  assert.ok(continuations.slice(6).every(value=>value==='next-page'));
@@ -120,7 +120,7 @@ test('uncached upstream failures are retryable and empty discovery is never cach
  const cache=edgeCache();
  await withTopics(cache,async(api,jobs)=>{
   const failure=await api.topicResponse(topicUrl(),{},jobs,options(async()=>null));
-  assert.equal(failure.status,503);assert.equal(failure.headers.get('Retry-After'),'30');assert.equal(cache.entries.size,0);
+  assert.equal(failure.status,503);assert.equal(failure.headers.get('Retry-After'),'5');assert.equal(cache.entries.size,0);
   const empty=await api.topicResponse(topicUrl(),{},jobs,options(async()=>({query:{categorymembers:[]}})));
   assert.equal(empty.status,200);assert.deepEqual((await empty.json()).articles,[]);assert.equal(cache.entries.size,0);
  });
@@ -168,4 +168,9 @@ test('translated topic branches are looked up once a day, not on every refill',a
  const lookups=requests.filter(u=>u.searchParams.has('lllang')).map(u=>u.searchParams.get('titles'));
  assert.ok(lookups.length<=12,'at most one lookup per branch: '+lookups.length);
  assert.equal(new Set(lookups).size,lookups.length,'no branch is translated twice');
+});
+
+test('a single qualified branch yields up to three distinct cards rather than dropping two',()=>{
+ const result=diverseDepth([page(1,'biology',1),page(2,'biology',1),page(3,'biology',1),page(4,'biology',1)],5);
+ assert.equal(result.length,3);assert.equal(new Set(result.map(p=>p.pageid)).size,3);
 });

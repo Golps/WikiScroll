@@ -1426,19 +1426,6 @@ body.how .err-btn {
   display: inline-flex;
 }
 
-.cat-tag:after {
-  content: "";
-  background: var(--w1);
-  opacity: .9;
-  border-radius: 50%;
-  width: 3px;
-  height: 3px;
-}
-
-.card.how .cat-tag:after {
-  background: var(--h2);
-}
-
 .kb-bar {
   z-index: 200;
   padding: 10px 20px max(10px,env(safe-area-inset-bottom));
@@ -3472,10 +3459,6 @@ button:disabled {
   font-size: 9px;
 }
 
-.cat-tag:after, .card.how .cat-tag:after {
-  background: var(--accent);
-}
-
 .panel > .art-title {
   font-family: var(--serif);
   font-variation-settings: "opsz" 72;
@@ -5159,20 +5142,20 @@ dialog.privacy-dialog::backdrop {
 
 .act:not(.cta):not(.deeper) > .atlas-icon {
   box-sizing: content-box;
-  border: 1px solid var(--rule);
-  width: 16px;
-  height: 16px;
+  border: 0;
+  width: 18px;
+  height: 18px;
   color: var(--accent);
-  border-radius: 50%;
-  padding: 5px;
+  border-radius: 0;
+  padding: 0;
 }
 
 .act.cta, .act.cta.hcta, body.light .act.cta, body.light .act.cta.hcta {
-  background: linear-gradient(125deg,var(--accent-solid),color-mix(in srgb,var(--accent-solid),#171d18 19%));
-  border-color: color-mix(in srgb,var(--accent-solid),#fff 12%);
+  background: var(--accent-solid);
+  border-color: var(--accent-solid);
   letter-spacing: .15px;
   font-weight: 600;
-  box-shadow: inset 0 1px #ffffff25, 0 3px 9px #00000012;
+  box-shadow: none;
 }
 
 .act.cta > .atlas-icon {
@@ -6735,7 +6718,7 @@ body .sp-about-logo, body.how .sp-about-logo, body.light .sp-about-logo {
   --ink: #edf0f5;
   --muted: #aab5c5;
   --accent: #94b8ff;
-  --serif: "Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+  --serif: Georgia,"Times New Roman",serif;
   --sans: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
 }
 
@@ -6872,23 +6855,23 @@ body.light, body.light.how {
 }
 
 .panel > .chip {
-  font: 600 11px/1.5 var(--sans);
-  text-transform: uppercase;
-  letter-spacing: .13em;
+  font: 500 12px/1.5 var(--sans);
+  text-transform: none;
+  letter-spacing: .02em;
   color: var(--accent);
   grid-area: 1 / 2;
   margin-bottom: 16px;
 }
 
 .panel > .art-title {
-  letter-spacing: -1.1px;
+  letter-spacing: -.025em;
   -webkit-line-clamp: 3;
   border: 0;
   grid-area: 2 / 2;
   margin-bottom: 20px;
   padding: 0;
   font-size: clamp(30px, 3.3vw, 48px);
-  font-weight: 500;
+  font-weight: 400;
   line-height: 1.12;
 }
 
@@ -6918,13 +6901,13 @@ body.light, body.light.how {
 .act, body.light .act, .act.cta, .act.hcta, body.light .act.cta, body.light .act.hcta {
   min-height: 50px;
   font: 600 14px/1.4 var(--sans);
-  border-radius: 13px;
+  border-radius: 10px;
   gap: 9px;
   padding: 12px 16px;
 }
 
 .act.cta, .act.hcta {
-  box-shadow: 0 3px 10px #0002;
+  box-shadow: none;
 }
 
 .act:hover {
@@ -7935,7 +7918,7 @@ button.hi{display:block;width:100%;font:inherit;color:inherit;text-align:start;c
 #likedList .li-btn[data-collect]{font-size:10px}
 #deleteCollBtn{min-height:44px;padding:10px 18px!important;border:1px solid color-mix(in srgb,#e87070,transparent 50%)!important;background:color-mix(in srgb,#e87070,transparent 94%)!important;border-radius:12px!important;font:500 13px/1.4 var(--sans);margin-top:12px}
 .collection-dialog{width:min(460px,calc(100vw - 32px));box-sizing:border-box;border-radius:18px;padding:26px;max-height:85dvh;overflow:auto}
-.collection-dialog h2{margin:0 0 14px;font:600 27px/1.25 var(--serif)}
+.collection-dialog h2{margin:0 0 14px;font:600 22px/1.3 var(--sans)}
 .collection-dialog p{margin:0 0 20px;color:var(--muted);line-height:1.5}
 .collection-dialog-actions{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:22px}
 .collection-dialog .collection-dialog-actions button{margin:0;width:100%;min-height:46px;padding:12px;border-radius:12px;font:600 13px/1.4 var(--sans)}
@@ -8200,14 +8183,14 @@ dialog.privacy-dialog[open]::backdrop, dialog.source-dialog[open]::backdrop {
    else. Panel titles share one size and weight; no UI text below 11px. */
 @media (min-width: 768px) {
   #settingsPanel .sp-hdr > span, #lp .lp-hdr > span, #hp .hp-hdr > span, #topicSheet #topicSheet .sheet-title, #topicSheet .sheet-title {
-    font: 400 36px/1.15 var(--serif); letter-spacing: -.5px;
+    font: 600 24px/1.25 var(--sans); letter-spacing: -.025em;
   }
 }
-body .mobile-settings-heading h2 { font: 400 36px/1.15 var(--serif); letter-spacing: -.5px; }
-#sourceDialog #sourceTitle { font: 400 30px/1.2 var(--serif); letter-spacing: -.3px; padding-right: 48px; }
+body .mobile-settings-heading h2 { font: 600 24px/1.25 var(--sans); letter-spacing: -.025em; }
+#sourceDialog #sourceTitle { font: 600 24px/1.25 var(--sans); letter-spacing: -.025em; padding-right: 48px; }
 #sourceDialog .source-eyebrow { font-size: 11px; }
 #sourceDialog h3 span { font-size: 11px; }
-#settingsPanel .sp-section-title, .sp-section-title { font-size: 11px; }
+#settingsPanel .sp-section-title, .sp-section-title { font: 600 12px/1.4 var(--sans); letter-spacing: .025em; text-transform: none; }
 .depth-steps .depth-step span { font-size: 11px; }
 .week-heatmap .week-day-lbl, .week-heatmap .week-day-cnt, .week-heatmap .week-day-today { font-size: 11px; }
 #likedList .li-src, .card .panel .chip { font-size: 11px; }

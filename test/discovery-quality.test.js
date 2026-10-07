@@ -56,7 +56,7 @@ function geocoder(responses) {
   const requests = [];
   const c = vm.createContext({URL, AbortSignal, console, encodeURIComponent,
     fetch: async url => { requests.push(new URL(url)); return Response.json(responses(new URL(url))); }});
-  vm.runInContext(savedKeys + slice('async function geocodePlace(', 'let mapLibraryPromise'), c);
+  vm.runInContext(savedKeys + slice('const coordinateCache=', 'let mapLibraryPromise'), c);
   return {geocodePlace: a => c.geocodePlace(a), requests};
 }
 test('the map pins Wikivoyage coordinates and keeps disambiguation in the fallback search', async () => {
@@ -163,4 +163,11 @@ test('cards show one maintenance tag, the most actionable need, linking to the a
   const voyage = vm.createContext({NEED_LABELS: c.NEED_LABELS, esc: String, isHow: true, a: {needs: ['citations'], url: 'x'}});
   vm.runInContext(render.replace(/const /g, 'globalThis.'), voyage);
   assert.equal(voyage.needHtml, '');
+});
+
+test('reopening a destination map reuses its verified coordinates and coalesces concurrent lookups',async()=>{
+ const g=geocoder(()=>({query:{pages:{77:{coordinates:[{lat:33.66,lon:-95.55}]}}}}));
+ const article={id:'v77',title:'Paris (Texas)',url:'https://en.wikivoyage.org/wiki/Paris_(Texas)'};
+ const [first,second]=await Promise.all([g.geocodePlace(article),g.geocodePlace(article)]);
+ assert.equal(first,second);await g.geocodePlace(article);assert.equal(g.requests.length,1);
 });

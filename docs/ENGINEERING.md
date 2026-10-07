@@ -135,9 +135,13 @@ if (!result) result = {articles: pending.snapshot(), cached_at: new Date().toISO
 
 Pages are added to the snapshot before their text arrives, and selection skips pages without an introduction, so a snapshot contains only complete cards.
 
-**Per-host cooldowns.** A `429` response, or a `503` with `Retry-After`, pauses that one host (for example `de.wikipedia.org`) for the requested time. `Retry-After` is read as seconds or as an HTTP date, with a minimum of 1 second and a default of 30. Calls during a cooldown return `null` immediately instead of adding to the load. The browser follows the same rule for its direct fallback calls, and applies a separate cooldown of 2 to 60 seconds to the Worker itself.
+**Per-host cooldowns.** A `429` response, or a `503` with `Retry-After`, pauses that one host (for example `de.wikipedia.org`) for the requested time. `Retry-After` is read as seconds or as an HTTP date, with a minimum of 1 second and a default of 30. Calls during a cooldown return `null` immediately instead of adding to the load. The browser follows the same rule for its direct fallback calls, and honors the full Worker Retry-After value, including HTTP dates, without bypassing it with direct fallback calls.
 
-**Fail-closed limits.** Three Cloudflare rate-limit bindings meter requests per IP (`REQUEST_LIMIT`), upstream work (`WORK_LIMIT`) and image rendering (`RENDER_LIMIT`). If a binding is missing or throws, `permit()` returns `false`.
+**Fail-closed limits.** Two Cloudflare rate-limit bindings meter requests per IP (`REQUEST_LIMIT`) and upstream calls per Wikimedia host (`WORK_LIMIT`, existing allowance of 600 per minute). If a binding is missing or throws, `permit()` returns `false`.
+
+**Combined invocation budget.** Fetches and Cache API operations count together. `runtime.js` stops at 48 total operations, with at most 44 upstream fetches, before Cloudflare Free's 50-operation ceiling. Shared calls run three at a time, and queued work expires within the invocation's 24-second deadline. The existing 600/minute allowance remains; this ceiling prevents rejected individual requests, rather than reducing card buffers. Category translations are batched, readership and introductions are reused across batches, and only selected candidates need text rendering.
+
+**Travel containment.** Destination IDs and Wikivoyage's `geocrumb-is-in` parent IDs establish geographic membership. The name/introduction fallback is used when ancestry is unavailable, but an unfinished lookup retains its cursor. Styles use vocabulary from the actual Wikivoyage edition. Identical cold searches coalesce, and successful map coordinates are cached on the client.
 
 ## 6. Stale responses after a change
 
@@ -170,14 +174,14 @@ Every asynchronous step records the generation it started in and checks it again
 A shared collection is a base64url snapshot in the link: a name and up to 30 article IDs. Before it's used, the Worker applies these checks:
 
 1. **Strict decoding.** At most 12,000 characters, a name of at most 80 characters, and 1 to 30 unique items. Each ID must match `^[wv][1-9]\d{0,11}$` and use a supported language. Any other properties are dropped.
-2. **Verification.** Each article is fetched again by page ID from its Wikimedia host, 4 at a time. Only articles in the main namespace are accepted, and images only from `upload.wikimedia.org` or `thumb.wikimedia.org`. If any article can't be verified, the page returns `503` instead of showing the text from the link.
-3. **Safe rendering.** All text is HTML-escaped. The collection page has a strict CSP (`default-src 'none'`, with images allowed only from Wikimedia). The preview image is SVG, rasterized in the Worker, and cached by a SHA-256 hash of the verified snapshot.
+2. **Verification.** Metadata is fetched in groups of five from each Wikimedia edition. Up to three upstream calls run concurrently; verified progress is cached for the selection. Only articles in the main namespace are accepted, and images only from `upload.wikimedia.org` or `thumb.wikimedia.org`. If any article can't be verified, the page returns `503` instead of showing the text from the link.
+3. **Safe rendering.** All text is HTML-escaped. The collection page has a strict CSP (`default-src 'none'`, with images allowed only from Wikimedia). The preview is a prebuilt branded PNG. Collection titles and descriptions are specific to the verified snapshot; rasterization never consumes live Worker CPU.
 
 Article links (`?a=w123&lang=es`) follow the same rules. Readers get the normal app. Link-preview bots such as Slack, Discord and WhatsApp get verified `noindex` metadata. Search crawlers get the canonical app, so article previews never compete with Wikipedia in search results.
 
 ## 9. Performance choices
 
-- **Loaded only when needed.** Leaflet (JS and CSS) loads from cdnjs the first time a map opens, with a 10-second timeout and a retry after failure. The PNG renderer (`resvg-wasm` and the font) is imported only for collection preview images.
+- **Loaded only when needed.** Leaflet (JS and CSS) loads from cdnjs the first time a map opens, with a 10-second timeout and a retry after failure. Collection PNG artwork is generated offline with `scripts/build-collection-preview.mjs`; the Worker serves the static asset, while collection metadata stays specific to the shared selection.
 - **Images.** The first card's photo loads eagerly with `fetchpriority="high"`; all others load lazily. A failed image falls back to a globe illustration instead of an empty box.
 - **Fewer requests.** The Wikivoyage fallback makes one request for 20 candidates. It replaced an earlier approach that made up to 80 requests per refill and triggered Wikimedia's per-IP limits.
 - **Memory over long sessions.** Removed cards give up their article data and their `ResizeObserver` subscriptions, so long reading sessions don't keep detached nodes around.

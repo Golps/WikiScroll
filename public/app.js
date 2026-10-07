@@ -479,15 +479,14 @@ function avgDailyViews(p, lag = new Set()) {
 function selectDepthPages(pages,depth,lang='en') {
   const lag=viewLag(pages),views=new Map(pages.map(p=>[p.pageid,avgDailyViews(p,lag)]));
   const known=pages.filter(p=>views.get(p.pageid)!==null);
-  // Missing pageviews cannot establish obscurity, but still provide a last-resort readable card.
-  if(!known.length)return shuffled(pages).slice(0,3);
+  if(!known.length)return [];
   const scale=VIEW_SCALE[lang]??1;
   const bounds=(depth===5?[0,2]:depth===4?[2,30]:depth===2?[100,300]:[depth===1?300:10,Infinity]).map(v=>v*scale);
   const eligible=shuffled(known.filter(p=>views.get(p.pageid)>=bounds[0]&&views.get(p.pageid)<=bounds[1]));
-  if(eligible.length>=5)return eligible.slice(0,20);
+  if(depth!==3||eligible.length>=5)return eligible.slice(0,20);
   const selected=new Set(eligible.map(p=>p.pageid));
-  const distance=p=>{const n=views.get(p.pageid);return n<bounds[0]?bounds[0]-n:Math.max(0,n-bounds[1]);};
-  const fallback=shuffled(known.filter(p=>!selected.has(p.pageid))).sort((a,b)=>distance(a)-distance(b)).slice(0,Math.min(3,5-eligible.length));
+  const distance=p=>{const n=views.get(p.pageid);return n<bounds[0]?Math.log1p(bounds[0])-Math.log1p(n):Math.log1p(n)-Math.log1p(bounds[1]);};
+  const fallback=shuffled(known.filter(p=>!selected.has(p.pageid)&&distance(p)<=Math.log(2))).sort((a,b)=>distance(a)-distance(b)).slice(0,Math.min(3,5-eligible.length));
   return shuffled([...eligible,...fallback]).slice(0,20);
 }
 async function fetchWikiRandom() {
@@ -591,7 +590,7 @@ async function fetchVoyage() {
 // Data reserve is deliberately much larger than the rendered window.
 const QUEUE_MIN = 60, QUEUE_TARGET = 100, CARDS_AHEAD = 16;
 let supplyTask = null, reserveTimer = null, pendingDeepGeneration = -1;
-let workerBatch = Math.floor(Math.random()*64), workerCooldownUntil = 0;
+let workerBatch = Math.floor(Math.random()*64), workerCooldownUntil = 0, pendingWorkerBatch = null;
 const supplyControllers = new Set(), feedSeen = new Set();
 const _imgCache = new Map();
 function preloadImg(url) {
@@ -602,7 +601,7 @@ function preloadImg(url) {
 }
 function preloadQueueImages() { queue.slice(0,24).forEach(a=>preloadImg(a.img)); }
 function feedContextKey() {
-  return ['topics-v4',curMode,curLang,curMode==='wiki'?depthLevel:3,curMode==='wiki'?[...curTopics,...(helpOnly()?['help']:[])].sort().join(','):'',curMode==='how'?JSON.stringify(travelFilters):''].join('|');
+  return ['topics-v5',curMode,curLang,curMode==='wiki'?depthLevel:3,curMode==='wiki'?[...curTopics,...(helpOnly()?['help']:[])].sort().join(','):'',curMode==='how'?JSON.stringify(travelFilters):''].join('|');
 }
 function validReserveArticle(a) {
   return a && /^[wv][1-9]\d{0,11}$/.test(a.id) && typeof a.title==='string' && typeof a.body==='string' && a.body.length>30 && /^https:\/\//.test(a.url||'') && (!a.img || /^https:\/\//.test(a.img));
@@ -655,6 +654,11 @@ function loadStarterLibrary(gen) {
     acceptSupply(items,gen);ensureFeedAhead();
   });
 }
+function retryAfterMillis(value){
+  if(value==null||value==='')return 5000;
+  const seconds=Number(value),date=Date.parse(value);
+  return Math.max(1000,Number.isFinite(seconds)?seconds*1000:Number.isFinite(date)?date-Date.now():5000);
+}
 async function fetchWorkerBatch(gen) {
   if(Date.now()<workerCooldownUntil)return [];
   const controller=new AbortController();supplyControllers.add(controller);
@@ -662,21 +666,28 @@ async function fetchWorkerBatch(gen) {
   const help=curMode==='wiki'&&helpOnly();
   const topical=subjects.length>0||help;
   const timer=setTimeout(()=>controller.abort(),topical?28000:7500);
-  const params=new URLSearchParams({mode:curMode,lang:curMode==='how'?voyageLang():curLang,n:'40',depth:String(curMode==='wiki'?depthLevel:3),batch:String(workerBatch++%64)});
-  // "Only these articles" alone samples maintenance lists; with topics it narrows them.
-  if(subjects.length){params.set('topic',subjects[(workerBatch-1)%subjects.length]);if(help)params.set('help','1');}
-  else if(help)params.set('topic','help');
+  const context=feedContextKey();
+  if(!pendingWorkerBatch||pendingWorkerBatch.context!==context){
+    const slot=workerBatch++%64;
+    const params=new URLSearchParams({mode:curMode,lang:curMode==='how'?voyageLang():curLang,n:'40',depth:String(curMode==='wiki'?depthLevel:3),batch:String(slot)});
+    if(subjects.length){params.set('topic',subjects[slot%subjects.length]);if(help)params.set('help','1');}
+    else if(help)params.set('topic','help');
+    pendingWorkerBatch={context,params};
+  }
+  const pending=pendingWorkerBatch,params=pending.params;
   try {
     const response=await fetch((topical?'/api/topics?':'/api/articles?')+params,{signal:controller.signal,cache:'no-store'});
     if(gen!==fillGeneration)return [];
     if(!response.ok){
       if(response.status===429||response.status===503){
-        const seconds=Number(response.headers.get('Retry-After'));
-        workerCooldownUntil=Date.now()+Math.min(60000,Math.max(2000,Number.isFinite(seconds)?seconds*1000:3000));
+        workerCooldownUntil=Date.now()+retryAfterMillis(response.headers.get('Retry-After'));
       }
+      else if(pendingWorkerBatch===pending)pendingWorkerBatch=null;
       return [];
     }
-    const data=await response.json();return Array.isArray(data.articles)?data.articles:[];
+    const data=await response.json();
+    if(pendingWorkerBatch===pending)pendingWorkerBatch=null;
+    return Array.isArray(data.articles)?data.articles:[];
   } catch {return [];} finally {clearTimeout(timer);supplyControllers.delete(controller);}
 }
 function fillQueue() {
@@ -699,7 +710,7 @@ function fillQueue() {
         // Filtered travel is served by WikiScroll's own /api/travel, so a pause
         // after Wikimedia rate-limited the browser's direct calls doesn't apply.
         const ownServer=curMode==='how'&&!useWorker;
-        if(!added&&(ownServer||budget.remaining>0&&Date.now()>=apiCooldownUntil))added=acceptSupply(await direct(),gen,!topical);
+        if(!added&&Date.now()>=workerCooldownUntil&&(ownServer||budget.remaining>0&&Date.now()>=apiCooldownUntil))added=acceptSupply(await direct(),gen,!topical);
         if(gen!==fillGeneration)return;
         // Render each successful batch immediately, not after a chain of API calls.
         ensureFeedAhead();
@@ -2082,7 +2093,16 @@ let mapRequest = 0;
 // Wikivoyage records each destination's own coordinates, so "Paris (Texas)"
 // is pinned in Texas. Free-text geocoding is only a fallback, and it keeps the
 // disambiguation ("Paris, Texas") instead of stripping it.
+const coordinateCache=new Map(),coordinatePending=new Map();
 async function geocodePlace(article) {
+  const key=typeof article==='string'?article:article.url+'|'+article.id;
+  const hit=coordinateCache.get(key);if(hit&&Date.now()-hit.at<86400000)return hit.value;
+  if(coordinatePending.has(key))return coordinatePending.get(key);
+  const task=lookupCoordinates(article);coordinatePending.set(key,task);
+  try{const value=await task;if(value){coordinateCache.delete(key);coordinateCache.set(key,{at:Date.now(),value});if(coordinateCache.size>200)coordinateCache.delete(coordinateCache.keys().next().value);}return value;}
+  finally{coordinatePending.delete(key);}
+}
+async function lookupCoordinates(article) {
   const title = typeof article === 'string' ? article : String(article?.title || '');
   try {
     const id = wireId(article?.id), host = new URL(article?.url || '').hostname;
@@ -2099,7 +2119,7 @@ async function geocodePlace(article) {
     const resp = await fetch(url,{signal:AbortSignal.timeout(8000)});
     if (!resp.ok) return null;
     const data = await resp.json();
-    if (data?.length) return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon), display: data[0].display_name };
+    if(data?.length){const lat=Number(data[0].lat),lng=Number(data[0].lon);if(Number.isFinite(lat)&&Number.isFinite(lng)&&Math.abs(lat)<=90&&Math.abs(lng)<=180)return {lat,lng,display:data[0].display_name};}
   } catch (e) { console.warn('Geocode failed:', e); }
   return null;
 }

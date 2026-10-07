@@ -215,6 +215,7 @@ test('filtered travel sends the place as typed, skips empty pages and keeps the 
   const requests = [];
   const pages = [{articles: [], next: 30}, {articles: [], next: 60}, {articles: [{id: 'v1'}, {id: 'v2'}], next: null, suggestion: 'Japan'}];
   const c = vm.createContext({
+    workerCooldownUntil:0,supplyControllers:new Set(),AbortController,Date,setTimeout:(fn,ms)=>ms===800?fn():1,clearTimeout(){},retryAfterMillis:()=>5000,
     fillGeneration: 1, travelFilters: {place: 'Japan, Tuscany', style: 'coast'}, travelOffset: 0, travelExhausted: false, travelSuggestion: '',
     articles: [{id: 'v2'}], queue: [], voyageLang: () => 'en', URLSearchParams, AbortSignal: {timeout: () => undefined},
     fetch: async url => { requests.push(new URL(url, 'https://wikiscroll.com').searchParams); return {ok: true, json: async () => pages.shift()}; },
@@ -234,8 +235,9 @@ test('an incomplete travel page is asked for again before the search moves on or
   // Last page: two guides' text was late twice, then everything arrives.
   const pages = [{articles: [{id: 'v1'}], next: null, retry: 0}, {articles: [{id: 'v1'}], next: null, retry: 0}, {articles: [{id: 'v1'}, {id: 'v2'}, {id: 'v3'}], next: null}];
   const c = vm.createContext({
+    workerCooldownUntil:0,supplyControllers:new Set(),AbortController,Date,setTimeout:(fn,ms)=>ms===800?fn():1,clearTimeout(){},retryAfterMillis:()=>5000,
     fillGeneration: 1, travelFilters: {place: 'Elba', style: ''}, travelOffset: 0, travelExhausted: false, travelSuggestion: '', travelRetries: 0,
-    articles: [], queue: [], voyageLang: () => 'en', URLSearchParams, AbortSignal: {timeout: () => undefined}, setTimeout: fn => fn(),
+    articles: [], queue: [], voyageLang: () => 'en', URLSearchParams, AbortSignal: {timeout: () => undefined},
     fetch: async url => { requests.push(new URL(url, 'https://wikiscroll.com').searchParams.get('offset')); return {ok: true, json: async () => pages.shift()}; },
   });
   vm.runInContext(slice(features, 'async function fetchFilteredTravel(', '// When a travel filter runs out'), c);
@@ -246,14 +248,14 @@ test('an incomplete travel page is asked for again before the search moves on or
   assert.deepEqual((await vm.runInContext('fetchFilteredTravel()', c)).map(a => a.id), ['v2', 'v3'], 'late guides arrive; shown ones are skipped');
   assert.deepEqual(requests, ['0', '0', '0']);
   assert.equal(c.travelExhausted, true, 'the end comes only after the page is complete');
-  // A page that stays incomplete is retried at most 3 times, then the search moves on.
-  const stuck = [1, 2, 3, 4].map(() => ({articles: [], next: 30, retry: 0}));
+  // A page that stays incomplete retains its cursor across bounded refills.
+  const stuck = [1, 2, 3, 4, 5, 6].map(() => ({articles: [], next: 30, retry: 0}));
   const c2 = vm.createContext({...c, travelOffset: 0, travelExhausted: false, travelRetries: 0, articles: [], fetch: async () => ({ok: true, json: async () => stuck.shift()})});
   vm.runInContext(slice(features, 'async function fetchFilteredTravel(', '// When a travel filter runs out'), c2);
   await vm.runInContext('fetchFilteredTravel()', c2);
   assert.equal(c2.travelOffset, 0, 'still retrying after three pages');
   await vm.runInContext('fetchFilteredTravel()', c2);
-  assert.equal(c2.travelOffset, 30); assert.equal(c2.travelRetries, 0);
+  assert.equal(c2.travelOffset, 0); assert.equal(c2.travelRetries, 6);
 });
 
 test('the end of a travel filter offers the closest next step first', () => {

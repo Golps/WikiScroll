@@ -45,6 +45,8 @@ export async function completeNeeds(lang, pages, query) {
     for (const page of chunk) {
       const found = new Set((data?.query?.pages?.[page.pageid]?.categories || []).map(c => categories[c.title]).filter(Boolean));
       page.needs = NEED_ORDER.filter(need => found.has(need));
+      if (!data?.query?.pages?.[page.pageid]) page.needsMissing = true;
+      else delete page.needsMissing;
     }
   }));
   return pages;

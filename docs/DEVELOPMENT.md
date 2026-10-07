@@ -95,7 +95,7 @@ With a token scoped to one Worker, Wrangler reports an error with code `10000` o
 ### 2. Adjust `wrangler.jsonc` for your copy
 
 - `name`: your Worker's name. `scripts/deploy.sh` looks for `Uploaded wikiscroll` in Wrangler's output, so update that too if you rename the Worker.
-- `ratelimits`: keep the three bindings (`REQUEST_LIMIT`, `WORK_LIMIT`, `RENDER_LIMIT`). The Worker refuses expensive work without them.
+- `ratelimits`: keep the two bindings (`REQUEST_LIMIT`, `WORK_LIMIT`). The Worker refuses expensive work without them.
 - `keep_vars: true` keeps variables set in the dashboard (such as `WEB_ANALYTICS_TOKEN`) across deploys.
 - The account ID is read from `CLOUDFLARE_ACCOUNT_ID`, so it isn't in this file.
 
@@ -177,7 +177,7 @@ WikiScroll was written for one deployment, at `wikiscroll.com`. Before deploying
 | **Domain in cache keys** | `worker/collections.js`, `worker/today.js`, `worker/verified.js`, `worker/vital.js` (the `https://wikiscroll.com/__…` keys). Use your own domain. |
 | **User-Agent** | `worker/index.js`, `worker/today.js`, `worker/verified.js`. Wikimedia asks for a descriptive `User-Agent` with contact information (a URL or an email address) that points to you, not to wikiscroll.com. |
 | **Page metadata** | `public/index.html` and `public/about/index.html` (title, canonical URL, Open Graph and structured data, contact address), `public/manifest.json`, `public/robots.txt`, `public/sitemap.xml`, `public/llms.txt` |
-| **Name and logo** | `branding/` sources, then `node scripts/build-branding.mjs`. The wordmark is also embedded in `worker/wordmark.js` for generated images. |
+| **Name and logo** | `branding/` sources, then `node scripts/build-branding.mjs`. Shared-collection artwork is generated offline with `node scripts/build-collection-preview.mjs`. |
 | **Worker name** | `name` in `wrangler.jsonc`, and the `Uploaded wikiscroll` check in `scripts/deploy.sh` |
 | **Map key** | Worker secret `CARTO_BASEMAP_KEY`: restrict it to your domain |
 | **Content Security Policy** | `PAGE_CSP` in `worker/security.js` and the `/*` block of `public/_headers`. Update both if you add a script, map-tile, analytics or API host. |

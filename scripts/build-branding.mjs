@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import {Resvg,initWasm} from '@resvg/resvg-wasm';
 await initWasm(fs.readFileSync(new URL('../node_modules/@resvg/resvg-wasm/index_bg.wasm',import.meta.url)));
-const font=fs.readFileSync(new URL('../worker/fonts/DMSerifDisplay-Regular.ttf',import.meta.url));
+const font=fs.readFileSync(new URL('../branding/fonts/DMSerifDisplay-Regular.ttf',import.meta.url));
 function png(svg,path,width){const r=new Resvg(svg,{font:{fontBuffers:[font],defaultFontFamily:'DM Serif Display',loadSystemFonts:false},...(width?{fitTo:{mode:'width',value:width}}:{})});fs.writeFileSync(path,r.render().asPng());r.free();}
 const geo=JSON.parse(fs.readFileSync('branding/land-detailed.geojson'));
 let lands='';for(const f of geo.features){const polys=f.geometry.type==='Polygon'?[f.geometry.coordinates]:f.geometry.coordinates;for(const p of polys){const pts=p[0].map(([lon,lat])=>{const a=(lon+20)*Math.PI/180,b=lat*Math.PI/180;return {x:Math.cos(b)*Math.sin(a)*155,y:-Math.sin(b)*155,front:Math.cos(b)*Math.cos(a)>0};});const visible=pts.filter(p=>p.front);if(visible.length>2)lands+='<path d="M'+visible.map(p=>p.x.toFixed(1)+','+p.y.toFixed(1)).join('L')+'Z"/>';}}

@@ -7,7 +7,7 @@ const env={REQUEST_LIMIT:allow,WORK_LIMIT:allow,RENDER_LIMIT:allow,ASSETS:{fetch
 const ctx={waitUntil:()=>{}};
 let moduleId=0;
 const freshWorker=async()=> (await import(`../worker/index.js?case=${moduleId++}`)).default;
-const page=(id,extra={})=>({ns:0,pageid:id,title:'Article '+id,extract:'A readable introduction with enough substance to make an interesting discovery card. '.repeat(2),thumbnail:{source:'https://upload.wikimedia.org/test.png'},...extra});
+const page=(id,extra={})=>({ns:0,pageid:id,title:'Article '+id,extract:'A readable introduction with enough substance to make an interesting discovery card. '.repeat(2),thumbnail:{source:'https://upload.wikimedia.org/test.png'},pageviews:{a:20,b:20},...extra});
 const data=pages=>Response.json({query:{pages:Object.fromEntries(pages.map(p=>[p.pageid,p]))}});
 const request=query=>new Request('https://wikiscroll.com/api/articles?'+query);
 function background(){const tasks=[];return {waitUntil:p=>tasks.push(p),done:()=>Promise.all(tasks)};}
@@ -88,7 +88,7 @@ test('overlapping requests share in-flight work; batch and depth have distinct c
   },cache);
 });
 test('stale edge supply is returned while a refresh runs in the background',async()=>{
-  const cache=edgeCache();const key=new Request('https://wikiscroll.com/api/articles?version=5&mode=wiki&lang=en&depth=3&batch=8');
+  const cache=edgeCache();const key=new Request('https://wikiscroll.com/api/articles?version=6&mode=wiki&lang=en&depth=3&batch=8');
   await cache.put(key,Response.json({articles:[{id:'w9',title:'Previously cached'}],cached_at:new Date(Date.now()-120000).toISOString()}));
   let finish;const slow=new Promise(resolve=>{finish=resolve;});
   await mocked(async()=>slow,async(api,jobs)=>{
@@ -109,10 +109,10 @@ test('edge cache failures do not block usable upstream articles',async()=>{
     await jobs.done();
   },broken);
 });
-test('depth prefers qualifying candidates without discarding the readable fallback',async()=>{
+test('Balanced rejects unrelated distant readership instead of filling with arbitrary cards',async()=>{
   await mocked(async()=>data([page(1,{pageviews:{a:1,b:1}}),page(2,{pageviews:{a:50,b:30}})]),async(api,jobs)=>{
     const response=await api.fetch(request('depth=3'),env,jobs);
-    assert.deepEqual((await response.json()).articles.map(a=>a.id),['w2','w1']);
+    assert.deepEqual((await response.json()).articles.map(a=>a.id),['w2']);
   });
 });
 test('depth selects distinct balanced, niche and obscure pools instead of sorting the same articles',async()=>{
@@ -133,13 +133,13 @@ test('depth selects distinct balanced, niche and obscure pools instead of sortin
     }
   });
 });
-test('missing metrics do not qualify as obscure; a sparse response has at most three nearby fallbacks',async()=>{
+test('Obscure refuses unknown readership and out-of-band cards even in a sparse response',async()=>{
   const candidates=[page(1,{pageviews:{a:0,b:2}}),page(2,{pageviews:{a:3}}),page(3,{pageviews:{a:4}}),page(4,{pageviews:{a:5}}),
-    page(5,{pageviews:{a:1000}}),page(6,{pageviews:{a:null,b:null}}),page(7),page(8,{pageviews:{a:-1}})];
+    page(5,{pageviews:{a:1000}}),page(6,{pageviews:{a:null,b:null}}),page(7,{pageviews:undefined}),page(8,{pageviews:{a:-1}})];
   await mocked(async()=>data(candidates),async(api,jobs)=>{
     const response=await api.fetch(request('n=40&depth=5'),env,jobs);
     const ids=(await response.json()).articles.map(a=>a.id);
-    assert.equal(ids[0],'w1');assert.deepEqual(new Set(ids),new Set(['w1','w2','w3','w4']));
+    assert.equal(ids[0],'w1');assert.deepEqual(new Set(ids),new Set(['w1']));
   });
 });
 test('depth shuffles eligible candidates and caps both the partial and completed cache at twenty',async()=>{
@@ -193,7 +193,7 @@ test('bot deep links get article-specific metadata',async()=>{
 });
 test('travel filters are relayed to Wikivoyage and preserve pagination without requiring photos',async()=>{
  let upstreamURL;
- await mocked(async url=>{upstreamURL=new URL(url);return Response.json({query:{pages:{7:page(7,{thumbnail:undefined,title:'Kyoto',extract:'Kyoto is a city in Japan, famous for its temples, gardens and old wooden streets.'})}},continue:{gsroffset:20}});},async worker=>{
+ await mocked(async url=>{if(new URL(url).searchParams.has('generator'))upstreamURL=new URL(url);return Response.json({query:{pages:{7:page(7,{thumbnail:undefined,title:'Kyoto',extract:'Kyoto is a city in Japan, famous for its temples, gardens and old wooden streets.'})}},continue:{gsroffset:20}});},async worker=>{
  const response=await worker.fetch(new Request('https://wikiscroll.com/api/travel?lang=en&place=Japan&style=culture'),env,ctx);
  assert.equal(response.status,200);const body=await response.json();assert.equal(body.articles[0].src,'how');assert.equal(body.articles[0].img,'');assert.equal(body.next,20);
  assert.equal(upstreamURL.hostname,'en.wikivoyage.org');assert.match(upstreamURL.searchParams.get('gsrsearch'),/Japan/);
@@ -208,7 +208,7 @@ test('travel filters reject invalid offsets and unknown styles before contacting
 test('pageviews are completed five at a time so depth sees every candidate, not only early-alphabet titles',async()=>{
   const views={a:40,b:40};const chunks=[];
   // Wikimedia reports views for the first five pages only; the rest must be completed.
-  const random=Array.from({length:20},(_,i)=>page(i+1,i<5?{pageviews:views}:{}));
+  const random=Array.from({length:20},(_,i)=>page(i+1,i<5?{pageviews:views}:{pageviews:undefined}));
   await mocked(async url=>{
     const p=new URL(url).searchParams;
     if(p.has('generator')){assert.match(p.get('prop'),/description/);return data(random);}
@@ -279,8 +279,8 @@ test('Wikivoyage candidates arrive without text, then introductions load in para
   assert.equal(chunks.length,4);assert.ok(chunks.every(n=>n===5));
 });
 test('depth bands follow each Wikipedia edition\'s readership',async()=>{
-  // 1.5 views a day is Niche on English Wikipedia but Balanced on Dutch (scale 0.1).
-  const candidates=[page(1,{pageviews:{a:1.5,b:1.5}}),...Array.from({length:6},(_,i)=>page(i+2,{pageviews:{a:0.05,b:0.05}}))];
+  // 2.5 views a day is Niche on English Wikipedia but Balanced on Dutch (scale 0.1).
+  const candidates=[page(1,{pageviews:{a:2.5,b:2.5}}),...Array.from({length:6},(_,i)=>page(i+2,{pageviews:{a:0.05,b:0.05}}))];
   await mocked(async url=>new URL(url).searchParams.has('generator')?data(candidates):data([]),async(api,jobs)=>{
     const nl=(await (await api.fetch(request('lang=nl&depth=3&n=40'),env,jobs)).json()).articles.map(a=>a.id);
     await jobs.done();
@@ -356,7 +356,7 @@ test('Popular answers with its complete cards when a slow introduction misses th
     t.mock.timers.tick(6200);await settle(60);await pending;
     assert.equal(response.status,200,'ready cards are not discarded as a 503');
     assert.equal((await response.json()).articles.length,5);
-    t.mock.timers.tick(2000);await settle(60);
+    for(let i=0;i<8;i++){t.mock.timers.tick(6000);await settle(60);}
   });
 });
 test('filtered travel answers within its budget, leaving out guides whose text is late',async t=>{
@@ -366,6 +366,7 @@ test('filtered travel answers within its budget, leaving out guides whose text i
   await mocked(async url=>{
     const p=new URL(url).searchParams;
     if(p.has('generator'))return later(3000,data(Array.from({length:10},(_,i)=>({pageid:i+1,title:'Town '+(i+1)}))));
+    if(p.has('titles'))return Response.json({query:{pages:{}}});
     const ids=p.get('pageids').split('|');
     return later(chunk++===0?500:5800,data(ids.map(id=>({pageid:Number(id),extract:'A harbour town in Norway with ferries to the islands and a busy fish market.'}))));
   },async(api,jobs)=>{
@@ -441,7 +442,7 @@ test('complete travel pages are shared from the edge cache; partial pages are no
   await mocked(async url=>{const p=new URL(url).searchParams;if(p.has('generator'))return Response.json({query:{pages:{8:page(8,{title:'Nara',extract:undefined})}}});return new Promise(()=>{});},async(worker,jobs)=>{
     const pending=worker.fetch(new Request('https://wikiscroll.com/api/travel?lang=en&place=Nara'),env,jobs);
     await settle();t.mock.timers.tick(8600);await settle();
-    const response=await pending;assert.equal(response.status,200);
+    const response=await pending;assert.equal(response.status,503);
     assert.equal(partial.entries.size,0,'a page missing introductions is never cached');
     t.mock.timers.tick(7000);await settle();
   },partial);
@@ -471,7 +472,7 @@ test('travel search keeps guides about the place, in relevance order, alternatin
     Tuscany:[page(21,{title:'Florence',index:1,extract:intro('Florence is the capital of Tuscany.')}),page(22,{title:'Siena',index:2,extract:intro('Siena is a hill town in Tuscany.')})],
   };
   await mocked(async url=>{
-    const p=new URL(url).searchParams,place=JSON.parse(p.get('gsrsearch'));searches.push([place,p.get('gsroffset'),p.get('gsrlimit')]);
+    const p=new URL(url).searchParams;if(!p.has('generator'))return Response.json({query:{pages:{}}});const place=JSON.parse(p.get('gsrsearch'));searches.push([place,p.get('gsroffset'),p.get('gsrlimit')]);
     return Response.json({query:{pages:Object.fromEntries(pages[place].map(x=>[x.pageid,x]))},...(place==='Japan'?{continue:{gsroffset:20}}:{})});
   },async worker=>{
     const body=await (await worker.fetch(new Request('https://wikiscroll.com/api/travel?lang=en&place='+encodeURIComponent('Japan, Tuscany')),env,ctx)).json();
@@ -487,7 +488,7 @@ test('a misspelled place that finds nothing comes back with a suggestion',async(
   await mocked(async url=>{
     const p=new URL(url).searchParams;
     if(p.get('list')==='search'){assert.equal(p.get('srsearch'),'Japn');return Response.json({query:{searchinfo:{totalhits:0,suggestion:'japan'},search:[]}});}
-    return Response.json({batchcomplete:''});
+    return Response.json({query:{pages:{}}});
   },async worker=>{
     const body=await (await worker.fetch(new Request('https://wikiscroll.com/api/travel?lang=en&place=Japn'),env,ctx)).json();
     assert.deepEqual(body,{articles:[],next:null,suggestion:'Japan'});
@@ -501,7 +502,7 @@ test('a travel guide without an introduction is found through its opening text',
     if(p.get('generator')==='search')return Response.json({query:{pages:{2577:{pageid:2577,ns:0,title:'Japón',index:1},3001:{pageid:3001,ns:0,title:'Tokio',index:2}}}});
     if(p.get('prop')==='extracts'&&p.get('exintro'))return Response.json({query:{pages:{2577:{pageid:2577,extract:''},3001:{pageid:3001,extract:'Tokio es la capital de Japón y una de las ciudades más grandes del mundo, con barrios muy distintos.'}}}});
     if(p.get('prop')==='extracts'){asked.push(p.get('pageids'));assert.equal(p.get('exsectionformat'),'wiki');return Response.json({query:{pages:{2577:{pageid:2577,extract:opening}}}});}
-    return Response.json({batchcomplete:''});
+    return Response.json({query:{pages:{}}});
   },async worker=>{
     const response=await worker.fetch(new Request('https://wikiscroll.com/api/travel?lang=es&place='+encodeURIComponent('Japón')),env,ctx);
     const body=await response.json();
@@ -509,7 +510,7 @@ test('a travel guide without an introduction is found through its opening text',
     assert.match(body.articles[0].body,/^Japón está formado por cuatro islas/);
     assert.deepEqual(asked,['2577'],'only the guide without an introduction reads its full text');
   },cache);
-  assert.ok([...cache.entries.keys()].some(k=>k.includes('/api/travel?v=8')),'a complete page is cached');
+  assert.ok([...cache.entries.keys()].some(k=>k.includes('/api/travel?v=9')),'a complete page is cached');
 });
 test('random and searched Wikivoyage feeds leave out phrasebooks in any language',async()=>{
   const seen=[];
@@ -534,7 +535,7 @@ test('a travel page whose guides arrived late keeps its place for a retry and is
       return Response.json({query:{pages:place==='Elba'?{1:{pageid:1,ns:0,title:'Portoferraio',index:1},2:{pageid:2,ns:0,title:'Marciana',index:2}}:{3:{pageid:3,ns:0,title:'Capraia',index:1,extract:'Capraia is a small island near Elba with a harbour and quiet walks.'}}},continue:{gsroffset:30}});}
     if(p.get('prop')==='extracts'){if(fail&&p.get('pageids').includes('2'))return new Response('busy',{status:500});
       return Response.json({query:{pages:Object.fromEntries(p.get('pageids').split('|').map(id=>[id,{pageid:+id,extract:intro(id==='1'?'Portoferraio':'Marciana')}]))}});}
-    return Response.json({batchcomplete:''});
+    return Response.json({query:{pages:{}}});
   },async worker=>{
     const first=await (await worker.fetch(new Request('https://wikiscroll.com/api/travel?lang=en&place='+encodeURIComponent('Elba, Capraia')),env,ctx)).json();
     assert.equal(first.next,'30.30');
@@ -559,7 +560,7 @@ test('a travel answer stays within the Workers Free subrequest limit, and retrie
       return Response.json({query:{pages:Object.fromEntries(Array.from({length:Number(p.get('gsrlimit'))},(_,i)=>[base+i+1,{pageid:base+i+1,ns:0,title:place+' '+i,index:i}]))}});}
     if(p.get('prop')==='extracts'&&p.get('exintro'))return Response.json({query:{pages:Object.fromEntries(p.get('pageids').split('|').map(id=>[id,{pageid:+id,extract:''}]))}});
     if(p.get('prop')==='extracts'){const id=p.get('pageids');reads.push(id);const place=places[Math.floor((+id-1)/100)];return Response.json({query:{pages:{[id]:{pageid:+id,extract:opening(place)}}}});}
-    return Response.json({batchcomplete:''});
+    return Response.json({query:{pages:{}}});
   },async worker=>{
     const before=calls;
     const body=await (await worker.fetch(new Request('https://wikiscroll.com/api/travel?lang=es&place='+encodeURIComponent(places.join(', '))),env,ctx)).json();

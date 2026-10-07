@@ -37,3 +37,15 @@ test('existing storage keys and native Safari privacy mechanism remain',()=>{
   assert.match(source,/closeBurger\(\); setTimeout\(openPrivacy, 350\)/);
   assert.match(source,/closeSettings\(\); setTimeout\(openPrivacy, 100\)/);
 });
+
+test('Worker retries retain the same batch and honor a 180-second cooldown before any fallback',async()=>{
+ const start=source.indexOf('function retryAfterMillis('),end=source.indexOf('function fillQueue(',start);
+ let now=100000,calls=0;const urls=[];
+ const c=vm.createContext({URLSearchParams,AbortController,Date:{now:()=>now,parse:Date.parse},setTimeout:()=>1,clearTimeout(){},fetch:async url=>{urls.push(url);return ++calls===1?new Response(null,{status:503,headers:{'Retry-After':'180'}}):Response.json({articles:[{id:'w1'}]});}});
+ vm.runInContext(`let curMode='wiki',curLang='en',depthLevel=5,workerBatch=7,workerCooldownUntil=0,pendingWorkerBatch=null,fillGeneration=0;const supplyControllers=new Set(),curTopics=new Set();const helpOnly=()=>false,feedContextKey=()=>curLang+'|'+depthLevel;${source.slice(start,end)}`,c);
+ await c.fetchWorkerBatch(0);assert.equal(c.retryAfterMillis('180'),180000);
+ await c.fetchWorkerBatch(0);assert.equal(calls,1);
+ now+=180001;assert.equal((await c.fetchWorkerBatch(0))[0].id,'w1');assert.equal(urls[0],urls[1]);
+ await c.fetchWorkerBatch(0);assert.notEqual(urls[1],urls[2]);
+ assert.ok(c.retryAfterMillis(new Date(now+60000).toUTCString())>59000);
+});

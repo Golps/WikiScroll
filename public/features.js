@@ -27,14 +27,21 @@ async function fetchFilteredTravel(){
  const params=()=>new URLSearchParams({lang,place:String(travelFilters.place||'').trim().slice(0,80),style:travelFilters.style||'',offset:String(travelOffset)});
  // A page of results can hold no guides about the place while later pages do,
  // so look a little further before leaving it to the next refill.
- for(let page=0;page<3&&!travelExhausted;page++){
-  let data;try{const response=await fetch('/api/travel?'+params(),{signal:AbortSignal.timeout(10000)});if(!response.ok)return [];data=await response.json();}catch{return [];}
+ for(let page=0;page<3&&!travelExhausted&&generation===fillGeneration;page++){
+  if(Date.now()<workerCooldownUntil)return [];
+  const controller=new AbortController();supplyControllers.add(controller);
+  const timer=setTimeout(()=>controller.abort(),10000);
+  let data;try{const response=await fetch('/api/travel?'+params(),{signal:controller.signal,cache:'no-store'});
+   if(generation!==fillGeneration)return [];
+   if(!response.ok){if(response.status===429||response.status===503)workerCooldownUntil=Date.now()+retryAfterMillis(response.headers.get('Retry-After'));return [];}
+   data=await response.json();
+  }catch{return [];}finally{clearTimeout(timer);supplyControllers.delete(controller);}
   if(generation!==fillGeneration||!data)return [];
   // An incomplete page (some guides' text was late, or more guides need their
   // opening text than one answer may read: 8, worker/extracts.js) is asked for
-  // again, at most 3 times (up to 32 such guides), before the search moves on;
-  // the end card waits until then.
-  if(data.retry!=null&&travelRetries<3){travelRetries++;travelOffset=data.retry;}
+  // again until complete; transient failures never skip the rest of a page.
+  // Each refill has a small request ceiling, and the end card waits until then.
+  if(data.retry!=null){travelRetries++;travelOffset=data.retry;}
   else{travelRetries=0;travelOffset=data.next??travelOffset;travelExhausted=data.next===null;}
   if(typeof data.suggestion==='string')travelSuggestion=data.suggestion;
   const seen=new Set(articles.map(a=>a.id).concat(queue.map(a=>a.id)));
@@ -90,7 +97,7 @@ function changeFeedThenClose(change){
  requestAnimationFrame(()=>requestAnimationFrame(()=>{closeAllPanels();closeBurger();}));
 }
 function installTravelFilters(){
- const markup='<h3>Wikivoyage · Travel filters</h3><p>Choose a destination and trip style.</p><div class="travel-place"><div class="travel-place-head"><label for="travelPlace-N">Country or region</label><button type="button" class="travel-info" aria-expanded="false" aria-controls="travelHelp-N" aria-label="How place search works" title="How place search works">i</button></div><div class="travel-help" id="travelHelp-N" hidden><p>Type a country, region or city, like Japan or Tuscany.</p><p>To search several places at once, separate them with commas: Japan, Tuscany. Guides from each place take turns in your feed.</p><p>A guide is included when its name or introduction mentions the place.</p><p>When you\'ve seen every matching guide, the feed tells you and lets you widen the search.</p></div><input id="travelPlace-N" name="place" maxlength="80" placeholder="e.g. Japan, Tuscany"></div><label>Trip style<select name="style"><option value="">Any style</option><option value="nature">Nature & hiking</option><option value="coast">Coasts & islands</option><option value="culture">History & culture</option><option value="city">City breaks</option></select></label><div class="feature-buttons"><button class="feature-action" type="submit">Explore destinations</button><button type="button" class="travel-clear">Clear filters</button></div>';
+ const markup='<h3>Wikivoyage · Travel filters</h3><p>Choose a destination and trip style.</p><div class="travel-place"><div class="travel-place-head"><label for="travelPlace-N">Country or region</label><button type="button" class="travel-info" aria-expanded="false" aria-controls="travelHelp-N" aria-label="How place search works" title="How place search works">i</button></div><div class="travel-help" id="travelHelp-N" hidden><p>Type a country, region or city, like Japan or Tuscany.</p><p>To search several places at once, separate them with commas: Japan, Tuscany. Guides from each place take turns in your feed.</p><p>Guides are matched using Wikivoyage’s geographic hierarchy, with their name and introduction as a fallback.</p><p>When you\'ve seen every matching guide, the feed tells you and lets you widen the search.</p></div><input id="travelPlace-N" name="place" maxlength="80" placeholder="e.g. Japan, Tuscany"></div><label>Trip style<select name="style"><option value="">Any style</option><option value="nature">Nature & hiking</option><option value="coast">Coasts & islands</option><option value="culture">History & culture</option><option value="city">City breaks</option></select></label><div class="feature-buttons"><button class="feature-action" type="submit">Explore destinations</button><button type="button" class="travel-clear">Clear filters</button></div>';
  [document.querySelector('#settingsPanel'),document.querySelector('.burger-inner')].forEach((parent,index)=>{
  const form=document.createElement('form');form.className='travel-filters';form.innerHTML=markup.replaceAll('-N','-'+index);parent.querySelector('.platform-stats').after(form);
  // The ⓘ button shows how place search works, including several places.

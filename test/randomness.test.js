@@ -73,7 +73,8 @@ test('backend discovery requests do not contain likes or previous-card informati
     fetch:async url=>{requests.push(new URL(url,'https://wikiscroll.com'));return Response.json({articles:[]});},
   });
   vm.runInContext(`
-    let curMode='wiki',curLang='en',depthLevel=4,workerBatch=3,workerCooldownUntil=0,fillGeneration=0;
+    function feedContextKey(){return curMode+'|'+curLang+'|'+depthLevel+'|'+[...curTopics];}
+    let curMode='wiki',curLang='en',depthLevel=4,workerBatch=3,workerCooldownUntil=0,pendingWorkerBatch=null,fillGeneration=0;
     const supplyControllers=new Set(),curTopics=new Set();
     const helpOnly=()=>false;
     let liked=new Map(),articles=[{id:'w48895',title:'Tom Cruise'}],queue=[];

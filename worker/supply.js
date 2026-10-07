@@ -1,0 +1,38 @@
+import {averageViews} from './pageviews.js';
+const MAX_PAGES = 3000, METRICS_MS = 6 * 3600000, TEXT_MS = 24 * 3600000;
+// Small reusable source records, independent of batch, depth, likes and history.
+// Failed metrics/tags never overwrite known successful data.
+export function createSupply() {
+  const records = new Map(), hydrated = new WeakMap();
+  const key = (lang, mode, id) => lang + '|' + mode + '|' + id;
+  return {
+    hydrate(pages, lang, mode = 'wiki') {
+      const now = Date.now();
+      for (const p of pages) {
+        const r = records.get(key(lang, mode, p.pageid)); if (!r) continue;
+        const flags = {}; hydrated.set(p, flags);
+        if (now - r.viewsAt < METRICS_MS && averageViews(p) === null) { p.pageviews = r.pageviews; flags.views = true; }
+        if (now - r.textAt < TEXT_MS && typeof p.extract !== 'string') { p.extract = r.extract; delete p.extractMissing; flags.text = true; }
+        if (now - r.needsAt < 3600000 && !Array.isArray(p.needs)) { p.needs = r.needs; flags.needs = true; }
+      }
+      return pages;
+    },
+    remember(pages, lang, mode = 'wiki') {
+      const now = Date.now();
+      for (const p of pages) {
+        if (!Number.isSafeInteger(p.pageid) || p.pageid < 1) continue;
+        const id = key(lang, mode, p.pageid), r = records.get(id) || {}, flags = hydrated.get(p) || {};
+        if (!flags.views && averageViews(p) !== null) { r.pageviews = p.pageviews; r.viewsAt = now; }
+        if (!flags.text && typeof p.extract === 'string' && !p.extractMissing) { r.extract = p.extract; r.textAt = now; }
+        if (!flags.needs && Array.isArray(p.needs) && !p.needsMissing) { r.needs = p.needs; r.needsAt = now; }
+        if (r.viewsAt === undefined && r.textAt === undefined && r.needsAt === undefined) continue;
+        records.delete(id); records.set(id, r);
+        if (records.size > MAX_PAGES) records.delete(records.keys().next().value);
+      }
+    }
+  };
+}
+export function imageURL(source) {
+  if (!/^https:\/\/(?:upload|thumb)\.wikimedia\.org\//.test(source || '')) return '';
+  return source.replace(/\/((?:lang[a-z-]+-)?)\d+px-([^/?]+)(\?[^/]*)?$/, '/$1960px-$2$3');
+}

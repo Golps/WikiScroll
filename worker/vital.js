@@ -46,10 +46,10 @@ async function build(level, upstream) {
 
 // Cached lists: memory, then the edge cache, then a rebuild. A partial or
 // failed rebuild is never cached.
-export async function vitalTitles(level, upstream, ctx, {wait = true} = {}) {
+export async function vitalTitles(level, upstream, ctx, {wait = true,cache = globalThis.caches?.default} = {}) {
   const now = Date.now(), held = memory.get(level);
   if (held && now - held.time < RETAIN_SECONDS * 1000) return held.titles;
-  const key = new Request(`https://wikiscroll.com/__vital/v1/level-${level}`), cache = globalThis.caches?.default;
+  const key = new Request(`https://wikiscroll.com/__vital/v1/level-${level}`);
   try {
     const hit = await cache?.match(key);
     if (hit) {
@@ -75,17 +75,17 @@ export async function vitalTitles(level, upstream, ctx, {wait = true} = {}) {
 
 // `info.borrowed` is set when Known had to answer from Level 3; callers must
 // not cache that answer, or other readers keep receiving Popular as Known.
-export async function vitalArticles(lang, depth, upstream, ctx, toArticle, info = {}) {
-  const level3 = await vitalTitles(3, upstream, ctx);
+export async function vitalArticles(lang, depth, upstream, ctx, toArticle, info = {}, work = null) {
+  const level3 = await vitalTitles(3, upstream, ctx, {cache: work ? work.cache : globalThis.caches?.default});
   if (!level3?.length) return [];
   // Warm Known's larger list on any depth 1-2 request, so it is usually ready
   // before a reader moves from Popular to Known.
-  if (depth === 1) vitalTitles(4, upstream, ctx, {wait: false});
+  if (depth === 1) vitalTitles(4, upstream, ctx, {wait: false, cache: work ? work.cache : globalThis.caches?.default});
   let pool = level3;
   if (depth === 2) {
     // Level 4 takes a few seconds to assemble; until it is cached, Known
     // borrows from Level 3 rather than keeping the reader waiting.
-    const level4 = await vitalTitles(4, upstream, ctx, {wait: false});
+    const level4 = await vitalTitles(4, upstream, ctx, {wait: false, cache: work ? work.cache : globalThis.caches?.default});
     if (level4?.length) { const essential = new Set(level3); pool = level4.filter(t => !essential.has(t)); }
     else info.borrowed = true;
   }
@@ -95,7 +95,7 @@ export async function vitalArticles(lang, depth, upstream, ctx, toArticle, info 
     titles = Object.values(data?.query?.pages || {}).map(p => p.langlinks?.[0]?.['*']).filter(Boolean);
     if (!titles.length) return [];
   }
-  const data = await upstream(api(lang, {titles: titles.join('|'), redirects: '1', prop: 'pageimages|info|description', piprop: 'thumbnail', pithumbsize: '800', pilimit: 'max', inprop: 'url'}));
+  const data = await upstream(api(lang, {titles: titles.join('|'), redirects: '1', prop: 'pageimages|info|description', piprop: 'thumbnail', pithumbsize: '960', pilimit: 'max', inprop: 'url'}));
   const pages = shuffle(Object.values(data?.query?.pages || {}).filter(p => Number.isSafeInteger(p.pageid) && p.pageid > 0 && p.ns === 0 && p.thumbnail?.source));
   // Cards whose introduction has already arrived. If the answer budget runs
   // out while a slower chunk is pending, the caller answers with these.

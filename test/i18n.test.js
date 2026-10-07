@@ -53,7 +53,7 @@ test('messages shown after an action are translated in every language, including
   "That's every matching guide","You've seen every guide that matches your travel filters.",'No matching guides','Nothing on Wikivoyage matches your travel filters.',
   'Try any trip style','Explore all destinations','Change filters','How place search works','Type a country, region or city, like Japan or Tuscany.',
   'To search several places at once, separate them with commas: Japan, Tuscany. Guides from each place take turns in your feed.',
-  'A guide is included when its name or introduction mentions the place.',"When you've seen every matching guide, the feed tells you and lets you widen the search.",'🌍 Travel','View map','📖 Just now','Enter a collection name','Read on Wikivoyage ↗',
+  'Guides are matched using Wikivoyage’s geographic hierarchy, with their name and introduction as a fallback.',"When you've seen every matching guide, the feed tells you and lets you widen the search.",'🌍 Travel','View map','📖 Just now','Enter a collection name','Read on Wikivoyage ↗',
   "📡 You're offline. Cached articles still work",'A collection with this name already exists'];
  for(const lang of langs)for(const message of messages)assert.notEqual(api.translate(message,lang),message,lang+': '+message);
  const name='Sea $& life <b>';

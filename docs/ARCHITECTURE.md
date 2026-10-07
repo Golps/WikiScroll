@@ -7,7 +7,7 @@ This page describes how WikiScroll is organized: where things live and which rul
 WikiScroll has two parts, deployed together as a single Cloudflare Worker with static assets:
 
 1. **A static front end** (`public/`). Plain HTML, CSS and JavaScript, served as-is. There is no framework, bundler or compile step. The browser holds all user data (saved articles, collections, history, settings) in `localStorage`, with IndexedDB as a second copy of saved articles.
-2. **A Worker** (`worker/`). It answers a few JSON endpoints that turn Wikimedia's APIs into ready-to-read cards. It also renders previews for shared links and collections. It has no database: its only state is Cloudflare's edge cache, in-memory maps for coalescing requests, and rate-limit bindings.
+2. **A Worker** (`worker/`). It answers a few JSON endpoints that turn Wikimedia's APIs into ready-to-read cards. It verifies metadata for shared links and collections, and serves prebuilt preview artwork. It has no database: its only state is Cloudflare's edge cache, in-memory maps for coalescing requests, and rate-limit bindings.
 
 ```mermaid
 sequenceDiagram
@@ -58,13 +58,13 @@ The browser asks the Worker for batches and keeps a reserve queued ahead of the 
 | `extracts.js` | Fetches introductions separately, in parallel chunks of 5. |
 | `needs.js` | Help Wikipedia: finds maintenance needs through hidden tracking categories, and samples articles that need work. |
 | `today.js` | `/api/today`: parses Wikipedia's "On this day" feed into exact page-ID matches and occasional surprise cards. |
-| `collections.js` | Decodes and validates shared collections, and renders the collection page and its SVG preview. |
+| `collections.js` | Decodes and validates shared collections, renders the verified collection page, and serves prebuilt PNG preview artwork. |
 | `verified.js` | Fetches article metadata again from Wikimedia by page ID, for shared links and collections. |
-| `collection-image.js` | Converts the collection SVG to PNG with `resvg-wasm` and the bundled font. It loads only when needed. |
+| `runtime.js` | One invocation budget for fetch and cache operations, a shared upstream scheduler, deadlines and cooldowns. |
+| `supply.js` | Bounded reusable source records for readership, introductions and maintenance tags, isolated by edition/source. |
 | `security.js` | Rate-limit checks that fail closed, the `429` response, security headers on every response, and the page's Content Security Policy (`PAGE_CSP`). |
 | `languages.js` | The 15 supported languages, shared by the router and shared collections. |
 | `travel.js` | Travel search rules: reading one or more places, matching guides to a place, alternating between places, and the per-place pagination cursor. |
-| `wordmark.js` | The logo as SVG path data, for generated images. |
 
 ### Everything else
 
@@ -109,6 +109,6 @@ These rules hold across the codebase, and many are enforced by tests. Changes sh
 ## Cross-cutting concerns
 
 - **Caching layers:** browser (queued cards in memory, saved reserves in `localStorage`, service-worker cache), then Worker (in-flight request maps, per-isolate memory for the vital-article lists), then the Cloudflare edge cache (article batches and topic batches for 24 hours, complete travel search pages for 1 hour, vital-article lists for 7 days, "On this day" data for 6 hours, verified metadata for 24 hours).
-- **Cache versioning:** cache keys include a version (`version=5` for articles, `v=5` for topics). Front-end assets use `?v=` query strings that must match the `SHELL` list and the `CACHE` name in `sw.js`.
+- **Cache versioning:** cache keys include a version (`version=6` for articles, `v=6` for topics). Front-end assets use `?v=` query strings that must match the `SHELL` list and the `CACHE` name in `sw.js`.
 - **Security headers:** `secure()` in `worker/security.js` adds `nosniff`, `DENY` framing, a strict referrer policy, a permissions policy and HSTS to every response, and the app's Content Security Policy (`PAGE_CSP`) to its pages. `public/_headers` sends the same policy for files served without the Worker. Generated pages (link previews, collection pages) set their own stricter CSP.
 - **Localization:** interface strings are translated by text match in `i18n.js`, with templates for messages that contain a collection name or a count (`Added to "{name}"`). New labels need entries in every `translations/<lang>.js`; `test/i18n.test.js` checks the core controls and every toast message.

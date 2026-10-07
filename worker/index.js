@@ -1,4 +1,7 @@
 import {permit,limited,secure} from './security.js';
+import {createWork,createNetwork,unavailable} from './runtime.js';
+import {createSupply,imageURL} from './supply.js';
+export {retryDelay} from './runtime.js';
 import {topicResponse} from './topics.js';
 import {verifiedArticle} from './verified.js';
 import { collectionResponse } from './collections.js';
@@ -9,7 +12,7 @@ import {completeNeeds,HELP_LANGS} from './needs.js';
 import {todayResponse} from './today.js';
 import {LANGS} from './languages.js';
 import {wantsMarkdown,htmlToMarkdown,markdownResponse} from './markdown.js';
-import {parsePlaces,parseCursor,formatCursor,namesPlace,interleave,fold,isPhrasebook,phrasebookParams,isDisambiguation} from './travel.js';
+import {parsePlaces,parseCursor,formatCursor,namesPlace,interleave,fold,isPhrasebook,phrasebookParams,isDisambiguation,TRAVEL_STYLES,travelTerms,createPlaceResolver} from './travel.js';
 /** WikiScroll Worker: explicit routing, static assets and article unfurls.
  * Handles article requests and social previews.
  * No GitHub integration, Pages runtime, KV or framework is required.
@@ -26,7 +29,7 @@ const BAD_TITLE = /^(list of|index of|wikipedia:|template:|category:|portal:|dra
 // replaying one cached random selection for every refill in the same session.
 const FRESH_MS = 60_000;
 const RETAIN_SECONDS = 86_400;
-const UPSTREAM_TIMEOUT_MS = 6_000;
+const network = createNetwork(), supply = createSupply();
 // One answer budget per request. A request can chain several upstream calls,
 // each with its own 6 s deadline, but the browser stops waiting at 7.5 s
 // (10 s for filtered travel). Answer with what is ready and let the rest of
@@ -34,41 +37,14 @@ const UPSTREAM_TIMEOUT_MS = 6_000;
 const RESPONSE_BUDGET_MS = 6_500;
 const TRAVEL_BUDGET_MS = 8_500;
 const within = (promise, ms) => { let timer; return Promise.race([promise, new Promise(resolve => { timer = setTimeout(() => resolve(null), ms); })]).finally(() => clearTimeout(timer)); };
-const cooldowns = new Map();
-const inFlight = new Map();
+
+const inFlight = new Map(), travelPending = new Map(), placesResolver = createPlaceResolver();
 const escape = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const strip = s => String(s ?? '').replace(/<[^>]*>/g,'').replace(/\s+/g,' ').trim();
 // The API serves WikiScroll's own pages, which call it from the same origin, so
 // it sends no CORS headers: other sites cannot spend its Wikimedia budget from
 // their visitors' browsers.
 const json = (body,status=200,headers={}) => Response.json(body,{status,headers:{'Cache-Control':'no-store',...headers}});
-
-export function retryDelay(value, now=Date.now()) {
-  if (/^\d+(\.\d+)?$/.test(value || '')) return Math.max(1000,Number(value)*1000);
-  const date=Date.parse(value);
-  return Number.isFinite(date) ? Math.max(1000,date-now) : 30000;
-}
-
-async function upstream(url) {
-  const host=new URL(url).hostname;
-  if (Date.now()<(cooldowns.get(host)||0)) return null;
-  // One wall-clock deadline includes response headers AND parsing the body.
-  // Promise.race also bounds this path if an upstream ignores cancellation.
-  const controller=new AbortController();
-  let timer;
-  const timeout=new Promise(resolve=>{timer=setTimeout(()=>{controller.abort();resolve(null);},UPSTREAM_TIMEOUT_MS);});
-  try {
-    return await Promise.race([timeout,(async()=>{
-      const response=await fetch(url,{headers:{'User-Agent':'WikiScroll/4.0 (https://wikiscroll.com; contact@wikiscroll.com)'},signal:controller.signal});
-      if(response.status===429||(response.status===503&&response.headers.has('Retry-After'))){
-        cooldowns.set(host,Date.now()+retryDelay(response.headers.get('Retry-After')));
-        return null;
-      }
-      return response.ok ? await response.json() : null;
-    })()]);
-  } catch { return null; }
-  finally { clearTimeout(timer); }
-}
 
 function apiURL(lang,mode,params) {
   return `https://${lang}.${mode==='how'?'wikivoyage':'wikipedia'}.org/w/api.php?`+new URLSearchParams({action:'query',format:'json',...params});
@@ -77,7 +53,7 @@ function apiURL(lang,mode,params) {
 function article(p,lang,mode) {
   // The short description ("species of beetle") labels the card's category.
   const desc=typeof p.description==='string'?strip(p.description).slice(0,160):'';
-  return {id:(mode==='how'?'v':'w')+p.pageid,src:mode,title:p.title,body:strip(p.extract),img:p.thumbnail?.source||'',url:p.fullurl||`https://${lang}.${mode==='how'?'wikivoyage':'wikipedia'}.org/wiki/${encodeURIComponent(p.title.replace(/ /g,'_'))}`,...(desc?{desc}:{}),...(mode==='wiki'&&p.needs?.length?{needs:p.needs}:{})};
+  return {id:(mode==='how'?'v':'w')+p.pageid,src:mode,title:p.title,body:strip(p.extract),img:imageURL(p.thumbnail?.source),url:p.fullurl||`https://${lang}.${mode==='how'?'wikivoyage':'wikipedia'}.org/wiki/${encodeURIComponent(p.title.replace(/ /g,'_'))}`,...(desc?{desc}:{}),...(mode==='wiki'&&p.needs?.length?{needs:p.needs}:{})};
 }
 
 function shuffle(values) {
@@ -86,10 +62,10 @@ function shuffle(values) {
   return result;
 }
 
-function selectArticles(pages,lang,mode,depth) {
+function selectCandidates(values,lang,mode,depth) {
   // Wikivoyage: 40 characters (20 in Chinese, Japanese, Korean); Wikipedia: 80.
-  const candidates=shuffle([...pages.values()].filter(p=>mode==='how'?guideReadable(strip(p.extract)):strip(p.extract).length>=80));
-  if(mode!=='wiki')return candidates.slice(0,20).map(p=>article(p,lang,mode));
+  const candidates=shuffle(values);
+  if(mode!=='wiki')return candidates.slice(0,20);
   // Discovery depth measures article popularity only. There is no saved-item,
   // previous-card, category-similarity or other personalization input here.
   // Bands are English readership; smaller editions are scaled (pageviews.js).
@@ -98,8 +74,8 @@ function selectArticles(pages,lang,mode,depth) {
   for(const page of candidates){
     const views=averageViews(page,lag);
     if(views!==null&&views>=low&&views<=high)eligible.push(page);
-    else{
-      const distance=views===null?Infinity:views<low?Math.log1p(low)-Math.log1p(views):Math.log1p(views)-Math.log1p(high);
+    else if(views!==null){
+      const distance=views<low?Math.log1p(low)-Math.log1p(views):Math.log1p(views)-Math.log1p(high);
       fallback.push({page,distance});
     }
   }
@@ -107,14 +83,19 @@ function selectArticles(pages,lang,mode,depth) {
   // out-of-band sample just because n is large. A small nearby fallback keeps
   // a thin first response usable while the next independent batch preloads.
   const selected=eligible.slice(0,20);
-  if(selected.length<5){
+  if(depth===3&&selected.length<5){
     fallback.sort((a,b)=>a.distance-b.distance);
-    selected.push(...fallback.slice(0,Math.min(3,5-selected.length)).map(x=>x.page));
+    selected.push(...fallback.filter(x=>x.distance<=Math.log(2)).slice(0,Math.min(3,5-selected.length)).map(x=>x.page));
   }
-  return selected.map(p=>article(p,lang,mode));
+  return selected;
+}
+function selectArticles(pages,lang,mode,depth) {
+  const readable=[...pages.values()].filter(p=>mode==='how'?guideReadable(strip(p.extract)):strip(p.extract).length>=80);
+  return selectCandidates(readable,lang,mode,depth).map(p=>article(p,lang,mode));
 }
 
-function startBatch(key,lang,mode,depth,cache,ctx) {
+function startBatch(key,lang,mode,depth,cache,ctx,work) {
+  const upstream=work.upstream;
   const id=key.url;
   if(inFlight.has(id))return inFlight.get(id);
   let deliver;
@@ -127,7 +108,7 @@ function startBatch(key,lang,mode,depth,cache,ctx) {
     if(mode==='wiki'&&depth<=2){
       const info={};
       entry.snapshot=()=>info.snapshot?.()||[];
-      const payload={articles:await vitalArticles(lang,depth,upstream,ctx,article,info),cached_at:new Date().toISOString()};
+      const payload={articles:await vitalArticles(lang,depth,upstream,ctx,article,info,work),cached_at:new Date().toISOString()};
       deliver(payload);
       // A Known answer borrowed from Popular serves this reader only.
       if(cache&&payload.articles.length&&!info.borrowed)await cache.put(key,json(payload,200,{'Cache-Control':`public, max-age=${RETAIN_SECONDS}`})).catch(()=>{});
@@ -138,7 +119,7 @@ function startBatch(key,lang,mode,depth,cache,ctx) {
     // Candidates first, text second: the random call carries no extracts, so
     // it returns in a fraction of a second; introductions are then fetched in
     // parallel chunks for the readable candidates only (extracts.js).
-    const params={generator:'random',grnnamespace:'0',grnlimit:'20',prop:'pageimages|info|description'+(mode==='wiki'?'|pageviews':'|categories'),pvipdays:'14',piprop:'thumbnail',pithumbsize:'800',pilimit:'max',inprop:'url',...(mode==='how'?phrasebookParams(lang):{})};
+    const params={generator:'random',grnnamespace:'0',grnlimit:'20',prop:'pageimages|info|description'+(mode==='wiki'?'|pageviews':'|categories'),pvipdays:'14',piprop:'thumbnail',pithumbsize:'960',pilimit:'max',inprop:'url',...(mode==='how'?phrasebookParams(lang):{})};
     // Two concurrent Wikipedia samples yield up to 40 candidates. Wikivoyage
     // needs one: its guides need no photo, so most of the 20 are usable.
     // Publish the first usable response immediately; cache the merged result
@@ -159,15 +140,16 @@ function startBatch(key,lang,mode,depth,cache,ctx) {
       for(const p of fresh)pages.set(p.pageid,p);
       // The random call returns views for only five pages; complete the
       // candidates so depth sees the whole sample, not A-to-D titles.
+      supply.hydrate(fresh,lang,mode);
+      if(mode==='wiki')await completePageviews(fresh,ids=>upstream(apiURL(lang,mode,{prop:'pageviews',pvipdays:'14',pageids:ids})));
+      const chosen=selectCandidates(fresh,lang,mode,depth);
       await Promise.all([
-        mode==='wiki'?completePageviews(fresh,ids=>upstream(apiURL(lang,mode,{prop:'pageviews',pvipdays:'14',pageids:ids}))):null,
-        // Wikivoyage guides without an introduction fall back to their opening text.
-        completeExtracts(fresh,ids=>upstream(apiURL(lang,mode,extractParams(ids)))).then(()=>mode==='how'?completeLeadFallback(fresh,id=>upstream(apiURL(lang,mode,fullTextParams(id)))):null),
-        // Maintenance tags for the optional "Needs citations" card label.
-        mode==='wiki'&&HELP_LANGS.has(lang)?completeNeeds(lang,fresh,params=>upstream(apiURL(lang,mode,params))):null,
+        completeExtracts(chosen,ids=>upstream(apiURL(lang,mode,extractParams(ids)))).then(()=>mode==='how'?completeLeadFallback(chosen,id=>upstream(apiURL(lang,mode,fullTextParams(id)))):null),
+        mode==='wiki'&&HELP_LANGS.has(lang)?completeNeeds(lang,chosen,params=>upstream(apiURL(lang,mode,params))):null,
       ]);
       // Only a sample that added pages publishes: a duplicate sample must not
       // answer before its sibling's views and introductions have arrived.
+      supply.remember(fresh,lang,mode);
       const selected=fresh.length?selectArticles(pages,lang,mode,depth):[];
       if(selected.length)deliver({articles:selected,cached_at:new Date().toISOString()});
     }));
@@ -183,7 +165,7 @@ function startBatch(key,lang,mode,depth,cache,ctx) {
   return entry;
 }
 
-async function articles(request,url,ctx,env) {
+async function articles(request,url,ctx,env,work) {
   const mode=url.searchParams.get('mode')||'wiki';
   const requested=url.searchParams.get('lang')||'en';
   const n=Number(url.searchParams.get('n')||20);
@@ -193,26 +175,24 @@ async function articles(request,url,ctx,env) {
   const lang=mode==='how'?voyageLang(requested):requested;
   // n only slices a shared batch; arbitrary request sizes cannot multiply cache
   // keys. Versioning excludes earlier unfiltered batches after depth changes.
-  const key=new Request(`${url.origin}/api/articles?version=5&mode=${mode}&lang=${lang}&depth=${mode==='how'?3:depth}&batch=${batch}`);
-  const cache=globalThis.caches?.default;
+  const key=new Request(`${url.origin}/api/articles?version=6&mode=${mode}&lang=${lang}&depth=${mode==='how'?3:depth}&batch=${batch}`);
+  const cache=work.cache;
   let stored;
   try{const hit=await cache?.match(key);if(hit)stored=await hit.json();}catch{}
   const valid=stored?.articles?.length&&Number.isFinite(Date.parse(stored.cached_at));
   const age=valid?Date.now()-Date.parse(stored.cached_at):Infinity;
   if(valid&&age<RETAIN_SECONDS*1000){
     const stale=age>=FRESH_MS;
-    if(stale&&await permit(env,'WORK_LIMIT','feed'))ctx.waitUntil(startBatch(key,lang,mode,depth,cache,ctx).complete);
+    if(stale&&!inFlight.has(key.url)&&await permit(env,'WORK_LIMIT','feed'))ctx.waitUntil(startBatch(key,lang,mode,depth,cache,ctx,work).complete);
     return json({...stored,articles:stored.articles.slice(0,n),stale},200,{'X-Cache':stale?'STALE':'HIT'});
   }
-  if(!await permit(env,'WORK_LIMIT','feed'))return limited();
-  const pending=startBatch(key,lang,mode,depth,cache,ctx);
+  if(!inFlight.has(key.url)&&!await permit(env,'WORK_LIMIT','feed'))return limited();
+  const pending=startBatch(key,lang,mode,depth,cache,ctx,work);
   ctx.waitUntil(pending.complete);
   let result=await within(pending.ready,RESPONSE_BUDGET_MS);
   if(!result)result={articles:pending.snapshot(),cached_at:new Date().toISOString()};
   if(!result.articles.length){
-    const host=new URL(apiURL(lang,mode,{})).hostname;
-    const retry=Math.max(5,Math.ceil(((cooldowns.get(host)||0)-Date.now())/1000));
-    return json({articles:[],error:'Wikimedia is temporarily unavailable.'},503,{'Retry-After':String(retry)});
+    return unavailable(work);
   }
   return json({...result,articles:result.articles.slice(0,n)},200,{'X-Cache':'MISS'});
 }
@@ -228,16 +208,17 @@ export function renderUnfurl(meta,url,lang) {
 // completeLeadFallback): kept in this isolate and in the edge cache for a day,
 // so a retried travel page makes progress. Subrequest budget per travel answer
 // on the Workers Free plan (50, Cache API calls included): page cache 2,
-// searches 3, introduction chunks 6 (30 results), stored texts checked 20,
-// opening texts read 8 and saved 8 = 47.
+// All fetches and cache operations share runtime.js's 48-operation ceiling.
+// Stored texts are checked in a small window so geographic ancestry and
+// opening-text retries also have room in the invocation budget.
 // Agent discovery (RFC 8288): the homepage points to its machine-readable
 // description and its Markdown version. There is deliberately no api-catalog
 // or service-desc: /api/ is the reader's own rate-limited backend, not a
 // public API (robots.txt disallows it).
 const HOME_LINKS='</llms.txt>; rel="describedby"; type="text/markdown", </about/>; rel="service-doc"; type="text/html", </>; rel="alternate"; type="text/markdown"';
-const LEAD_LOOKUPS=20,leads=new Map();
-function leadStore(lang,ctx){
-  const cache=globalThis.caches?.default,key=id=>new Request(`https://wikiscroll.com/__lead/v1/${lang}/${id}`);
+const LEAD_LOOKUPS=12,leads=new Map();
+function leadStore(lang,ctx,work){
+  const cache=work.cache,key=id=>new Request(`https://wikiscroll.com/__lead/v1/${lang}/${id}`);
   const remember=(id,text)=>{if(leads.size>=4000)leads.delete(leads.keys().next().value);leads.set(lang+'|'+id,text);};
   return {
     async lookup(ids){
@@ -250,15 +231,16 @@ function leadStore(lang,ctx){
   };
 }
 
-async function handle(request,env,ctx) {
+async function handle(request,env,ctx,work) {
+    const upstream=work.upstream;
     const url=new URL(request.url);
-    if(['/collection','/collection.png','/api/collection'].includes(url.pathname)) return collectionResponse(request,ctx,env);
+    if(['/collection','/collection.png','/api/collection'].includes(url.pathname)) return collectionResponse(request,ctx,env,work);
     if(url.pathname.startsWith('/api/')){
       if(!['GET','HEAD'].includes(request.method))return json({error:'Method not allowed'},405,{'Allow':'GET, HEAD'});
       if(url.pathname==='/api/travel'){
         const requested=url.searchParams.get('lang')||'en',input=(url.searchParams.get('place')||'').trim(),style=url.searchParams.get('style')||'';
-        const styles={nature:'nature OR hiking OR park',coast:'beach OR coast OR island',culture:'museum OR history OR culture',city:'city OR urban'};
-        if(!LANGS.has(requested)||input.length>80||style&&!Object.hasOwn(styles,style))return json({error:'Invalid travel filters'},400);
+
+        if(!LANGS.has(requested)||input.length>80||style&&!TRAVEL_STYLES.includes(style))return json({error:'Invalid travel filters'},400);
         // One to three places ("Japan, Tuscany"), each searched on its own so
         // results alternate between them; the cursor keeps one offset per place.
         const places=parsePlaces(input,requested),cursor=parseCursor(url.searchParams.get('offset'),places.length);
@@ -267,30 +249,52 @@ async function handle(request,env,ctx) {
         const lang=voyageLang(requested);
         // Many readers ask for the same destination and style: complete result
         // pages are shared from the edge cache for an hour, before any upstream work.
-        const key=new Request(`${url.origin}/api/travel?v=8&lang=${lang}&place=${encodeURIComponent(places.map(fold).join('|'))}&style=${style}&offset=${cursor.map(c=>c??'-').join('.')}`),cache=globalThis.caches?.default;
+        const key=new Request(`${url.origin}/api/travel?v=9&lang=${lang}&place=${encodeURIComponent(places.map(fold).join('|'))}&style=${style}&offset=${cursor.map(c=>c??'-').join('.')}`),cache=work.cache;
         try{const hit=await cache?.match(key);if(hit)return json(await hit.json(),200,{'X-Cache':'HIT'});}catch{}
+        if(travelPending.has(key.url))return (await travelPending.get(key.url)).clone();
         if(!await permit(env,'WORK_LIMIT','travel'))return limited();
+        const job=(async()=>{
         const started=Date.now(),limit=String(places.length>1?Math.ceil(30/places.length):30);
         const searches=await Promise.all((places.length?places:[null]).map(async(place,i)=>{
           if(cursor[i]===null)return {place,pages:[],next:null};
-          const query=[place?JSON.stringify(place):'',style?'('+styles[style]+')':''].filter(Boolean).join(' ');
-          const data=await upstream(apiURL(lang,'how',{generator:'search',gsrsearch:query,gsrnamespace:'0',gsrlimit:limit,gsroffset:String(cursor[i]),prop:'pageimages|info|description|categories',piprop:'thumbnail',pithumbsize:'800',pilimit:'max',inprop:'url',...phrasebookParams(lang)}));
+          const query=[place?JSON.stringify(place):'',style?'('+travelTerms(lang,style)+')':''].filter(Boolean).join(' ');
+          const data=await upstream(apiURL(lang,'how',{generator:'search',gsrsearch:query,gsrnamespace:'0',gsrlimit:limit,gsroffset:String(cursor[i]),prop:'pageimages|info|description|categories|pageprops',ppprop:'geocrumb-is-in|disambiguation',piprop:'thumbnail',pithumbsize:'960',pilimit:'max',inprop:'url',...phrasebookParams(lang)}));
           if(!data||data.error)return null;
           // Search relevance order (the generator's index), not page-ID order.
           const pages=Object.values(data.query?.pages||{}).filter(p=>p.pageid>0&&!isDisambiguation(p)&&!isPhrasebook(p)).sort((a,b)=>(a.index??0)-(b.index??0));
           return {place,pages,next:data.continue?.gsroffset??null};
         }));
-        if(searches.includes(null))return json({error:'Travel search temporarily unavailable'},503);
-        const found=searches.flatMap(s=>s.pages);
+        if(searches.includes(null))return unavailable(work,'Travel search temporarily unavailable');
+        const canonical=new Map(searches.flatMap(s=>s.pages).map(p=>[p.pageid,p]));
+        for(const search of searches)search.pages=search.pages.map(p=>canonical.get(p.pageid));
+        const found=[...canonical.values()];
+        const identityTask=(async()=>{
+          if(!places.length)return new Map();
+          const identities=await placesResolver.resolve(lang,places,upstream);
+          await placesResolver.annotate(lang,found,new Set([...identities.values()].filter(Boolean)),upstream);
+          return identities;
+        })();
         // Guides whose introduction misses the budget are left out of this page.
         // Guides without an introduction use their opening text: texts read
         // before come from leadStore, at most FALLBACK_MAX more are read now, and
         // the rest leave the page unfinished, so the browser's retry reads them.
-        await within(completeExtracts(found,ids=>upstream(apiURL(lang,'how',extractParams(ids)))).then(()=>completeLeadFallback(found,id=>upstream(apiURL(lang,'how',fullTextParams(id))),FALLBACK_MAX,leadStore(lang,ctx))),Math.max(0,TRAVEL_BUDGET_MS-(Date.now()-started)));
+        supply.hydrate(found,lang,'how');
+        const texts=completeExtracts(found,ids=>upstream(apiURL(lang,'how',extractParams(ids)))).then(()=>completeLeadFallback(found,id=>upstream(apiURL(lang,'how',fullTextParams(id))),FALLBACK_MAX,leadStore(lang,ctx,work))).then(()=>supply.remember(found,lang,'how'));
+        work.keep(texts);
+        const preparation=Promise.all([texts,identityTask]);work.keep(preparation);
+        await within(preparation,Math.max(0,TRAVEL_BUDGET_MS-(Date.now()-started)));
+        const identities=await within(identityTask,0)||new Map();
         // Keep guides that are about the place: named in the title or introduction.
-        const ready=searches.map(s=>s.pages.filter(p=>guideReadable(strip(p.extract))&&(!s.place||namesPlace(p,s.place))));
+        const ready=searches.map(s=>s.pages.filter(p=>{
+          if(!guideReadable(strip(p.extract)))return false;
+          if(!s.place)return true;
+          const belongs=placesResolver.belongs(lang,p,identities.get(s.place));
+          if(belongs==='pending'||!identities.has(s.place)){p.locationMissing=true;return false;}
+          delete p.locationMissing;
+          return belongs===null?namesPlace(p,s.place):belongs;
+        }));
         const body={articles:interleave(ready).map(p=>article(p,lang,'how')),next:formatCursor(searches.map(s=>s.next))};
-        const unfinished=s=>s.pages.some(p=>typeof p.extract!=='string'||p.extractMissing);
+        const unfinished=s=>s.pages.some(p=>typeof p.extract!=='string'||p.extractMissing||p.locationMissing);
         let complete=!searches.some(unfinished);
         // Some guides' text did not arrive in time: moving on would skip them for
         // good (and could end the feed early). "retry" keeps each unfinished
@@ -307,18 +311,22 @@ async function handle(request,env,ctx) {
         // Only a page where every guide's introduction arrived is cached. A
         // partial or failed page is not, so a slow moment never hides guides for an hour.
         if(cache&&complete)ctx.waitUntil(cache.put(key,json(body,200,{'Cache-Control':'public, max-age=3600'})).catch(()=>{}));
+        if(!body.articles.length&&!complete&&work.reason)return unavailable(work,'Travel guides are temporarily unavailable');
         return json(body,200,{'X-Cache':'MISS'});
+        })();
+        travelPending.set(key.url,job);work.keep(job);
+        try{return (await job).clone();}finally{travelPending.delete(key.url);}
       }
       if(url.pathname==='/api/today'){
-        const response=await todayResponse(url,ctx,{langs:LANGS,permit,limited,env});
+        const response=await todayResponse(url,ctx,{langs:LANGS,permit,limited,env,work,feed:address=>work.upstream(address,{timeoutMs:15000})});
         return request.method==='HEAD'?new Response(null,response):response;
       }
       if(url.pathname==='/api/topics'){
-        const response=await topicResponse(url,env,ctx,{langs:LANGS,permit,limited,upstream});
+        const response=await topicResponse(url,env,ctx,{langs:LANGS,permit,limited,upstream,work,supply});
         return request.method==='HEAD'?new Response(null,response):response;
       }
       if(url.pathname==='/api/articles'){
-        const response=await articles(request,url,ctx,env);
+        const response=await articles(request,url,ctx,env,work);
         return request.method==='HEAD'?new Response(null,response):response;
       }
       return json({error:'Not found'},404);
@@ -326,7 +334,7 @@ async function handle(request,env,ctx) {
     if(!['GET','HEAD'].includes(request.method))return new Response('Method not allowed',{status:405,headers:{Allow:'GET, HEAD'}});
     const id=url.searchParams.get('a'),lang=url.searchParams.get('lang')||'en';
     if(id&&/^[wv][1-9]\d{0,11}$/.test(id)&&LANGS.has(lang)&&BOTS.test(request.headers.get('User-Agent')||'')){
-      let meta;try{meta=await verifiedArticle(id,lang,env,ctx);}catch{return new Response('Preview temporarily unavailable',{status:503,headers:{'Retry-After':'60'}});}
+      let meta;try{meta=await verifiedArticle(id,lang,env,ctx,work);}catch{return new Response('Preview temporarily unavailable',{status:503,headers:{'Retry-After':'60'}});}
       if(meta){
         // Never let a cached bot response become a human's app shell.
         return new Response(request.method==='HEAD'?null:renderUnfurl(meta,url.href,lang),{headers:{'Content-Type':'text/html;charset=UTF-8','Content-Security-Policy':"default-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'",'Cache-Control':'private, no-store','Vary':'User-Agent','X-Robots-Tag':'noindex'}});
@@ -371,6 +379,7 @@ export default {async fetch(request,env,ctx){
   const url=new URL(request.url);
   const dynamic=url.pathname.startsWith('/api/')||url.pathname.startsWith('/collection')||(url.searchParams.has('a')&&BOTS.test(request.headers.get('User-Agent')||''));
   if(dynamic&&!await permit(env,'REQUEST_LIMIT',request.headers.get('CF-Connecting-IP')||'unknown'))return secure(limited());
-  try{return secure(await handle(request,env,ctx));}
+  const work=createWork(env,ctx,network);
+  try{return secure(await handle(request,env,ctx,work));}
   catch{return secure(new Response('Temporarily unavailable. Please retry.',{status:503,headers:{'Cache-Control':'no-store','Retry-After':'60'}}));}
 }};

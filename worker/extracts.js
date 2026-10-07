@@ -15,7 +15,8 @@ export async function completeExtracts(pages, fetchChunk) {
       const extract = data?.query?.pages?.[page.pageid]?.extract;
       page.extract = typeof extract === 'string' ? extract : '';
       // A failed request is not the same as a page without an introduction.
-      if (!data) page.extractMissing = true;
+      if (!data?.query?.pages?.[page.pageid]) page.extractMissing = true;
+      else delete page.extractMissing;
     }
   }));
   return pages;

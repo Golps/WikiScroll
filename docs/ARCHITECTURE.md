@@ -75,8 +75,8 @@ The browser asks the Worker for batches and keeps a reserve queued ahead of the 
 | Path | Purpose |
 |---|---|
 | `test/` | `node --test` suites for the Worker modules, plus browser logic extracted from `public/*.js` and run in `node:vm` sandboxes. |
-| `scripts/` | `deploy.sh` (token-scoped deployment), `build-about.mjs`, `build-branding.mjs` (regenerates icons and the share image). |
-| `branding/` | Logo sources and the Natural Earth geometry used to draw the globe on the share image. |
+| `scripts/` | `deploy.sh` (token-scoped deployment), `build-about.mjs`, `build-branding.mjs` (regenerates icons and copies the approved share image). |
+| `branding/` | Logo sources and the approved raster social artwork. |
 | `wrangler.jsonc` | Worker configuration: static assets, rate-limit bindings and observability. |
 | `docs/` | This documentation and the images used in the README. |
 

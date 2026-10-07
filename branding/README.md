@@ -1,10 +1,10 @@
 # Current branding
 
-Run `node scripts/build-branding.mjs` from site to rebuild the live share image, app icons and favicon.
+Run `node scripts/build-branding.mjs` from the repository root to rebuild app icons and the favicon, and copy the approved social artwork to its public filename.
 
-- wordmark.svg: canonical outlined About-card logo used across the site and previews.
-- monogram.svg: matching app-icon letter and blue diamond punctuation.
-- land-detailed.geojson and easteregg.geojson: Natural Earth 1:50m geometry (public domain), used for the globe and its subtle visual easter egg.
-- share-card.svg and favicon.png: current generated artwork (the app icons are drawn from monogram.svg).
+- `wordmark.svg`: canonical outlined logo used throughout the reader.
+- `monogram.svg`: matching app-icon letter and blue diamond.
+- `discovery-preview.png`: approved 1200 x 630 social artwork showing three illustrative article cards and the headline "Replace doomscrolling with discovery". The artwork is an AI-generated illustration, not a screenshot or sourced article photograph.
+- `favicon.png`: generated favicon intermediate.
 
-The headline font is bundled under branding/fonts with its license. Public outputs live in public/images. Natural Earth terms: https://www.naturalearthdata.com/about/terms-of-use/
+The homepage, About page, article fallback and shared collections use `public/images/og-discovery-v9.png`. Collection titles and descriptions remain specific to the shared list. The original globe generator, map geometry and country-highlight instructions have been removed. Rebuilding does not recreate the old artwork.

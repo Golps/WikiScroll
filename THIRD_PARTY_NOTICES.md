@@ -21,17 +21,12 @@ The starter file contains image *URLs*, not image files. **Images on Wikimedia d
 
 ## Fonts
 
-| Font | Where | License |
-|---|---|---|
-| DM Serif Display (Colophon Foundry; derived from Adobe Source Serif) | `worker/fonts/DMSerifDisplay-Regular.ttf`, used to render shared-collection preview images | [SIL Open Font License 1.1](worker/fonts/OFL.txt) |
-
 The web interface uses the fonts already installed on each device and loads no web fonts.
 
 ## Map and geographic data
 
 | Source | Used for | Terms |
 |---|---|---|
-| [Natural Earth](https://www.naturalearthdata.com/) 1:50m land and country geometry | `branding/*.geojson`, drawn as the globe on the share image | Public domain ([terms](https://www.naturalearthdata.com/about/terms-of-use/)) |
 | [OpenStreetMap](https://www.openstreetmap.org/copyright) contributors | Map data behind the basemap tiles | ODbL 1.0. Attribution is shown on every map. |
 | [CARTO](https://carto.com/attributions) basemaps | Map tiles in Wikivoyage mode | [CARTO's terms](https://carto.com/legal). Attribution is shown on every map. |
 | [Nominatim](https://nominatim.org/) | Fallback place search when a guide has no coordinates | [Nominatim usage policy](https://operations.osmfoundation.org/policies/nominatim/) |
@@ -54,3 +49,7 @@ npm dependencies (installed from the lockfile, not included in this repository):
 ## Services
 
 The live site runs on [Cloudflare Workers](https://workers.cloudflare.com/) and can load [Cloudflare Web Analytics](https://www.cloudflare.com/web-analytics/) when it's configured. Article data comes from the [Wikimedia APIs](https://api.wikimedia.org/), used under their terms and API etiquette: a descriptive `User-Agent`, bounded concurrency, and respect for `Retry-After`.
+
+## Social artwork
+
+The social preview is an AI-generated illustration approved for WikiScroll. Its article-card images are illustrative artwork, not Wikimedia photographs or screenshots of the live reader.

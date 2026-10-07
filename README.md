@@ -260,7 +260,7 @@ If WikiScroll is useful to you, a ⭐ on the repository helps others find it.
 
 - Article text and images come from [Wikipedia](https://www.wikipedia.org/) and [Wikivoyage](https://www.wikivoyage.org/) contributors. Text is available under [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/). Each image has its own license on Wikimedia Commons. WikiScroll links every card to its source for full attribution. Photos in this README are credited in [docs/images/ATTRIBUTION.md](docs/images/ATTRIBUTION.md).
 - Maps use [Leaflet](https://leafletjs.com/), [OpenStreetMap](https://www.openstreetmap.org/copyright) data, [CARTO](https://carto.com/attributions) basemaps and [Nominatim](https://nominatim.org/) search.
-- Globe artwork uses [Natural Earth](https://www.naturalearthdata.com/) data (public domain). Shared-collection images use [DM Serif Display](https://github.com/googlefonts/dm-fonts) (SIL Open Font License 1.1).
+- Social preview artwork is an AI-generated illustration of the discovery reader; it is not a screenshot or sourced article photography.
 
 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) has the full list.
 

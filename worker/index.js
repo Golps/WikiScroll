@@ -200,7 +200,7 @@ async function articles(request,url,ctx,env,work) {
 
 export function renderUnfurl(meta,url,lang) {
   const title=escape(meta.title+' | WikiScroll'),description=escape(meta.body.replace(/\s*—\s*/g, ', ').slice(0,200));
-  const img=escape(meta.img||'https://wikiscroll.com/images/og-discovery-v8.png');
+  const img=escape(meta.img||'https://wikiscroll.com/images/og-discovery-v9.png');
   const canonical=escape(url);
   return `<!doctype html><html lang="${lang}"><head><meta charset="utf-8"><title>${title}</title><meta name="robots" content="noindex,follow"><meta name="description" content="${description}"><link rel="canonical" href="${canonical}"><meta property="og:type" content="article"><meta property="og:url" content="${canonical}"><meta property="og:title" content="${title}"><meta property="og:description" content="${description}"><meta property="og:image" content="${img}"><meta property="og:site_name" content="WikiScroll"><meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="${title}"><meta name="twitter:description" content="${description}"><meta name="twitter:image" content="${img}"></head><body><h1>${title}</h1><p>${description}</p><a href="${canonical}">Open in WikiScroll</a></body></html>`;
 }

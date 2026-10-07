@@ -188,7 +188,7 @@ Article links (`?a=w123&lang=es`) follow the same rules. Readers get the normal 
 
 ## 9. Performance choices
 
-- **Loaded only when needed.** Leaflet (JS and CSS) loads from cdnjs the first time a map opens, with a 10-second timeout and a retry after failure. Collection PNG artwork is generated offline with `scripts/build-collection-preview.mjs`; the Worker serves the static asset, while collection metadata stays specific to the shared selection.
+- **Loaded only when needed.** Leaflet (JS and CSS) loads from cdnjs the first time a map opens, with a 10-second timeout and a retry after failure. Social artwork is exported ahead of deployment from `branding/discovery-preview.png`; collection previews serve the same static asset, while titles and descriptions stay specific to the shared selection.
 - **Images.** The first card's photo loads eagerly with `fetchpriority="high"`; all others load lazily. A failed image falls back to a globe illustration instead of an empty box.
 - **Fewer requests.** The Wikivoyage fallback makes one request for 20 candidates. It replaced an earlier approach that made up to 80 requests per refill and triggered Wikimedia's per-IP limits.
 - **Memory over long sessions.** Removed cards give up their article data and their `ResizeObserver` subscriptions, so long reading sessions don't keep detached nodes around.

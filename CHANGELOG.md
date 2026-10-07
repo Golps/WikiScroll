@@ -2,6 +2,11 @@
 
 Releases of this repository. Each entry describes what changed in the code; [docs/ENGINEERING.md](docs/ENGINEERING.md#known-issues) has the details and tests behind each change.
 
+## Unreleased
+
+- Replace site and collection social previews with the approved article-card artwork and "Replace doomscrolling with discovery" headline.
+- Remove the obsolete globe artwork, geometry, country-highlight instructions and rendering-only font sources. Use versioned preview URLs to refresh messaging-client requests.
+
 ## 2.0.0 (October 7, 2026)
 
 ### Discovery
@@ -44,7 +49,7 @@ Releases of this repository. Each entry describes what changed in the code; [doc
 
 ## 1.4.1 (September 27, 2026)
 
-- The tagline is now "Turn doomscrolling into discovery" everywhere: the welcome screen in all 15 languages, the About page, the page and app descriptions, and the link-preview image (`og-discovery-v8.png`, built by `scripts/build-branding.mjs`).
+- The tagline is now "Turn doomscrolling into discovery" everywhere: the welcome screen in all 15 languages, the About page, the page and app descriptions, and the link-preview image (the preview artwork used in that release).
 - The description shown to browsers without JavaScript is shorter and leads with the tagline.
 
 208 tests (1 new).

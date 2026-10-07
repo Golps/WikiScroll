@@ -177,7 +177,7 @@ WikiScroll was written for one deployment, at `wikiscroll.com`. Before deploying
 | **Domain in cache keys** | `worker/collections.js`, `worker/today.js`, `worker/verified.js`, `worker/vital.js` (the `https://wikiscroll.com/__…` keys). Use your own domain. |
 | **User-Agent** | `worker/index.js`, `worker/today.js`, `worker/verified.js`. Wikimedia asks for a descriptive `User-Agent` with contact information (a URL or an email address) that points to you, not to wikiscroll.com. |
 | **Page metadata** | `public/index.html` and `public/about/index.html` (title, canonical URL, Open Graph and structured data, contact address), `public/manifest.json`, `public/robots.txt`, `public/sitemap.xml`, `public/llms.txt` |
-| **Name and logo** | `branding/` sources, then `node scripts/build-branding.mjs`. Shared-collection artwork is generated offline with `node scripts/build-collection-preview.mjs`. |
+| **Name and logo** | `branding/` sources, then `node scripts/build-branding.mjs`. The approved raster social source is `branding/discovery-preview.png`; collections use the same exported artwork. |
 | **Worker name** | `name` in `wrangler.jsonc`, and the `Uploaded wikiscroll` check in `scripts/deploy.sh` |
 | **Map key** | Worker secret `CARTO_BASEMAP_KEY`: restrict it to your domain |
 | **Content Security Policy** | `PAGE_CSP` in `worker/security.js` and the `/*` block of `public/_headers`. Update both if you add a script, map-tile, analytics or API host. |
@@ -194,5 +194,5 @@ Please use your own name and logo for a public deployment, so readers can tell y
 - **Preserve storage keys.** The `ws_*` `localStorage` keys and the `wikiscroll` IndexedDB database hold readers' libraries. Add migrations; never rename keys.
 - **Translate new labels.** Add every new interface string to all 14 files in `public/translations/`. A message that includes a collection name or a number needs a template entry (`"Added to \"{name}\""`) and a matching pattern in `public/i18n.js`. `test/i18n.test.js` fails when a toast message has no translation.
 - **About content.** Edit `public/about/index.html`, then run `node scripts/build-about.mjs` to copy it into the in-app dialog.
-- **Branding.** Edit the sources in `branding/`, then run `node scripts/build-branding.mjs` (after `pnpm install`) to regenerate icons and the share image. With unchanged sources, it reproduces the committed images byte for byte.
+- **Branding.** Edit the icon sources or replace the approved `branding/discovery-preview.png`, then run `node scripts/build-branding.mjs` (after `pnpm install`) to regenerate icons and copy the social artwork. Use a new public image filename when replacing the preview so messaging clients can request fresh artwork.
 - **Wording.** Keep product copy calm and factual. Describe only what the app does today.

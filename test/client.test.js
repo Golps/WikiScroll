@@ -74,10 +74,12 @@ test('fresh visitors use independent opening draws even with the same shared slo
  assert.equal(new Set(openings).size,16);
 });
 
-test('partial random supply keeps its opening draw and asks for the unfinished batch',async()=>{
- const start=source.indexOf('function retryAfterMillis('),end=source.indexOf('function fillQueue(',start),urls=[];
- const c=vm.createContext({crypto:webcrypto,URLSearchParams,AbortController,Date,setTimeout:()=>1,clearTimeout(){},fetch:async url=>{urls.push(new URL(url,'https://wikiscroll.com'));return Response.json({articles:[{id:'w1'}],partial:urls.length===1});}});
- vm.runInContext(`let curMode='wiki',curLang='en',depthLevel=3,workerBatch=7,workerCooldownUntil=0,pendingWorkerBatch=null,fillGeneration=0,articles=[],queue=[];const supplyControllers=new Set(),curTopics=new Set();const helpOnly=()=>false,feedContextKey=()=>curLang+'|'+depthLevel;${source.slice(start,end)}`,c);
- await c.fetchWorkerBatch(0);await c.fetchWorkerBatch(0);await c.fetchWorkerBatch(0);
+test('late random supply retains its opening draw without blocking the next fresh batch',async()=>{
+ const start=source.indexOf('function retryAfterMillis('),end=source.indexOf('function fillQueue(',start),urls=[];let finish;
+ const late=new Promise(resolve=>{finish=resolve;});let fresh=0;
+ const c=vm.createContext({crypto:webcrypto,URLSearchParams,AbortController,Date,setTimeout:()=>1,clearTimeout(){},fetch:async url=>{const u=new URL(url,'https://wikiscroll.com');urls.push(u);if(u.searchParams.has('resume'))return late;return Response.json({articles:[{id:'w'+(++fresh)}],partial:fresh===1});}});
+ vm.runInContext(`let curMode='wiki',curLang='en',depthLevel=3,workerBatch=7,workerCooldownUntil=0,pendingWorkerBatch=null,fillGeneration=0,articles=[],queue=[];const supplyControllers=new Set(),curTopics=new Set(),lateSupplyTasks=new Set();const helpOnly=()=>false,feedContextKey=()=>curLang+'|'+depthLevel,acceptSupply=()=>{},ensureFeedAhead=()=>{},scheduleRefill=()=>{},QUEUE_MIN=60;${source.slice(start,end)}`,c);
+ await c.fetchWorkerBatch(0);await c.fetchWorkerBatch(0);
  assert.equal(urls[0].searchParams.get('draw'),urls[1].searchParams.get('draw'));assert.equal(urls[1].searchParams.get('resume'),'1');assert.notEqual(urls[1].searchParams.get('draw'),urls[2].searchParams.get('draw'));
+ finish(Response.json({articles:[{id:'w3'}],partial:false}));await new Promise(setImmediate);
 });

@@ -591,7 +591,7 @@ async function fetchVoyage() {
 const QUEUE_MIN = 60, QUEUE_TARGET = 100, CARDS_AHEAD = 16;
 let supplyTask = null, reserveTimer = null, pendingDeepGeneration = -1;
 let workerBatch = Math.floor(Math.random()*64), workerCooldownUntil = 0, pendingWorkerBatch = null;
-const supplyControllers = new Set(), feedSeen = new Set();
+const supplyControllers = new Set(), feedSeen = new Set(), lateSupplyTasks = new Set();
 const _imgCache = new Map();
 function preloadImg(url) {
   if (!url || _imgCache.has(url)) return;
@@ -709,10 +709,37 @@ async function fetchWorkerBatch(gen) {
       return [];
     }
     const data=await response.json();
-    if(data.partial&&!topical)pending.params.set('resume','1');
+    if(data.partial&&!topical&&lateSupplyTasks.size<2){
+      collectLateSupply(pending,gen);
+      if(pendingWorkerBatch===pending)pendingWorkerBatch=null;
+    }else if(data.partial&&!topical)pending.params.set('resume','1');
     if(!data.partial&&pendingWorkerBatch===pending)pendingWorkerBatch=null;
     return Array.isArray(data.articles)?data.articles:[];
   } catch {return [];} finally {clearTimeout(timer);supplyControllers.delete(controller);}
+}
+// Recover unfinished random batches without blocking the next fresh refill.
+// Two background lanes at most; source resets abort every associated request.
+function collectLateSupply(pending,gen) {
+  const token={gen};lateSupplyTasks.add(token);
+  const params=new URLSearchParams(pending.params);params.set('resume','1');
+  (async()=>{
+    for(let attempt=0;attempt<5&&gen===fillGeneration;attempt++){
+      if(Date.now()<workerCooldownUntil)return;
+      const controller=new AbortController();supplyControllers.add(controller);
+      const timer=setTimeout(()=>controller.abort(),7500);
+      try{
+        const response=await fetch('/api/articles?'+params,{signal:controller.signal,cache:'no-store'});
+        if(gen!==fillGeneration)return;
+        if(!response.ok){
+          if(response.status===429||response.status===503)workerCooldownUntil=Date.now()+retryAfterMillis(response.headers.get('Retry-After'));
+          return;
+        }
+        const data=await response.json();
+        acceptSupply(data.articles,gen);ensureFeedAhead();
+        if(!data.partial)return;
+      }catch{return;}finally{clearTimeout(timer);supplyControllers.delete(controller);}
+    }
+  })().finally(()=>{lateSupplyTasks.delete(token);if(gen===fillGeneration&&queue.length<QUEUE_MIN)scheduleRefill();});
 }
 function fillQueue() {
   const gen=fillGeneration;
@@ -963,7 +990,7 @@ function resetFeed() {
   fillGeneration++;pendingDeepGeneration=-1;
   supplyControllers.forEach(controller=>controller.abort());
   articles=[];queue=[];feedSeen.clear();filling=false;supplyTask=null;
-  pendingWorkerBatch=null;
+  pendingWorkerBatch=null;lateSupplyTasks.clear();
   clearTimeout(refillTimer);refillTimer=null;refillAttempts=0;clearTimeout(reserveTimer);
   window.WSDiscoveryHint?.hide();
   const feed=document.getElementById('feed');

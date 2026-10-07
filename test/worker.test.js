@@ -25,10 +25,25 @@ test('human deep links receive the app, not crawler HTML',async()=>{
   assert.equal(response.headers.get('Vary'),'Accept, User-Agent');
 });
 test('reject invalid article query parameters before upstream access',async()=>{
-  for(const query of ['lang=evil.test','mode=bad','n=NaN','n=-1','n=200','n=1.5','batch=-1','batch=64','batch=1.5','depth=0','depth=6']){
+  for(const query of ['lang=evil.test','mode=bad','n=NaN','n=-1','n=200','n=1.5','batch=-1','batch=64','batch=1.5','depth=0','depth=6','draw=','draw=short','draw='+ 'z'.repeat(32),'draw='+ 'a'.repeat(33)]){
     const response=await worker.fetch(request(query),env,ctx);
     assert.equal(response.status,400,query);
   }
+});
+
+test('opening draws bypass a shared completed batch, sample independently and reuse only their own retries',async()=>{
+ const cache=edgeCache(),key=new Request('https://wikiscroll.com/api/articles?version=7&mode=wiki&lang=en&depth=3&batch=8');
+ await cache.put(key,Response.json({articles:[{id:'w999'}],cached_at:new Date().toISOString()}));
+ let count=0;
+ await mocked(async url=>new URL(url).searchParams.has('generator')?data([page(++count)]):data([]),async(api,jobs)=>{
+  const a=await api.fetch(request('batch=8&draw='+'a'.repeat(32)),env,jobs),first=await a.json();await jobs.done();
+  assert.equal(a.headers.get('X-Cache'),'FRESH');assert.ok(first.articles.length);assert.ok(first.articles.every(x=>x.id!=='w999'));assert.equal(count,2);
+  const b=await api.fetch(request('batch=8&draw='+'b'.repeat(32)),env,jobs),second=await b.json();await jobs.done();
+  assert.equal(b.headers.get('X-Cache'),'FRESH');assert.equal(count,4);assert.ok(second.articles.every(x=>!first.articles.some(y=>y.id===x.id)));
+  const retry=await api.fetch(request('batch=8&draw='+'a'.repeat(32)),env,jobs);assert.equal(retry.headers.get('X-Cache'),'REPLAY');assert.equal(count,4);
+  assert.ok((await retry.json()).articles.every(x=>['w1','w2'].includes(x.id)));
+  const refill=await api.fetch(request('batch=8'),env,jobs);assert.equal(refill.headers.get('X-Cache'),'HIT');assert.equal((await refill.json()).articles[0].id,'w999');assert.equal(count,4);assert.equal(cache.entries.size,1);
+ },cache);
 });
 test('API errors remain JSON and mutations are rejected',async()=>{
   assert.equal((await worker.fetch(new Request('https://wikiscroll.com/api/unknown'),env,ctx)).status,404);

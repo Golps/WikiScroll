@@ -1,6 +1,6 @@
 import {permit,limited,secure} from './security.js';
 import {createWork,createNetwork,unavailable} from './runtime.js';
-import {createSupply,imageURL} from './supply.js';
+import {createSupply,imageURL,validOpeningDraw,createOpeningCache} from './supply.js';
 export {retryDelay} from './runtime.js';
 import {topicResponse} from './topics.js';
 import {verifiedArticle} from './verified.js';
@@ -29,7 +29,7 @@ const BAD_TITLE = /^(list of|index of|wikipedia:|template:|category:|portal:|dra
 // replaying one cached random selection for every refill in the same session.
 const FRESH_MS = 60_000;
 const RETAIN_SECONDS = 86_400;
-const network = createNetwork(), supply = createSupply();
+const network = createNetwork(), supply = createSupply(),openingCache=createOpeningCache();
 // One answer budget per request. A request can chain several upstream calls,
 // each with its own 6 s deadline, but the browser stops waiting at 7.5 s
 // (10 s for filtered travel). Answer with what is ready and let the rest of
@@ -171,20 +171,21 @@ async function articles(request,url,ctx,env,work) {
   const n=Number(url.searchParams.get('n')||20);
   const depth=Number(url.searchParams.get('depth')||3);
   const batch=Number(url.searchParams.get('batch')||0);
-  if(!['wiki','how'].includes(mode)||!LANGS.has(requested)||!Number.isInteger(n)||n<1||n>40||!Number.isInteger(depth)||depth<1||depth>5||!Number.isInteger(batch)||batch<0||batch>63) return json({error:'Use mode=wiki|how, a supported lang, n=1..40, depth=1..5, and batch=0..63.'},400);
+  const draw=url.searchParams.get('draw');
+  if(!['wiki','how'].includes(mode)||!LANGS.has(requested)||!Number.isInteger(n)||n<1||n>40||!Number.isInteger(depth)||depth<1||depth>5||!Number.isInteger(batch)||batch<0||batch>63||!validOpeningDraw(draw)) return json({error:'Use mode=wiki|how, a supported lang, n=1..40, depth=1..5, batch=0..63, and a valid optional opening draw.'},400);
   const lang=mode==='how'?voyageLang(requested):requested;
   // n only slices a shared batch; arbitrary request sizes cannot multiply cache
   // keys. Versioning excludes earlier unfiltered batches after depth changes.
-  const key=new Request(`${url.origin}/api/articles?version=7&mode=${mode}&lang=${lang}&depth=${mode==='how'?3:depth}&batch=${batch}`);
-  const cache=work.cache;
+  const key=new Request(`${url.origin}/api/articles?version=7&mode=${mode}&lang=${lang}&depth=${mode==='how'?3:depth}&batch=${batch}${draw?'&draw='+draw:''}`);
+  const cache=draw?openingCache:work.cache;
   let stored;
   try{const hit=await cache?.match(key);if(hit)stored=await hit.json();}catch{}
   const valid=stored?.articles?.length&&Number.isFinite(Date.parse(stored.cached_at));
   const age=valid?Date.now()-Date.parse(stored.cached_at):Infinity;
   if(valid&&age<RETAIN_SECONDS*1000){
-    const stale=age>=FRESH_MS;
+    const stale=!draw&&age>=FRESH_MS;
     if(stale&&!inFlight.has(key.url)&&await permit(env,'WORK_LIMIT','feed'))ctx.waitUntil(startBatch(key,lang,mode,depth,cache,ctx,work).complete);
-    return json({...stored,articles:stored.articles.slice(0,n),stale},200,{'X-Cache':stale?'STALE':'HIT'});
+    return json({...stored,articles:stored.articles.slice(0,n),stale},200,{'X-Cache':draw?'REPLAY':stale?'STALE':'HIT'});
   }
   if(!inFlight.has(key.url)&&!await permit(env,'WORK_LIMIT','feed'))return limited();
   const pending=startBatch(key,lang,mode,depth,cache,ctx,work);
@@ -194,7 +195,7 @@ async function articles(request,url,ctx,env,work) {
   if(!result.articles.length){
     return unavailable(work);
   }
-  return json({...result,articles:result.articles.slice(0,n)},200,{'X-Cache':'MISS'});
+  return json({...result,articles:result.articles.slice(0,n)},200,{'X-Cache':draw?'FRESH':'MISS'});
 }
 
 export function renderUnfurl(meta,url,lang) {

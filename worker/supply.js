@@ -1,5 +1,25 @@
 import {averageViews} from './pageviews.js';
 const MAX_PAGES = 3000, METRICS_MS = 6 * 3600000, TEXT_MS = 24 * 3600000;
+export const validOpeningDraw=draw=>draw===null||/^[a-f0-9]{32}$/.test(draw);
+// Fresh opening draws never share a completed batch with another visitor.
+// Keep only a small, short-lived response cache for retries of that exact draw;
+// do not put one-off visit keys into the shared edge supply cache.
+export function createOpeningCache(){
+  const entries=new Map();
+  return {
+    async match(key){
+      const entry=entries.get(key.url);
+      if(!entry)return;
+      if(Date.now()-entry.at>=120000){entries.delete(key.url);return;}
+      return new Response(entry.body,{headers:{'Content-Type':'application/json','Cache-Control':'no-store'}});
+    },
+    async put(key,response){
+      const body=await response.text();if(body.length>128000)return;
+      entries.delete(key.url);if(entries.size>=64)entries.delete(entries.keys().next().value);
+      entries.set(key.url,{body,at:Date.now()});
+    }
+  };
+}
 // Small reusable source records, independent of batch, depth, likes and history.
 // Failed metrics/tags never overwrite known successful data.
 export function createSupply() {

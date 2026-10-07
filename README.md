@@ -202,7 +202,7 @@ The browser keeps a reserve of cards ready ahead of the one you're reading. The 
 Discovery depends on public APIs that can be slow, rate-limited or briefly unavailable. Most of the work in this codebase goes into keeping the reader moving anyway:
 
 - **Supply ahead of the reader:** a bounded queue (60 to 100 articles, 16 cards rendered ahead) with retries that back off exponentially.
-- **No repeats:** duplicate checks across queued and displayed cards, and randomized batch slots so readers don't all receive the same cached selection.
+- **Fresh openings, no repeats within a visit:** online readers start from an independently sampled batch. Duplicate checks cover queued and displayed cards; later preloading uses randomized shared batch slots for efficiency. Offline openings use cached content.
 - **Accurate depth:** Wikimedia returns pageviews for only 5 pages per request, so the rest are fetched in chunks. Missing data is never treated as "obscure". Depth ranges are adjusted per language.
 - **Deadlines:** each upstream call has a 6-second limit, and the main feed answers within a 6.5-second budget. If time runs out, the Worker answers with the cards that are complete and finishes the rest in the background.
 - **Rate-limit awareness:** `429` and `Retry-After` pause only the affected host, in both the Worker and the browser.

@@ -9,6 +9,8 @@ WikiScroll has two parts, deployed together as a single Cloudflare Worker with s
 1. **A static front end** (`public/`). Plain HTML, CSS and JavaScript, served as-is. There is no framework, bundler or compile step. The browser holds all user data (saved articles, collections, history, settings) in `localStorage`, with IndexedDB as a second copy of saved articles.
 2. **A Worker** (`worker/`). It answers a few JSON endpoints that turn Wikimedia's APIs into ready-to-read cards. It verifies metadata for shared links and collections, and serves prebuilt preview artwork. It has no database: its only state is Cloudflare's edge cache, in-memory maps for coalescing requests, and rate-limit bindings.
 
+The diagram below shows ordinary preloading. Online Wikipedia and unfiltered Wikivoyage openings include a per-draw random key and bypass completed shared batches; they reuse source metadata and coalesce retries of that exact draw. Topic and Help openings follow the same rule. Offline openings use an exact-settings local reserve or eligible starter content.
+
 ```mermaid
 sequenceDiagram
   participant R as Reader (browser)
@@ -46,7 +48,7 @@ The browser asks the Worker for batches and keeps a reserve queued ahead of the 
 | `lang.js`, `i18n.js` + `translations/<lang>.js` | Interface localization. `lang.js` loads the reader's dictionary (one small file per language) as early as possible; `i18n.js` applies it through a `MutationObserver`. Article text is excluded. |
 | `sw.js` | Service worker: offline app shell, network-first page loads with a 2.5-second fallback to cache, and a cache of up to 80 Wikimedia images. |
 | `styles.css` | All styling, including the dark and light themes, responsive layouts, RTL and reduced-motion rules. |
-| `data/starter-en.json` | A small bundled set of English articles, used for an instant first screen when no filters are set. See [STARTER-SOURCES.md](STARTER-SOURCES.md). |
+| `data/starter-en.json` | A small bundled set of English articles for eligible offline openings when there is no matching local reserve. Online openings wait for an independent live draw. See [STARTER-SOURCES.md](STARTER-SOURCES.md). |
 | `about/` | The crawlable About page. `scripts/build-about.mjs` copies its content into the in-app About dialog. |
 
 ### `worker/`: the Cloudflare Worker
@@ -63,7 +65,7 @@ The browser asks the Worker for batches and keeps a reserve queued ahead of the 
 | `collections.js` | Decodes and validates shared collections, renders the verified collection page, and serves prebuilt PNG preview artwork. |
 | `verified.js` | Fetches article metadata again from Wikimedia by page ID, for shared links and collections. |
 | `runtime.js` | One invocation budget for fetch and cache operations, a shared upstream scheduler, deadlines and cooldowns. |
-| `supply.js` | Bounded reusable source records for readership, introductions and maintenance tags, isolated by edition/source. |
+| `supply.js` | Bounded reusable source records for readership, introductions and maintenance tags, isolated by edition/source; a separate bounded, short-lived cache for retries of individual opening draws. |
 | `security.js` | Rate-limit checks that fail closed, the `429` response, security headers on every response, and the page's Content Security Policy (`PAGE_CSP`). |
 | `languages.js` | The 15 supported languages, shared by the router and shared collections. |
 | `travel.js` | Travel search rules: reading one or more places, matching guides to a place, alternating between places, and the per-place pagination cursor. |
@@ -75,7 +77,7 @@ The browser asks the Worker for batches and keeps a reserve queued ahead of the 
 | `test/` | `node --test` suites for the Worker modules, plus browser logic extracted from `public/*.js` and run in `node:vm` sandboxes. |
 | `scripts/` | `deploy.sh` (token-scoped deployment), `build-about.mjs`, `build-branding.mjs` (regenerates icons and the share image). |
 | `branding/` | Logo sources and the Natural Earth geometry used to draw the globe on the share image. |
-| `wrangler.jsonc` | Worker configuration: static assets, the three rate-limit bindings, observability. |
+| `wrangler.jsonc` | Worker configuration: static assets, rate-limit bindings and observability. |
 | `docs/` | This documentation and the images used in the README. |
 
 ## Data model
@@ -97,7 +99,7 @@ The browser stores data under stable keys: `ws_liked`, `ws_collections`, `ws_his
 
 These rules hold across the codebase, and many are enforced by tests. Changes should preserve them.
 
-- **No personalization from behavior.** Feed requests contain only the reader's explicit choices: source, language, depth, topics, Help Wikipedia mode and travel filters. Likes, history and previous cards never affect selection.
+- **No personalization from behavior.** Feed requests contain explicit choices (source, language, depth, topics, Help Wikipedia mode and travel filters), a batch slot, and an ephemeral opening draw when needed. Likes and previous cards never personalize live selection; history stays on-device and can order offline reserves.
 - **Depth means readership, not length.** Excerpt length is never used as a stand-in for depth. Pages with unknown readership never qualify as *Obscure*.
 - **One feed generation at a time.** Changing source, language or filters increments `fillGeneration`, aborts in-flight requests and cancels animations. Any reply or animation frame from an older generation is discarded.
 - **The visible card is never lost.** Clean-up, resizes, supply gaps and gestures keep the reader on the article they are reading.

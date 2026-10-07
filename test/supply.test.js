@@ -151,12 +151,13 @@ test('live cards win online startup before any restored or fixed starter cards',
   h.requests[1]([]);await filling;
 });
 
-test('slow online startup still obtains readable starter cards after the grace period',async()=>{
-  const h=harness(),fallback=h.run('startStartupFallback(fillGeneration)');
+test('slow online startup never substitutes the fixed starter pool before the fresh draw arrives',async()=>{
+  const h=harness(),fallback=h.run('startStartupFallback(fillGeneration)'),filling=h.run('fillQueue()');
   assert.equal(h.nodes.length,0);assert.equal(h.starterRequests,0);
   await h.fire(1800);await fallback;
-  assert.equal(h.starterRequests,1);assert.equal(h.nodes.length,17);
-  assert.equal(h.state().articles.length+h.state().queue.length,30);
+  assert.equal(h.starterRequests,0);assert.equal(h.nodes.length,0);
+  h.requests[0](batch(40,1000));await tick();assert.equal(h.state().articles[0],'w1000');
+  h.requests[1]([]);await filling;
 });
 
 test('offline startup reshuffles the exact reserve and puts recently unread cards first',async()=>{
@@ -173,8 +174,9 @@ test('offline startup reshuffles the exact reserve and puts recently unread card
 test('a delayed starter response cannot enter a switched feed or replace live cards',async()=>{
   for(const action of ['change','live']){
     const h=harness();let deliver;
+    h.context.navigator.onLine=false;
     h.context.fetch=()=>new Promise(resolve=>{deliver=resolve;});
-    const fallback=h.run('startStartupFallback(fillGeneration)'),timer=h.fire(1800);
+    const fallback=h.run('startStartupFallback(fillGeneration)'),timer=h.fire(0);
     if(action==='change')h.change("curMode='how';");
     h.add(batch(25,1000,action==='change'?'how':'wiki'));h.run('ensureFeedAhead()');
     deliver(Response.json({wiki:batch(30),how:batch(30,1,'how')}));await timer;await fallback;

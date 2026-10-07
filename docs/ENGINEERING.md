@@ -32,7 +32,7 @@ const QUEUE_MIN = 60, QUEUE_TARGET = 100, CARDS_AHEAD = 16;
 - **Rendering is bounded.** At most 16 cards are rendered ahead of the current one. Images for the next 24 queued articles are preloaded into an in-memory cache of 100 images.
 - **Refills are bounded.** A refill makes at most 5 requests and stops at 100 queued articles. Concurrent refill calls share the same task instead of starting new ones.
 - **Retries back off.** When the queue falls below 60, a refill is scheduled with exponential backoff (700 ms × 1.6ⁿ, capped at 10 s). Retries pause while the tab is hidden or offline, and restart when the connection returns.
-- **A fresh opening with a fallback.** Online starts give live randomized cards first priority. If no cards arrive within 1.8 seconds, an exact-settings reserve (up to 7 days old) or an eligible bundled English starter set supplies the opening. Offline starts use that fallback immediately. Cached content is reshuffled with recently unviewed cards first; a late fallback never replaces live cards or enters a switched feed. Explicit filters are never replaced by generic English content.
+- **Independent online openings, cached offline openings.** Online starts wait for their own fresh draw. A slow response never substitutes a shared starter pool or a previously restored batch. Offline starts immediately use an exact-settings reserve (up to 7 days old) or the eligible bundled English starter set. Offline content is reshuffled with recently unviewed cards first; a late fallback never replaces live cards or enters a switched feed. Explicit filters are never replaced by generic English content.
 
 ## 2. Random discovery without repeats
 
@@ -40,7 +40,9 @@ const QUEUE_MIN = 60, QUEUE_TARGET = 100, CARDS_AHEAD = 16;
 
 Every article that enters the queue is recorded in a session-wide `feedSeen` set, so a card can't appear twice, whether it arrives from the Worker, the reserve, the starter set or a direct fallback. Batches are shuffled as they arrive.
 
-The Worker caches supply in **64 batch slots** per source, language and depth. Each browser starts at a random slot and moves through them in turn, so readers don't all receive the same cached selection:
+Wikipedia and unfiltered Wikivoyage openings include an ephemeral **128-bit draw key** generated on the device. The Worker bypasses completed shared batches for that key and samples a new opening, even if another visitor picked the same batch slot. Topic and Help openings do the same while preserving their filters. Retries retain the draw key, coalesce pending work, and reuse only that draw's completed response. A bounded memory cache keeps at most 64 such answers for two minutes; these one-off keys never enter the shared edge cache. The key is not stored as a visitor identifier. Articles can still overlap by chance, especially inside a small filtered pool.
+
+Later preloading uses shared supply in **64 batch slots** per source, language and depth. Each browser chooses a random starting slot and advances through them, preserving the speed and upstream savings of cached refills:
 
 ```js
 let workerBatch = Math.floor(Math.random()*64);
@@ -54,7 +56,7 @@ Topic feeds sample 6 random branches of a topic's category tree, go down 2 or 3 
 
 **A failed lookup resumes instead of starting over.** A bounded five-minute progress map retains candidates and successful metadata for a failed topic batch. Failed tags and introductions remain retryable; they are not treated as verified empty results. Slow topic responses expose ready verified cards after nine seconds, or return a short retry interval while the shared job continues. Partial responses retain the browser's batch key. A temporary cooldown on an empty opening keeps the loading state and automatic recovery instead of immediately replacing it with a generic failure card.
 
-Live sampling never uses likes, saves or history. The browser sends only the settings it displays; `test/randomness.test.js` checks that those actions do not personalize live discovery or its requests. The startup fallback orders its cached cards on the device to avoid reopening a recently read card when an unread one is available; that history is never sent to the server.
+Live sampling never uses likes, saves or history. Apart from the ephemeral opening draw and batch slot, the browser sends only the settings it displays; `test/randomness.test.js` checks that reader actions do not personalize live discovery or its requests. The offline startup fallback orders cached cards on the device to avoid reopening a recently read card when an unread one is available; that history is never sent to the server. Filtered travel retains its destination-aware pagination rather than skipping guides to manufacture uniqueness.
 
 ## 3. Depth from real readership
 
@@ -108,7 +110,7 @@ flowchart LR
   C & D --> F["deliver ready cards"]
 ```
 
-**Two samples, first one wins.** For Wikipedia, two random queries run at once (up to 40 candidates). Whichever sample finishes first delivers cards immediately. The merged result is cached after both finish.
+**Two samples, first one wins.** For Wikipedia, two random queries run at once (up to 40 candidates). Whichever sample finishes first delivers cards immediately. The merged result is cached after both finish: in short-lived memory for that opening draw, or in the shared edge cache for ordinary refills.
 
 **Request coalescing.** Identical requests share one in-flight task (the `inFlight` map keyed by cache URL). The same pattern appears for topics, filtered travel, vital-article lists, "On this day", verified metadata and collection verification. Collection artwork is served as a static asset.
 

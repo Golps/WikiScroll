@@ -2,7 +2,7 @@ import {averageViews,lagDays,completePageviews,scaleBand} from './pageviews.js';
 import {completeExtracts,extractParams} from './extracts.js';
 import {completeNeeds,sampleNeedyTitles,HELP_LANGS} from './needs.js';
 import {createWork,unavailable} from './runtime.js';
-import {imageURL} from './supply.js';
+import {imageURL,validOpeningDraw,createOpeningCache} from './supply.js';
 // Each refill samples several branches; neither likes nor previous cards enter
 // this pipeline. Bounds keep category traversal and upstream work finite.
 export const roots={
@@ -20,6 +20,7 @@ arts:['Painting','Sculpture','Architecture','Literature','Classical music','Cine
 people:['Scientists','Explorers','Philosophers','Inventors','Artists','Writers','Mathematicians','Historians','Engineers','Educators','Composers','Humanitarians']};
 const shuffle=a=>{a=[...a];for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;};
 const lists=new Map(),pending=new Map(),translatedRoots=new Map(),progress=new Map();
+const openingCache=createOpeningCache();
 const FRESH_MS=120_000,RETAIN_SECONDS=86_400,CATEGORY_MS=15*60_000;
 const bands={1:[300,Infinity],2:[100,500],3:[10,300],4:[5,60],5:[0,10]};
 function readyArticles(chosen,topic,lang){
@@ -137,9 +138,10 @@ export async function topicResponse(url,env,ctx,{langs,permit,limited,upstream,w
  const suppliedWork=!!work;work ||= createWork(env,ctx);
  const topic=url.searchParams.get('topic'),lang=url.searchParams.get('lang')||'en',depth=Number(url.searchParams.get('depth')||3),batch=Number(url.searchParams.get('batch')||0);
  const helpParam=url.searchParams.get('help'),help=helpParam==='1';
- if(!(Object.hasOwn(roots,topic)||topic==='help')||!langs.has(lang)||!Number.isInteger(depth)||!bands[depth]||!Number.isInteger(batch)||batch<0||batch>63||(helpParam!==null&&!help))return Response.json({error:'Invalid topic parameters'},{status:400});
+ const draw=url.searchParams.get('draw');
+ if(!(Object.hasOwn(roots,topic)||topic==='help')||!langs.has(lang)||!Number.isInteger(depth)||!bands[depth]||!Number.isInteger(batch)||batch<0||batch>63||(helpParam!==null&&!help)||!validOpeningDraw(draw))return Response.json({error:'Invalid topic parameters'},{status:400});
  if((topic==='help'||help)&&!HELP_LANGS.has(lang))return Response.json({error:'Help Wikipedia is not available in this language'},{status:400});
- const key=new Request(`${url.origin}/api/topics?v=7&topic=${topic}&lang=${lang}&depth=${depth}&batch=${batch}${help&&topic!=='help'?'&help=1':''}`),cache=work.cache;
+ const key=new Request(`${url.origin}/api/topics?v=7&topic=${topic}&lang=${lang}&depth=${depth}&batch=${batch}${help&&topic!=='help'?'&help=1':''}${draw?'&draw='+draw:''}`),cache=draw?openingCache:work.cache;
  const respond=(payload,cacheState)=>Response.json(payload,{headers:{'Cache-Control':'no-store',...(cacheState?{'X-Cache':cacheState}:{})}});
  let stored;try{const hit=await cache?.match(key);if(hit)stored=await hit.json();}catch{}
  const age=Array.isArray(stored?.articles)&&stored.articles.length?Date.now()-Date.parse(stored.cached_at):Infinity;
@@ -159,18 +161,18 @@ export async function topicResponse(url,env,ctx,{langs,permit,limited,upstream,w
   return task;
  }
  if(Number.isFinite(age)&&age>=0&&age<RETAIN_SECONDS*1000){
-  const stale=age>=FRESH_MS;
+  const stale=!draw&&age>=FRESH_MS;
   if(stale&&!pending.has(key.url)&&await permit(env,'WORK_LIMIT','topics'))refresh();
-  return respond({...stored,stale},stale?'STALE':'HIT');
+  return respond({...stored,stale},draw?'REPLAY':stale?'STALE':'HIT');
  }
  if(!pending.has(key.url)&&!await permit(env,'WORK_LIMIT','topics'))return limited();
  let timer;
  try{
   const task=refresh();
   const answer=await Promise.race([task,new Promise(resolve=>{timer=setTimeout(()=>resolve(null),9000);})]);
-  if(answer)return respond(answer,'MISS');
+  if(answer)return respond(answer,draw?'FRESH':'MISS');
   const articles=readyArticles(progress.get(key.url)?.chosen||[],topic,lang);
-  if(articles.length)return respond({articles,partial:true},'MISS');
+  if(articles.length)return respond({articles,partial:true},draw?'FRESH':'MISS');
   // The shared job continues within its original invocation budget. Retrying
   // this key joins it instead of repeating sampling and source lookups.
   if(work.reason==='upstream_rate_limited'||work.reason==='work_rate_limited')return unavailable(work,'Topic search temporarily unavailable');

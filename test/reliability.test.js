@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createWork,createNetwork,FETCH_LIMIT,SUBREQUEST_LIMIT} from '../worker/runtime.js';
-import {createSupply} from '../worker/supply.js';
+import {createSupply,createOpeningCache,validOpeningDraw} from '../worker/supply.js';
 import {topicResponse} from '../worker/topics.js';
 import {verifyCollection} from '../worker/verified.js';
 import {createPlaceResolver,parsePlaces,placeMention,travelTerms,isDisambiguation} from '../worker/travel.js';
@@ -11,6 +11,15 @@ import {NEED_CATEGORIES} from '../worker/needs.js';
 const env={WORK_LIMIT:{limit:async()=>({success:true})}};
 const context=()=>{const tasks=[];return {waitUntil:p=>tasks.push(p),done:()=>Promise.all(tasks)};};
 function cache(){const values=new Map();return {async match(k){return values.get(k.url)?.clone();},async put(k,v){values.set(k.url,v.clone());}};}
+
+test('opening retry storage is bounded, expires without extending its lifetime and refuses oversized answers',async t=>{
+ let now=100000;t.mock.method(Date,'now',()=>now);const openings=createOpeningCache(),key=i=>new Request('https://wikiscroll.com/opening/'+i);
+ assert.equal(validOpeningDraw(null),true);assert.equal(validOpeningDraw('a'.repeat(32)),true);assert.equal(validOpeningDraw(''),false);assert.equal(validOpeningDraw('a'.repeat(33)),false);
+ for(let i=0;i<65;i++)await openings.put(key(i),Response.json({articles:[{id:'w'+(i+1)}]}));
+ assert.equal(await openings.match(key(0)),undefined);assert.equal((await (await openings.match(key(64))).json()).articles[0].id,'w65');
+ now+=60000;assert.ok(await openings.match(key(64)));now+=60001;assert.equal(await openings.match(key(64)),undefined);
+ await openings.put(key('large'),new Response('x'.repeat(128001)));assert.equal(await openings.match(key('large')),undefined);
+});
 
 test('one invocation accounts for fetches AND caches, caps concurrency, and refuses overflow',async()=>{
  const oldFetch=globalThis.fetch,oldCache=globalThis.caches;

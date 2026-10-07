@@ -655,9 +655,9 @@ function loadStarterLibrary(gen) {
   });
 }
 function startStartupFallback(gen) {
-  // The fixed starter library must not win every online start merely because
-  // static assets arrive before live cards. Reserves remain a latency/offline
-  // fallback, not the default opening sequence.
+  // Online visits wait for their own fresh draw. A quick shared starter or
+  // restored batch would give different readers the same small opening pool.
+  if(navigator.onLine!==false)return Promise.resolve();
   return new Promise(resolve=>setTimeout(async()=>{
     try {
       if(gen!==fillGeneration||articles.length)return;
@@ -670,7 +670,7 @@ function startStartupFallback(gen) {
       const seen=shuffledBackup.filter(a=>recent.has(savedKey(a)));
       acceptSupply([...unseen,...seen],gen,false);ensureFeedAhead();
     } catch {} finally {resolve();}
-  },navigator.onLine===false?0:1800));
+  },0));
 }
 function retryAfterMillis(value){
   if(value==null||value==='')return 5000;
@@ -688,6 +688,11 @@ async function fetchWorkerBatch(gen) {
   if(!pendingWorkerBatch||pendingWorkerBatch.context!==context){
     const slot=workerBatch++%64;
     const params=new URLSearchParams({mode:curMode,lang:curMode==='how'?voyageLang():curLang,n:'40',depth:String(curMode==='wiki'?depthLevel:3),batch:String(slot)});
+    if(!articles.length&&!queue.length){
+      // Ephemeral per-draw randomness, never a stored visitor identifier.
+      const bytes=crypto.getRandomValues(new Uint8Array(16));
+      params.set('draw',Array.from(bytes,byte=>byte.toString(16).padStart(2,'0')).join(''));
+    }
     if(subjects.length){params.set('topic',subjects[slot%subjects.length]);if(help)params.set('help','1');}
     else if(help)params.set('topic','help');
     pendingWorkerBatch={context,params};
@@ -957,6 +962,7 @@ function resetFeed() {
   fillGeneration++;pendingDeepGeneration=-1;
   supplyControllers.forEach(controller=>controller.abort());
   articles=[];queue=[];feedSeen.clear();filling=false;supplyTask=null;
+  pendingWorkerBatch=null;
   clearTimeout(refillTimer);refillTimer=null;refillAttempts=0;clearTimeout(reserveTimer);
   window.WSDiscoveryHint?.hide();
   const feed=document.getElementById('feed');

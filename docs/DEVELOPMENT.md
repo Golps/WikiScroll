@@ -22,7 +22,7 @@ pnpm install --frozen-lockfile
 pnpm dev
 ```
 
-`pnpm dev` runs `wrangler dev`, which serves the Worker and the static files in `public/` at <http://localhost:8787>. Local development simulates the rate-limit bindings and the edge cache. Article data comes live from Wikimedia, so you need a network connection that can reach `*.wikipedia.org` and `*.wikivoyage.org`. Without it, the API returns `503` with a JSON error, and the app shows its retry state or the bundled English starter set.
+`pnpm dev` runs `wrangler dev`, which serves the Worker and the static files in `public/` at <http://localhost:8787>. Local development simulates the rate-limit bindings and the edge cache. Article data comes live from Wikimedia, so you need a network connection that can reach `*.wikipedia.org` and `*.wikivoyage.org`. Without it, the API returns `503` with a JSON error and the online app stays in its retry state. When the browser reports it is offline, an exact-settings local reserve or eligible bundled English starter set can supply the opening.
 
 There is no front-end build step. Edit `public/*` and reload. When you test offline behavior, remember that the service worker caches assets: use a private window, or bypass the service worker in your browser's developer tools.
 

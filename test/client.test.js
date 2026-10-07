@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
+import {webcrypto} from 'node:crypto';
 const source=fs.readFileSync(new URL('../public/app.js',import.meta.url),'utf8');
 const network=source.slice(source.indexOf('let apiCooldownUntil ='),source.indexOf('// ── ARTICLE VALIDATORS'));
 test('client honors global 429 cooldown without a second fetch',async()=>{
@@ -41,8 +42,8 @@ test('existing storage keys and native Safari privacy mechanism remain',()=>{
 test('Worker retries retain the same batch and honor a 180-second cooldown before any fallback',async()=>{
  const start=source.indexOf('function retryAfterMillis('),end=source.indexOf('function fillQueue(',start);
  let now=100000,calls=0;const urls=[];
- const c=vm.createContext({URLSearchParams,AbortController,Date:{now:()=>now,parse:Date.parse},setTimeout:()=>1,clearTimeout(){},fetch:async url=>{urls.push(url);return ++calls===1?new Response(null,{status:503,headers:{'Retry-After':'180'}}):Response.json({articles:[{id:'w1'}]});}});
- vm.runInContext(`let curMode='wiki',curLang='en',depthLevel=5,workerBatch=7,workerCooldownUntil=0,pendingWorkerBatch=null,fillGeneration=0;const supplyControllers=new Set(),curTopics=new Set();const helpOnly=()=>false,feedContextKey=()=>curLang+'|'+depthLevel;${source.slice(start,end)}`,c);
+ const c=vm.createContext({crypto:webcrypto,URLSearchParams,AbortController,Date:{now:()=>now,parse:Date.parse},setTimeout:()=>1,clearTimeout(){},fetch:async url=>{urls.push(url);return ++calls===1?new Response(null,{status:503,headers:{'Retry-After':'180'}}):Response.json({articles:[{id:'w1'}]});}});
+ vm.runInContext(`let curMode='wiki',curLang='en',depthLevel=5,workerBatch=7,workerCooldownUntil=0,pendingWorkerBatch=null,fillGeneration=0,articles=[],queue=[];const supplyControllers=new Set(),curTopics=new Set();const helpOnly=()=>false,feedContextKey=()=>curLang+'|'+depthLevel;${source.slice(start,end)}`,c);
  await c.fetchWorkerBatch(0);assert.equal(c.retryAfterMillis('180'),180000);
  await c.fetchWorkerBatch(0);assert.equal(calls,1);
  now+=180001;assert.equal((await c.fetchWorkerBatch(0))[0].id,'w1');assert.equal(urls[0],urls[1]);
@@ -52,8 +53,23 @@ test('Worker retries retain the same batch and honor a 180-second cooldown befor
 
 test('partial topic cards retain their batch until the completed response arrives',async()=>{
  const start=source.indexOf('function retryAfterMillis('),end=source.indexOf('function fillQueue(',start),urls=[];
- const c=vm.createContext({URLSearchParams,AbortController,Date,setTimeout:()=>1,clearTimeout(){},fetch:async url=>{urls.push(url);return Response.json({articles:[{id:'w1'}],partial:urls.length===1});}});
- vm.runInContext(`let curMode='wiki',curLang='en',depthLevel=3,workerBatch=7,workerCooldownUntil=0,pendingWorkerBatch=null,fillGeneration=0;const supplyControllers=new Set(),curTopics=new Set(['tech']);const helpOnly=()=>true,feedContextKey=()=>curLang+'|'+depthLevel;${source.slice(start,end)}`,c);
+ const c=vm.createContext({crypto:webcrypto,URLSearchParams,AbortController,Date,setTimeout:()=>1,clearTimeout(){},fetch:async url=>{urls.push(url);return Response.json({articles:[{id:'w1'}],partial:urls.length===1});}});
+ vm.runInContext(`let curMode='wiki',curLang='en',depthLevel=3,workerBatch=7,workerCooldownUntil=0,pendingWorkerBatch=null,fillGeneration=0,articles=[],queue=[];const supplyControllers=new Set(),curTopics=new Set(['tech']);const helpOnly=()=>true,feedContextKey=()=>curLang+'|'+depthLevel;${source.slice(start,end)}`,c);
  await c.fetchWorkerBatch(0);await c.fetchWorkerBatch(0);await c.fetchWorkerBatch(0);
  assert.equal(urls[0],urls[1]);assert.notEqual(urls[1],urls[2]);assert.match(urls[0],/help=1/);
+});
+
+test('fresh visitors use independent opening draws even with the same shared slot, then return to cached refills',async()=>{
+ const start=source.indexOf('function retryAfterMillis('),end=source.indexOf('function fillQueue(',start),openings=[];
+ for(let visitor=0;visitor<16;visitor++){
+  const urls=[];
+  const c=vm.createContext({crypto:webcrypto,URLSearchParams,AbortController,Date,setTimeout:()=>1,clearTimeout(){},fetch:async url=>{urls.push(new URL(url,'https://wikiscroll.com'));return Response.json({articles:[{id:'w1'}]});}});
+  vm.runInContext(`let curMode='wiki',curLang='en',depthLevel=3,workerBatch=7,workerCooldownUntil=0,pendingWorkerBatch=null,fillGeneration=0,articles=[],queue=[];const supplyControllers=new Set(),curTopics=new Set();const helpOnly=()=>false,feedContextKey=()=>curLang+'|'+depthLevel;${source.slice(start,end)}`,c);
+  await c.fetchWorkerBatch(0);
+  assert.equal(urls[0].searchParams.get('batch'),'7');assert.match(urls[0].searchParams.get('draw'),/^[a-f0-9]{32}$/);
+  openings.push(urls[0].searchParams.get('draw'));
+  vm.runInContext('queue.push({id:"w1"});',c);await c.fetchWorkerBatch(0);
+  assert.equal(urls[1].searchParams.get('draw'),null,'ordinary preloading still uses shared supply');
+ }
+ assert.equal(new Set(openings).size,16);
 });

@@ -30,7 +30,7 @@ test('translated topic branches stay in the selected Wikipedia edition',async()=
 });
 test('invalid topic inputs do not trigger upstream work',async()=>{
  const options={langs:new Set(['en']),permit:async()=>{throw Error('should not execute');}};
- for(const query of ['topic=__proto__','topic=tech&depth=99','topic=tech&lang=invalid','topic=tech&batch=64'])assert.equal((await topicResponse(new URL('https://example.org/api/topics?'+query),{}, {},options)).status,400);
+ for(const query of ['topic=__proto__','topic=tech&depth=99','topic=tech&lang=invalid','topic=tech&batch=64','topic=tech&draw=','topic=tech&draw=short'])assert.equal((await topicResponse(new URL('https://example.org/api/topics?'+query),{}, {},options)).status,400);
 });
 
 let topicModule=0;
@@ -78,6 +78,32 @@ test('stale topic cards arrive immediately and remain available after an upstrea
   const retained=await (await cache.match(topicKey())).json();assert.equal(retained.articles[0].id,'w90');
   const denied={...settings,permit:async()=>false};
   assert.equal((await api.topicResponse(topicUrl(),{},jobs,denied)).status,200);
+ });
+});
+
+test('fresh topic/help openings bypass shared completed cards while retries retain their own verified batch',async t=>{
+ let seed=123;t.mock.method(Math,'random',()=>((seed=(seed*1664525+1013904223)>>>0)/4294967296));
+ const cache=edgeCache();await cache.put(topicKey(),Response.json({articles:[{id:'w777'}],cached_at:new Date().toISOString()}));
+ await withTopics(cache,async(api,jobs)=>{
+  const categories=new Map();let next=0,details=0;
+  const fixture=async address=>{
+   const p=new URL(address).searchParams;
+   if(p.has('cmtitle')){
+    const title=p.get('cmtitle');if(!categories.has(title))categories.set(title,Array.from({length:50},()=>({pageid:++next,ns:0,title:'Opportunity '+next})));
+    return {query:{categorymembers:categories.get(title)}};
+   }
+   if(p.get('prop').includes('info'))details++;
+   return {query:{pages:Object.fromEntries(p.get('pageids').split('|').map(id=>[id,{
+    pageid:Number(id),ns:0,title:'Opportunity '+id,pageviews:{a:20},categories:[{title:'Category:All articles needing additional references'}],
+    ...(p.get('prop')==='extracts'?{extract:'An informative and verified introduction to this article requiring help. '.repeat(2)}:{})
+   }]))}};
+  };
+  const settings=options(fixture),drawA=new URL(topicUrl()),drawB=new URL(topicUrl());
+  drawA.searchParams.set('draw','a'.repeat(32));drawA.searchParams.set('help','1');drawB.searchParams.set('draw','b'.repeat(32));drawB.searchParams.set('help','1');
+  const a=await api.topicResponse(drawA,{},jobs,settings),first=await a.json();await jobs.done();assert.equal(a.headers.get('X-Cache'),'FRESH');assert.ok(first.articles.length>0&&first.articles.every(p=>p.id!=='w777'&&p.needs.includes('citations')));
+  const before=details,b=await api.topicResponse(drawB,{},jobs,settings),second=await b.json();await jobs.done();assert.equal(b.headers.get('X-Cache'),'FRESH');assert.ok(details>before);
+  assert.notDeepEqual(first.articles.map(a=>a.id).sort(),second.articles.map(a=>a.id).sort());
+  const count=details,retry=await api.topicResponse(drawA,{},jobs,settings);assert.equal(retry.headers.get('X-Cache'),'REPLAY');assert.deepEqual((await retry.json()).articles,first.articles);assert.equal(details,count);assert.equal(cache.entries.size,1);
  });
 });
 

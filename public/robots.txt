@@ -1,4 +1,13 @@
+# Content Signals (https://contentsignals.org/): how WikiScroll's own pages
+# may be used after they are read.
+#   search=yes    build a search index and show links and short excerpts
+#   ai-input=yes  use a page to answer a question in an AI answer, with a link
+#   ai-train=no   do not train or fine-tune AI models on these pages
+# Article text shown in WikiScroll comes from Wikipedia and Wikivoyage under
+# their own licenses (CC BY-SA); these signals cover WikiScroll's pages only.
 User-agent: *
+Content-Signal: search=yes, ai-input=yes, ai-train=no
 Allow: /
 Disallow: /api/
+
 Sitemap: https://wikiscroll.com/sitemap.xml

@@ -8235,3 +8235,14 @@ html.i18n-pending body { visibility: hidden; }
 .travel-end-actions { display: flex; flex-direction: column; gap: 10px; }
 .travel-end-actions .err-btn + .err-btn { background: none; color: var(--ink); border: 1px solid var(--rule); }
 .travel-end h2.err-ttl { margin-top: 0; }
+
+/* Settings About card footer: About, Privacy Policy and the GitHub icon as one
+   evenly spaced, centred row that wraps cleanly on narrow phones. */
+.sp-about-links { display: flex; flex-wrap: wrap; justify-content: center; gap: 0 20px; margin-top: 12px; }
+.sp-about-links .about-link, .sp-about-links .privacy-link-btn, body.light .sp-about-links .privacy-link-btn {
+  display: inline-flex; align-items: center; min-height: 36px; padding: 0; margin: 0;
+  font: 400 12px/1.2 var(--sans); color: var(--accent) !important;
+  text-decoration: underline; text-underline-offset: 3px; background: none; border: 0; cursor: pointer;
+}
+.sp-about-links .about-link-icon { text-decoration: none; justify-content: center; min-width: 36px; }
+.sp-about-links .about-link-icon svg { display: block; }

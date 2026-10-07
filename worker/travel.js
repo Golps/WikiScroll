@@ -34,6 +34,32 @@ export function namesPlace(page, place) {
   return fold(page.title).includes(name) || fold(page.extract).includes(name);
 }
 
+// Ordering within a page stays Wikivoyage's search relevance. Measured and
+// rejected (September 24, 2026): dropping guides that mention the place only
+// after their first sentence lost Tokyo, Sapporo, Rio de Janeiro and Kansai;
+// moving them to the end of the page pushed English Tokyo behind airports.
+
+// Disambiguation pages, by description (English) or by title in each edition:
+// "Goiás (desambiguação)", "Paris (homonymie)", "Georgia (Begriffsklärung)".
+const DISAMBIGUATION_DESCRIPTION = /^topics referred to by the same term$/i;
+const DISAMBIGUATION_TITLE = /\((?:disambiguation|desambiguaci[oó]n|desambiguação|homonymie|begriffsklärung|disambigua|значения|曖昧さ回避|消歧[义義]|doorverwijspagina|ujednoznacznienie|פירושונים)\)$/iu;
+export const isDisambiguation = page => DISAMBIGUATION_DESCRIPTION.test(page?.description || '') || DISAMBIGUATION_TITLE.test(page?.title || '');
+
+// Phrasebooks are language guides, not destinations. Each Wikivoyage edition
+// names them its own way (checked against every edition's phrasebook
+// category): "Japanese phrasebook", "Sprachführer Englisch", "Guía de
+// húngaro", "Guide linguistique basque", "שיחון איטלקי", "Taalgids Deens",
+// "Rozmówki czeskie", "Guia de conversação alemão", "Японский разговорник",
+// "英語会話集", "丹麦语会话手册". Italian titles them with the language alone
+// ("Cinese"), so the category is checked too: phrasebookParams adds it to the
+// same request, and a page in it comes back with a categories list.
+export const PHRASEBOOK_CATEGORY = {en: 'Category:Phrasebooks', de: 'Kategorie:Sprachführer', es: 'Categoría:Guías de conversación', fr: 'Catégorie:Guides linguistiques', he: 'קטגוריה:שיחונים', it: 'Categoria:Frasari', ja: 'カテゴリ:会話集', nl: 'Categorie:Taalgids', pl: 'Kategoria:Rozmówki', pt: 'Categoria:Guias de conversação', ru: 'Категория:Разговорники', zh: 'Category:会话手册'};
+export const PHRASEBOOK = /\bphrasebooks?\b|^Sprachführer\b|^Guías? de conversación\b|^Guides? linguistiques?\b|^שיחו[ןנ]|^Frasari[oi]?\b|会話集$|^Taalgids\b|^Rozmówki\b|^Guias? de conversação\b|разговорник|会话手册|會話手冊/iu;
+// Spanish: "Guía de húngaro" (a language, lower case), never "Guía de Madrid".
+const SPANISH_GUIDE = /^Guía de \p{Ll}/u;
+export const phrasebookParams = lang => PHRASEBOOK_CATEGORY[lang] ? {clcategories: PHRASEBOOK_CATEGORY[lang], cllimit: 'max'} : {};
+export const isPhrasebook = page => PHRASEBOOK.test(page?.title || '') || SPANISH_GUIDE.test(page?.title || '') || (Array.isArray(page?.categories) && page.categories.length > 0);
+
 // Alternate between places so one never crowds out another. A guide that
 // matches two places appears once.
 export function interleave(lists) {

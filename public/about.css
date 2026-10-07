@@ -11,3 +11,6 @@
 #aboutDialog .about-copy{padding-top:0}
 #aboutDialog .about-copy h1,#privacyDialog .modal-logo{margin:0 0 24px;padding:12px 48px 24px 0;border-bottom:1px solid var(--rule);font:400 clamp(26px,5vw,32px)/1.2 var(--serif,"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif);text-align:left}
 @media(max-width:767px){#aboutDialog,#privacyDialog{padding:24px}#aboutDialog .modal-close,#privacyDialog .modal-close,#sourceDialog .modal-close{top:12px;right:12px}}
+
+/* The WikiScroll film under the About heading (dialog and /about/). */
+.about-film{margin:0 0 28px}.about-film video{display:block;width:100%;height:auto;aspect-ratio:16/9;border-radius:12px;background:#000}.about-film figcaption{margin-top:8px;font-size:13px;line-height:1.5;color:var(--muted,#9aa3b2)}

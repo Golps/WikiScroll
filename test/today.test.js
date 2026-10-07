@@ -26,16 +26,8 @@ test('only each entry\'s subject is matched, with its kind and year', () => {
 test('surprise candidates need a photo and an introduction, and never come from deaths', () => {
   const {seeds} = parseToday(feed, 'en');
   assert.deepEqual(seeds.map(a => a.id).sort(), ['w1', 'w3', 'w6']);
-  assert.equal(seeds.find(a => a.id === 'w1').img, 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/ab/P1.jpg/960px-P1.jpg', 'card-size photo, in a width Wikimedia serves');
+  assert.equal(seeds.find(a => a.id === 'w1').img, 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/ab/P1.jpg/960px-P1.jpg', 'card-size photo (a standard Wikimedia width)');
   assert.equal(seeds.find(a => a.id === 'w1').title, 'Page 1');
-});
-
-test('photos from thumb.wikimedia.org qualify like upload.wikimedia.org ones', () => {
-  const thumbHost = page(7, {thumbnail: {source: 'https://thumb.wikimedia.org/wikipedia/commons/thumb/c/cd/P7.jpg/320px-P7.jpg'}, originalimage: undefined});
-  const other = page(8, {thumbnail: {source: 'https://example.org/wikipedia/commons/thumb/c/cd/P8.jpg/320px-P8.jpg'}});
-  const {seeds} = parseToday({births: [{year: 1900, pages: [thumbHost, other]}]}, 'en');
-  assert.deepEqual(seeds.map(a => a.id), ['w7'], 'the same article qualifies on either Wikimedia host; other hosts do not');
-  assert.equal(seeds[0].img, 'https://thumb.wikimedia.org/wikipedia/commons/thumb/c/cd/P7.jpg/960px-P7.jpg');
 });
 
 test('a missing or broken feed yields nothing rather than an error', () => {
@@ -59,7 +51,7 @@ test('the endpoint validates input and caches each language and date', async () 
     assert.equal(calls.length, 1); assert.equal(again.headers.get('X-Cache'), 'HIT');
     const unsupported = await todayResponse(new URL('https://w.test/api/today?lang=ja&md=09-23'), {}, options(() => ({}), calls));
     assert.deepEqual((await unsupported.json()).matches, {});
-    assert.match(cache.m.get('https://wikiscroll.com/__today/v3/ja/09-23').headers.get('Cache-Control'), /max-age=21600/, 'editions without the list are settled for the day');
+    assert.match(cache.m.get('https://wikiscroll.com/__today/v4/ja/09-23').headers.get('Cache-Control'), /max-age=21600/, 'editions without the list are settled for the day');
   } finally { globalThis.caches = original; }
 });
 
@@ -71,7 +63,7 @@ test('a failed feed is a temporary error, never a cached empty day', async () =>
     assert.equal(failed.status, 503, 'the browser must not accept a timeout as a day without anniversaries');
     assert.equal(failed.headers.get('Retry-After'), '120');
     assert.equal(failed.headers.get('Cache-Control'), 'no-store', 'browsers never keep the failure');
-    assert.match(cache.m.get('https://wikiscroll.com/__today/v3/es/09-23').headers.get('Cache-Control'), /max-age=120/, 'the edge retries after two minutes');
+    assert.match(cache.m.get('https://wikiscroll.com/__today/v4/es/09-23').headers.get('Cache-Control'), /max-age=120/, 'the edge retries after two minutes');
     const during = await todayResponse(url, {}, options(() => feed, calls));
     assert.equal(during.status, 503, 'the short failure marker is served as an error too');
     assert.equal(calls.length, 1, 'no extra upstream request while the marker lasts');
@@ -140,4 +132,16 @@ test('average spacing is about one in forty', () => {
   const mean = gaps.reduce((a, b) => a + b, 0) / gaps.length;
   assert.ok(mean > 34 && mean < 46, 'mean gap ' + mean.toFixed(1));
   assert.ok(Math.min(...gaps) >= 10 && Math.max(...gaps) > 100, 'irregular: short and long gaps both occur');
+});
+
+
+test('anniversary photos from either Wikimedia host qualify, in a width Wikimedia serves', async () => {
+  const {cardImage} = await import('../worker/today.js');
+  const q = '?utm_source=en.wikipedia.org&utm_campaign=api&utm_content=thumbnail';
+  assert.equal(cardImage({thumbnail: {source: `https://thumb.wikimedia.org/wikipedia/commons/thumb/b/b2/Shinjuku.jpg/330px-Shinjuku.jpg${q}`}, originalimage: {source: 'https://upload.wikimedia.org/wikipedia/commons/b/b2/Shinjuku.jpg', width: 2560}}),
+    `https://thumb.wikimedia.org/wikipedia/commons/thumb/b/b2/Shinjuku.jpg/960px-Shinjuku.jpg${q}`);
+  assert.equal(cardImage({thumbnail: {source: 'https://thumb.wikimedia.org/wikipedia/commons/thumb/c/c3/Flag.svg/langes-330px-Flag.svg.png?utm_source=es.wikipedia.org'}}),
+    'https://thumb.wikimedia.org/wikipedia/commons/thumb/c/c3/Flag.svg/langes-960px-Flag.svg.png?utm_source=es.wikipedia.org');
+  assert.equal(cardImage({thumbnail: {source: 'https://thumb.wikimedia.org/x/330px-a.jpg'}, originalimage: {source: 'https://upload.wikimedia.org/a.jpg?utm_source=x', width: 600}}), 'https://upload.wikimedia.org/a.jpg?utm_source=x', 'a small original is used as is');
+  assert.equal(cardImage({thumbnail: {source: 'https://example.org/330px-a.jpg'}}), '', 'other hosts are refused');
 });

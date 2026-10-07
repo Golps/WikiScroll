@@ -1,12 +1,14 @@
-# Runs the syntax checks and the test suite. It never deploys: wikiscroll.com
-# is deployed to Cloudflare by hand (docs/DEVELOPMENT.md#deploying).
 name: Tests
 on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
 permissions:
   contents: read
+concurrency:
+  group: wikiscroll-${{ github.event_name == 'pull_request' && github.ref || 'production' }}
+  cancel-in-progress: false
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -15,8 +17,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
-      # The suite has no dependencies to install.
-      - name: Syntax check
+      - name: Syntax checks
         run: for f in public/*.js public/translations/*.js worker/*.js scripts/*.mjs; do node --check "$f" || exit 1; done
       - name: Test suite
         run: node --test test/*.test.js

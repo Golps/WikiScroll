@@ -22,7 +22,7 @@ async function mocked(fetcher,run,cache){
 test('human deep links receive the app, not crawler HTML',async()=>{
   const response=await worker.fetch(new Request('https://wikiscroll.com/?a=w123',{headers:{'User-Agent':'Mozilla/5.0'}}),env,ctx);
   assert.match(await response.text(),/WikiScroll app/);
-  assert.equal(response.headers.get('Vary'),'User-Agent');
+  assert.equal(response.headers.get('Vary'),'Accept, User-Agent');
 });
 test('reject invalid article query parameters before upstream access',async()=>{
   for(const query of ['lang=evil.test','mode=bad','n=NaN','n=-1','n=200','n=1.5','batch=-1','batch=64','batch=1.5','depth=0','depth=6']){
@@ -477,7 +477,7 @@ test('travel search keeps guides about the place, in relevance order, alternatin
     const body=await (await worker.fetch(new Request('https://wikiscroll.com/api/travel?lang=en&place='+encodeURIComponent('Japan, Tuscany')),env,ctx)).json();
     assert.deepEqual(body.articles.map(a=>a.title),['Japan','Florence','Tokyo','Siena','Kyoto'],'relevance order, alternating, without Busan or the phrasebook');
     assert.equal(body.next,'20.-','Japan continues at 20; Tuscany has no more results');
-    assert.deepEqual(searches,[['Japan','0','15'],['Tuscany','0','15']],'30 results in total, split between the places');
+    assert.deepEqual(searches,[['Japan','0','15'],['Tuscany','0','15']],'two places share 30 results');
     searches.length=0;
     await worker.fetch(new Request('https://wikiscroll.com/api/travel?lang=en&place='+encodeURIComponent('Japan, Tuscany')+'&offset=20.-'),env,ctx);
     assert.deepEqual(searches,[['Japan','20','15']],'a finished place is not searched again');
@@ -493,143 +493,85 @@ test('a misspelled place that finds nothing comes back with a suggestion',async(
     assert.deepEqual(body,{articles:[],next:null,suggestion:'Japan'});
   });
 });
-test('a guide without an introduction uses its first paragraphs, never headings or lists',async()=>{
-  const {firstParagraphs,completeLeadText}=await import('../worker/extracts.js');
-  // Shapes taken from Spanish and Japanese Wikivoyage (September 2026).
-  const japon='\nRegiones\nJapón está formado por cuatro islas principales y muchas islas menores, siendo la más notable Okinawa. Honshu, la isla principal, es la más poblada.\n\n\nCiudades\nJapón tiene miles de ciudades; estas son nueve de las más importantes para el viajero.\n\nTokio - la moderna capital de Japón y la ciudad más densamente poblada de todas.\n1 Roma     ​  41.912.5 — La Ciudad Eterna ha sobrevivido a saqueos y fascistas, desastres de planificación urbana.\nSendai - la mayor ciudad de…';
-  assert.equal(firstParagraphs(japon),'Japón está formado por cuatro islas principales y muchas islas menores, siendo la más notable Okinawa. Honshu, la isla principal, es la más poblada.','the sentence that only introduces the city list is left out');
-  assert.equal(firstParagraphs('Regiones\nJapón está formado por cuatro islas principales y muchas islas menores, siendo la más notable Okinawa. Honshu se divide en estas regiones:\n\nCiudades'),'Japón está formado por cuatro islas principales y muchas islas menores, siendo la más notable Okinawa.','a paragraph ending in a colon keeps its complete sentences');
-  const kyoto='京都市（きょうとし）は日本の京都府の市であり、同府の府庁所在地です。\n\n\n地区\n京都市は11の区からなる。これらを5つの地域に分けて説明します。\n\n\n知る\n1　東京​　    ​  35.683333139.683333 - 首都であり、政治や金融などの一大中心地。\n平安時代から1869年（明治元年）に東京へ遷都するまでの間、日本の首都でした。';
-  assert.equal(firstParagraphs(kyoto),'京都市（きょうとし）は日本の京都府の市であり、同府の府庁所在地です。京都市は11の区からなる。これらを5つの地域に分けて説明します。平安時代から1869年（明治元年）に東京へ遷都するまでの間、日本の首都でした。');
-  assert.equal(firstParagraphs('Ciudades\nHay cientos de ciudades italianas. Aquí están nueve de las más famosas...'),'','a line cut off by the length limit is not used');
-  // Only short introductions are completed, at most `limit` per answer; a failed request is remembered.
-  const pages=[{pageid:1,extract:''},{pageid:2,extract:'Una introducción suficientemente larga para mostrarse en una tarjeta de viaje.'},{pageid:3,extract:'短い。'},{pageid:4,extract:''}];
-  const asked=[];
-  await completeLeadText(pages,async id=>{asked.push(id);if(id===3)throw Error('timeout');return {query:{pages:{[id]:{extract:japon}}}};},2);
-  assert.deepEqual(asked,[1,3]);
-  assert.match(pages[0].extract,/^Japón está formado/);
-  assert.equal(pages[2].extractMissing,true);assert.equal(pages[3].extract,'','over the limit: left for a later page');
-  assert.ok(pages.every(p=>!p.leadPending));
-});
-test('Spanish "Japón", which has no introduction, becomes a card from its first paragraph',async()=>{
-  const requests=[];
+test('a travel guide without an introduction is found through its opening text',async()=>{
+  const cache=edgeCache(),asked=[];
+  const opening='\n== Regiones ==\nJapón está formado por cuatro islas principales y muchas islas menores, siendo la más notable Okinawa. Honshu se divide en cinco regiones.\n\n== Ciudades ==\nTokio - la capital.';
   await mocked(async url=>{
-    const p=new URL(url).searchParams;requests.push(p.has('generator')?'search':p.has('exintro')?'intro':'lead');
-    if(p.has('generator'))return Response.json({query:{pages:{9:{pageid:9,ns:0,title:'Japón',index:1,fullurl:'https://es.wikivoyage.org/wiki/Jap%C3%B3n'}}}});
-    if(p.has('exintro'))return Response.json({query:{pages:{9:{pageid:9,extract:''}}}});
-    return Response.json({query:{pages:{9:{pageid:9,extract:'Regiones\nJapón está formado por cuatro islas principales y muchas islas menores, siendo la más notable Okinawa.'}}}});
+    const p=new URL(url).searchParams;
+    if(p.get('generator')==='search')return Response.json({query:{pages:{2577:{pageid:2577,ns:0,title:'Japón',index:1},3001:{pageid:3001,ns:0,title:'Tokio',index:2}}}});
+    if(p.get('prop')==='extracts'&&p.get('exintro'))return Response.json({query:{pages:{2577:{pageid:2577,extract:''},3001:{pageid:3001,extract:'Tokio es la capital de Japón y una de las ciudades más grandes del mundo, con barrios muy distintos.'}}}});
+    if(p.get('prop')==='extracts'){asked.push(p.get('pageids'));assert.equal(p.get('exsectionformat'),'wiki');return Response.json({query:{pages:{2577:{pageid:2577,extract:opening}}}});}
+    return Response.json({batchcomplete:''});
   },async worker=>{
-    const body=await (await worker.fetch(new Request('https://wikiscroll.com/api/travel?lang=es&place='+encodeURIComponent('Japón')),env,ctx)).json();
-    assert.deepEqual(body.articles.map(a=>[a.title,a.body.slice(0,26)]),[['Japón','Japón está formado por cua']]);
-    assert.deepEqual(requests,['search','intro','lead']);
-  });
+    const response=await worker.fetch(new Request('https://wikiscroll.com/api/travel?lang=es&place='+encodeURIComponent('Japón')),env,ctx);
+    const body=await response.json();
+    assert.deepEqual(body.articles.map(a=>a.title),['Japón','Tokio']);
+    assert.match(body.articles[0].body,/^Japón está formado por cuatro islas/);
+    assert.deepEqual(asked,['2577'],'only the guide without an introduction reads its full text');
+  },cache);
+  assert.ok([...cache.entries.keys()].some(k=>k.includes('/api/travel?v=8')),'a complete page is cached');
 });
-test('phrasebooks are recognized in every Wikivoyage edition by category or real title pattern, not look-alikes',async()=>{
-  const {isPhrasebook,phrasebookParams,PHRASEBOOK_CATEGORY}=await import('../worker/phrasebooks.js');
-  // Real titles from each edition's phrasebook category (September 2026).
-  const real={en:'Japanese phrasebook',es:'Guía de húngaro',fr:'Guide linguistique allemand',de:'Sprachführer Englisch',pt:'Guia de conversação japonês',
-    ru:'Японский разговорник',ja:'英語会話集',zh:'世界语会话手册',he:'שיחון אנגלי',nl:'Taalgids Engels',pl:'Rozmówki angielskie'};
-  for(const [lang,title] of Object.entries(real))assert.ok(isPhrasebook({title},lang),lang+': '+title);
-  assert.ok(isPhrasebook({title:'土耳其語會話手冊'},'zh'),'traditional Chinese titles');
-  assert.ok(isPhrasebook({title:'Английский разговорник (США)'},'ru'));
-  // Look-alikes that are destinations or topics.
-  for(const [lang,title] of [['it','Cina'],['it','Cucina cinese'],['es','Guía de Madrid'],['he','שיחונים ישנים'],['en','Phrasebook Bay'],['de','Sprachführerin'],['ja','会話']])
-    assert.equal(isPhrasebook({title},lang),false,lang+': '+title);
-  // Italian titles are just the language, so the category flag decides.
-  assert.equal(isPhrasebook({title:'Cinese'},'it'),false);
-  assert.ok(isPhrasebook({title:'Cinese',categories:[{ns:14,title:'Categoria:Frasari'}]},'it'));
-  assert.deepEqual(phrasebookParams('it'),{clcategories:'Categoria:Frasari',cllimit:'max'});
-  assert.equal(Object.keys(PHRASEBOOK_CATEGORY).length,12,'every Wikivoyage edition the app reads');
-});
-test('the random Wikivoyage feed and travel search request the phrasebook flag and skip phrasebooks',async()=>{
+test('random and searched Wikivoyage feeds leave out phrasebooks in any language',async()=>{
   const seen=[];
-  const pages=[{pageid:31,ns:0,title:'Cinese',categories:[{ns:14,title:'Categoria:Frasari'}]},{pageid:32,ns:0,title:'Roma',index:1}];
+  const guide=(id,title,extra={})=>({pageid:id,ns:0,title,index:id,extract:title+' es un destino con calles antiguas, mercados y museos que vale la pena explorar a fondo.',...extra});
   await mocked(async url=>{
-    const p=new URL(url).searchParams;
-    if(p.has('generator')){seen.push([p.get('generator'),p.get('clcategories'),p.get('prop').includes('categories')]);return Response.json({query:{pages:Object.fromEntries(pages.map(x=>[x.pageid,{...x,fullurl:'https://it.wikivoyage.org/wiki/'+x.title}]))}});}
-    return Response.json({query:{pages:Object.fromEntries(p.get('pageids').split('|').map(id=>[id,{pageid:Number(id),extract:'Roma è la capitale d\'Italia, con monumenti, musei e piazze famose in tutto il mondo.'}]))}});
+    const p=new URL(url).searchParams;seen.push(p.get('clcategories'));
+    return Response.json({query:{pages:{1:guide(1,'Cina'),2:guide(2,'Cinese',{categories:[{ns:14,title:'Categoria:Frasari'}]}),3:guide(3,'Frasario dell\'autostoppista')}}});
   },async worker=>{
-    const random=await (await worker.fetch(request('mode=how&lang=it&n=20&batch=2'),env,ctx)).json();
-    assert.deepEqual(random.articles.map(a=>a.title),['Roma']);
-    const travel=await (await worker.fetch(new Request('https://wikiscroll.com/api/travel?lang=it&place=Roma'),env,ctx)).json();
-    assert.deepEqual(travel.articles.map(a=>a.title),['Roma']);
-    assert.deepEqual(seen,[['random','Categoria:Frasari',true],['search','Categoria:Frasari',true]]);
+    const travel=await (await worker.fetch(new Request('https://wikiscroll.com/api/travel?lang=it&place=Cina'),env,ctx)).json();
+    assert.deepEqual(travel.articles.map(a=>a.title),['Cina']);
+    const random=await (await worker.fetch(new Request('https://wikiscroll.com/api/articles?mode=how&lang=it&batch=9'),env,ctx)).json();
+    assert.deepEqual(random.articles.map(a=>a.title),['Cina']);
   });
+  assert.ok(seen.filter(Boolean).every(c=>c==='Categoria:Frasari')&&seen.includes('Categoria:Frasari'),'both requests ask for the phrasebook category');
 });
-test('the browser keeps an identical copy of the phrasebook tables',async()=>{
-  const {readFileSync}=await import('node:fs');
-  const read=f=>readFileSync(new URL('../'+f,import.meta.url),'utf8');
-  const worker=read('worker/phrasebooks.js'),app=read('public/app.js');
-  for(const name of ['PHRASEBOOK_CATEGORY','PHRASEBOOK_TITLE']){
-    const table=source=>source.match(new RegExp(`const ${name} = (\\{[\\s\\S]*?\\});`))[1];
-    assert.equal(table(app),table(worker),name);
-  }
-  assert.match(app,/!isPhrasebook\(p, lang\)/);
-  assert.match(app,/clcategories='\+encodeURIComponent\(PHRASEBOOK_CATEGORY\[lang\]\)/);
-});
-test('guides still loading when time runs out are asked for again, not skipped',async t=>{
-  t.mock.timers.enable({apis:['setTimeout','Date']});
-  const later=(ms,value)=>new Promise(resolve=>setTimeout(()=>resolve(value),ms));
-  let chunk=0;
+test('a travel page whose guides arrived late keeps its place for a retry and is not cached',async()=>{
+  const cache=edgeCache();let fail=true;
+  const intro=title=>title+' is on the coast of Elba, with beaches, old harbours and walks along the sea.';
   await mocked(async url=>{
     const p=new URL(url).searchParams;
-    if(p.has('generator'))return Response.json({query:{pages:Object.fromEntries(Array.from({length:10},(_,i)=>[i+1,{pageid:i+1,ns:0,title:'Town '+(i+1),index:i}]))},continue:{gsroffset:30}});
-    const ids=p.get('pageids').split('|');
-    return later(chunk++===0?500:9000,Response.json({query:{pages:Object.fromEntries(ids.map(id=>[id,{pageid:Number(id),extract:'A harbour town in Norway with ferries to the islands and a busy fish market.'}]))}}));
-  },async(api,jobs)=>{
-    let response;const pending=api.fetch(new Request('https://wikiscroll.com/api/travel?lang=en&place=Norway'),env,jobs).then(r=>response=r);
-    await settle();for(const ms of [500,8100])t.mock.timers.tick(ms),await settle();
-    await pending;const body=await response.json();
-    assert.equal(body.articles.length,5);
-    assert.equal(body.next,30,'the search itself has more pages');
-    assert.equal(body.resume,0,'but this page still has guides to deliver');
-    t.mock.timers.tick(2000);await settle();
-  });
-});
-test('guides past the text-fallback limit wait for the next request, and fetched text is reused',async()=>{
-  const {LEAD_FALLBACK_LIMIT}=await import('../worker/extracts.js');
-  const cache=edgeCache(),count=LEAD_FALLBACK_LIMIT+4;let leads=0;
-  const pages=Object.fromEntries(Array.from({length:count},(_,i)=>[i+1,{pageid:i+1,ns:0,title:'Pueblo '+(i+1),index:i}]));
-  await mocked(async url=>{
-    const p=new URL(url).searchParams;
-    if(p.has('generator'))return Response.json({query:{pages}});
-    if(p.has('exintro'))return Response.json({query:{pages:Object.fromEntries(p.get('pageids').split('|').map(id=>[id,{pageid:Number(id),extract:''}]))}});
-    leads++;return Response.json({query:{pages:{[p.get('pageids')]:{extract:'Regiones\nEste pueblo de Galicia tiene un puerto, una playa larga y un mercado de pescado muy animado.'}}}});
-  },async(worker,jobs)=>{
-    const first=await (await worker.fetch(new Request('https://wikiscroll.com/api/travel?lang=es&place=Galicia'),env,jobs)).json();
-    await jobs.done();
-    assert.equal(first.articles.length,LEAD_FALLBACK_LIMIT);assert.equal(leads,LEAD_FALLBACK_LIMIT);
-    assert.equal(first.next,null);assert.equal(first.resume,0,'the remaining guides are not lost');
-    const again=await (await worker.fetch(new Request('https://wikiscroll.com/api/travel?lang=es&place=Galicia&offset=0'),env,jobs)).json();
-    assert.equal(again.articles.length,count,'every guide on the page arrives');
-    assert.equal(leads,count,'text already fetched came from the edge cache');
-    assert.equal(again.resume,undefined);
+    if(p.get('generator')==='search'){const place=JSON.parse(p.get('gsrsearch'));
+      return Response.json({query:{pages:place==='Elba'?{1:{pageid:1,ns:0,title:'Portoferraio',index:1},2:{pageid:2,ns:0,title:'Marciana',index:2}}:{3:{pageid:3,ns:0,title:'Capraia',index:1,extract:'Capraia is a small island near Elba with a harbour and quiet walks.'}}},continue:{gsroffset:30}});}
+    if(p.get('prop')==='extracts'){if(fail&&p.get('pageids').includes('2'))return new Response('busy',{status:500});
+      return Response.json({query:{pages:Object.fromEntries(p.get('pageids').split('|').map(id=>[id,{pageid:+id,extract:intro(id==='1'?'Portoferraio':'Marciana')}]))}});}
+    return Response.json({batchcomplete:''});
+  },async worker=>{
+    const first=await (await worker.fetch(new Request('https://wikiscroll.com/api/travel?lang=en&place='+encodeURIComponent('Elba, Capraia')),env,ctx)).json();
+    assert.equal(first.next,'30.30');
+    assert.equal(first.retry,'0.30','Elba stays on its page; Capraia, complete, moves on');
+    assert.equal([...cache.entries.keys()].some(k=>k.includes('/api/travel?v=')),false,'an incomplete page is not cached');
+    fail=false;
+    const again=await (await worker.fetch(new Request('https://wikiscroll.com/api/travel?lang=en&place='+encodeURIComponent('Elba, Capraia')+'&offset=0.30'),env,ctx)).json();
+    assert.ok(again.articles.some(a=>a.title==='Marciana'),'the late guide arrives on the retry');
+    assert.equal(again.retry,undefined);
   },cache);
 });
-test('a travel search stays well under the Free plan\'s 50 subrequests, even in the worst case',async t=>{
-  // Worst case: three places, full result pages, and not one guide with an
-  // introduction, so every answer uses its full text-fallback allowance.
-  const {LEAD_FALLBACK_LIMIT}=await import('../worker/extracts.js');
-  const cache=edgeCache(),counts=[];let n=0;
-  const counted={match:async key=>{n++;return cache.match(key);},put:async(key,response)=>{n++;return cache.put(key,response);}};
-  await mocked(async url=>{
-    n++;const p=new URL(url).searchParams;
-    if(p.has('generator')){const base=Number(p.get('gsroffset'))+{Kyoto:1000,Nara:2000,Osaka:3000}[JSON.parse(p.get('gsrsearch'))];
-      return Response.json({query:{pages:Object.fromEntries(Array.from({length:Number(p.get('gsrlimit'))},(_,i)=>[base+i,{pageid:base+i,ns:0,title:'Pueblo '+(base+i),index:i}]))},continue:{gsroffset:Number(p.get('gsroffset'))+Number(p.get('gsrlimit'))}});}
-    if(p.has('exintro'))return Response.json({query:{pages:Object.fromEntries(p.get('pageids').split('|').map(id=>[id,{pageid:Number(id),extract:''}]))}});
-    return Response.json({query:{pages:{[p.get('pageids')]:{extract:'Kyoto, Nara y Osaka tienen templos, jardines y mercados que merecen una visita larga y tranquila.'}}}});
-  },async(worker,jobs)=>{
-    let offset='';const delivered=new Set();
-    for(let i=0;i<4;i++){
-      n=0;
-      const body=await (await worker.fetch(new Request('https://wikiscroll.com/api/travel?lang=es&place='+encodeURIComponent('Kyoto, Nara, Osaka')+(offset!==''?'&offset='+offset:'')),env,jobs)).json();
-      await jobs.done();counts.push(n);body.articles.forEach(a=>delivered.add(a.id));
-      offset=String(body.resume??body.next);
-      if(i<3)assert.equal(body.resume,'0.0.0','guides still waiting keep the page open');
-    }
-    assert.equal(delivered.size,30,'4 answers cover the whole page of 30 guides');
-    t.diagnostic('travel subrequests per answer (worst case): '+counts.join(', '));
-    assert.ok(Math.max(...counts)<=1+3+6+1+LEAD_FALLBACK_LIMIT+1+1,`subrequests per answer: ${counts}`);
-    assert.ok(Math.max(...counts)<50);
-  },counted);
+
+test('a travel answer stays within the Workers Free subrequest limit, and retries read the next guides',async()=>{
+  // Worst case: three places, 30 results, every guide without an introduction.
+  let calls=0;const cache=edgeCache(),count=fn=>async(...a)=>{calls++;return fn(...a);};
+  cache.match=count(cache.match.bind(cache));cache.put=count(cache.put.bind(cache));
+  const places=['Alpha','Beta','Gamma'],opening=name=>'\n== Ver ==\n'+name+' es un lugar tranquilo con playas, pueblos y caminos para recorrer a pie.';
+  const reads=[];
+  const run=()=>mocked(async url=>{
+    calls++;const p=new URL(url).searchParams;
+    if(p.get('generator')==='search'){const place=JSON.parse(p.get('gsrsearch')),base=places.indexOf(place)*100;
+      return Response.json({query:{pages:Object.fromEntries(Array.from({length:Number(p.get('gsrlimit'))},(_,i)=>[base+i+1,{pageid:base+i+1,ns:0,title:place+' '+i,index:i}]))}});}
+    if(p.get('prop')==='extracts'&&p.get('exintro'))return Response.json({query:{pages:Object.fromEntries(p.get('pageids').split('|').map(id=>[id,{pageid:+id,extract:''}]))}});
+    if(p.get('prop')==='extracts'){const id=p.get('pageids');reads.push(id);const place=places[Math.floor((+id-1)/100)];return Response.json({query:{pages:{[id]:{pageid:+id,extract:opening(place)}}}});}
+    return Response.json({batchcomplete:''});
+  },async worker=>{
+    const before=calls;
+    const body=await (await worker.fetch(new Request('https://wikiscroll.com/api/travel?lang=es&place='+encodeURIComponent(places.join(', '))),env,ctx)).json();
+    return {body,used:calls-before};
+  },cache);
+  const first=await run();
+  assert.ok(first.used<=50,`first answer used ${first.used} subrequests`);
+  assert.equal(reads.length,8,'at most 8 opening texts read per answer');
+  assert.ok(first.body.retry!=null,'the rest is left for a retry');
+  const second=await run();
+  assert.ok(second.used<=50,`retry used ${second.used} subrequests`);
+  assert.equal(new Set(reads).size,reads.length,'a retry reads new guides, never the ones already read');
+  assert.equal(reads.length,16);
+  assert.ok(second.body.articles.length>first.body.articles.length,'each retry adds guides');
 });

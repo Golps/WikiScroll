@@ -6,3 +6,6 @@
 # browser-visible once injected, but keep your own out of the repository.
 # Leave empty to serve pages without the analytics beacon.
 WEB_ANALYTICS_TOKEN=
+
+# Browser-visible CARTO basemap key, restricted to your own domain.
+CARTO_BASEMAP_KEY=

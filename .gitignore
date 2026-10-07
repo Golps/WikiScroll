@@ -1,18 +1,36 @@
-# Dependencies and build state
 node_modules/
 .wrangler/
 dist/
+build/
 *.log
-
-# Local configuration and credentials: never commit these
+.DS_Store
 .env
 .env.*
 !.env.example
 .dev.vars
 .dev.vars.*
 !.dev.vars.example
-
-# Editor and OS files
-.DS_Store
+private/
+_to_delete/
+archives/
+backups/
+.claude/
+.codex/
+.cursor/
+.agents/
 .vscode/
 .idea/
+AGENTS.md
+CLAUDE.md
+docs/HANDOFF.md
+docs/AUDIT-*.md
+docs/TRAVEL-SEARCH-*.md
+CONTINUE.md
+DEPLOYED.md
+CLAUDE-HANDOFF.md
+VERIFICATION.md
+*token*
+*credential*
+*oauth*
+*.pem
+*.key

@@ -4,7 +4,7 @@ function snapshotItems(){
  const col=collections[activeCollection];if(!col)return [];
  return col.ids.map(id=>liked.get(id)).filter(Boolean).map(a=>{
   const lang=new URL(a.url).hostname.split('.')[0];
-  return {id:pageId(a.id),lang,title:a.title.slice(0,160),body:(a.body||'').slice(0,240)};
+  return {id:wireId(a.id),lang,title:a.title.slice(0,160),body:(a.body||'').slice(0,240)};
  });
 }
 function renderCollectionShare(){
@@ -30,16 +30,17 @@ async function fetchFilteredTravel(){
  for(let page=0;page<3&&!travelExhausted;page++){
   let data;try{const response=await fetch('/api/travel?'+params(),{signal:AbortSignal.timeout(10000)});if(!response.ok)return [];data=await response.json();}catch{return [];}
   if(generation!==fillGeneration||!data)return [];
-  // Guides that were still loading come back through "resume": ask for the
-  // same page again (3 times at most: at 8 guide texts per answer, 4 answers
-  // cover a full page of 30), then move on with "next".
-  const tried=String(travelOffset);
-  if(data.resume!=null&&(travelRetries[tried]||0)<3){travelRetries[tried]=(travelRetries[tried]||0)+1;travelOffset=data.resume;travelExhausted=false;}
-  else{travelOffset=data.next??travelOffset;travelExhausted=data.next===null;}
+  // An incomplete page (some guides' text was late, or more guides need their
+  // opening text than one answer may read: 8, worker/extracts.js) is asked for
+  // again, at most 3 times (up to 32 such guides), before the search moves on;
+  // the end card waits until then.
+  if(data.retry!=null&&travelRetries<3){travelRetries++;travelOffset=data.retry;}
+  else{travelRetries=0;travelOffset=data.next??travelOffset;travelExhausted=data.next===null;}
   if(typeof data.suggestion==='string')travelSuggestion=data.suggestion;
   const seen=new Set(articles.map(a=>a.id).concat(queue.map(a=>a.id)));
   const result=(data.articles||[]).filter(a=>!seen.has(a.id));
   if(result.length)return result;
+  if(travelRetries)await new Promise(resolve=>setTimeout(resolve,800));
  }
  return [];
 }
@@ -69,7 +70,7 @@ function setTravelFilters(filters){travelFilters=filters;lsSet('ws_travel_filter
 // Keep going from where the reader is: the end card becomes a loading card,
 // and new guides are added after it (cards already seen are skipped).
 function continueTravel(filters){
- setTravelFilters(filters);travelOffset=0;travelExhausted=false;travelSuggestion='';travelRetries={};
+ setTravelFilters(filters);travelOffset=0;travelExhausted=false;travelSuggestion='';travelRetries=0;
  const card=document.querySelector('#feed .travel-end');
  if(!card||!document.querySelector('#feed .card[data-id]')){resetFeed();return;}
  travelContinuing=true;
@@ -113,7 +114,7 @@ if(importCode){
  const dlg=document.createElement('dialog');dlg.className='source-dialog collection-dialog';
  const heading=document.createElement('h2');heading.textContent='Save “'+data.name+'”?';const note=document.createElement('p');note.textContent=`Add ${data.items.length} articles to a new collection on this device.`;
  const save=document.createElement('button');save.className='feature-action';save.textContent='Save collection';const cancel=document.createElement('button');cancel.textContent='Cancel';cancel.className='source-close';
- save.onclick=()=>{let name=data.name;while(collections.some(c=>c.name.toLowerCase()===name.toLowerCase()))name+=' (copy)';const ids=[];for(const a of data.items){const saved={...a,src:a.id[0]==='v'?'how':'wiki',img:a.img||'',url:`https://${a.lang}.${a.id[0]==='v'?'wikivoyage':'wikipedia'}.org/?curid=${a.id.slice(1)}`};saved.id=saveKey(saved);ids.push(saved.id);if(!liked.has(saved.id)){liked.set(saved.id,saved);IDB.put(saved);}}collections.push({name,ids});saveCollections();saveLiked();updateBadge();activeCollection=collections.length-1;renderLikedList();dlg.close();toast('Collection saved');};
+ save.onclick=()=>{let name=data.name;while(collections.some(c=>c.name.toLowerCase()===name.toLowerCase()))name+=' (copy)';const ids=[];for(const a of data.items){const key=a.lang==='en'?a.id:a.lang+':'+a.id;ids.push(key);if(!liked.has(key)){const {lang,...item}=a,saved={...item,id:key,src:a.id[0]==='v'?'how':'wiki',img:a.img||'',url:`https://${lang}.${a.id[0]==='v'?'wikivoyage':'wikipedia'}.org/?curid=${a.id.slice(1)}`};liked.set(key,saved);IDB.put(saved);}}collections.push({name,ids});saveCollections();saveLiked();updateBadge();activeCollection=collections.length-1;renderLikedList();dlg.close();toast('Collection saved');};
  cancel.onclick=()=>dlg.close();dlg.addEventListener('keydown',e=>e.stopPropagation());dlg.addEventListener('close',()=>setTimeout(()=>dlg.remove(),400));const actions=document.createElement('div');actions.className='collection-dialog-actions';actions.append(save,cancel);dlg.append(heading,note,actions);document.body.append(dlg);dlg.showModal();
  }catch{toast('Could not verify this collection. Please reopen the link to try again.');}})();
  const clean=new URL(location.href);clean.searchParams.delete('importCollection');window.history.replaceState(null,'',clean);

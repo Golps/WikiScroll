@@ -1,6 +1,15 @@
 allowBuilds:
   esbuild: true
   workerd: true
+minimumReleaseAgeExclude:
+  - '@cloudflare/workerd-darwin-64@1.20260917.1'
+  - '@cloudflare/workerd-darwin-arm64@1.20260917.1'
+  - '@cloudflare/workerd-linux-64@1.20260917.1'
+  - '@cloudflare/workerd-linux-arm64@1.20260917.1'
+  - '@cloudflare/workerd-windows-64@1.20260917.1'
+  - miniflare@5.20260917.0-alpha
+  - workerd@1.20260917.1
+  - wrangler@4.134.0
 onlyBuiltDependencies:
   - esbuild
   - workerd

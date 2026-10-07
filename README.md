@@ -229,7 +229,7 @@ node --test test/*.test.js
 ```
 
 > [!NOTE]
-> Wikivoyage maps use [CARTO](https://carto.com/) basemaps and work without any setup. The production map key isn't included. For a public deployment, add your own domain-restricted key and check CARTO's usage terms. See [configuration](docs/DEVELOPMENT.md#configuration).
+> Wikivoyage maps use [CARTO](https://carto.com/) basemaps and work without any setup. The map key is configured on the Worker rather than committed in the source. For a public deployment, add your own domain-restricted key and check CARTO's usage terms. See [configuration](docs/DEVELOPMENT.md#configuration).
 
 **Two ways to host it:**
 
@@ -240,7 +240,7 @@ node --test test/*.test.js
 
 ## Known limitations
 
-This repository is a snapshot of the code behind wikiscroll.com. It isn't finished, and these limitations are known:
+This repository contains the source used to deploy wikiscroll.com. It isn't finished, and these limitations are known:
 
 - **Browser-only storage.** Saves, collections and history live in your browser, with no account sync. Clearing site data removes them, and Safari may clear them after about 7 days without a visit.
 - **Shared collections can't be revoked.** A shared link contains its snapshot. Deleting the collection locally doesn't disable a link that was already shared.
@@ -250,7 +250,7 @@ This repository is a snapshot of the code behind wikiscroll.com. It isn't finish
 
 ## Forking and contributing
 
-You're welcome to study this code, fork it and build something of your own. This repository is published as a reference snapshot and isn't actively maintained, so issues and pull requests may not get a response. [CONTRIBUTING.md](CONTRIBUTING.md) has more detail, and [CHANGELOG.md](CHANGELOG.md) lists what changed in each release. To report a security problem with wikiscroll.com, follow [SECURITY.md](SECURITY.md) instead of opening a public issue.
+You're welcome to study this code, fork it and build something of your own. The main branch is the source for production, with automated tests and support for Cloudflare Workers Builds. Issues and pull requests may not get a response. [CONTRIBUTING.md](CONTRIBUTING.md) has more detail, and [CHANGELOG.md](CHANGELOG.md) lists what changed in each release. To report a security problem with wikiscroll.com, follow [SECURITY.md](SECURITY.md) instead of opening a public issue.
 
 If WikiScroll is useful to you, a ⭐ on the repository helps others find it.
 

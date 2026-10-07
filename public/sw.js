@@ -1,5 +1,5 @@
-const CACHE='wikiscroll-atlas-v79';
-const SHELL=['/discovery.js?v=49','/about/','/about.css?v=50','/about.js?v=47','/images/wordmark-dark.svg','/images/wordmark-light.svg','/styles.css?v=70','/images/favicon.ico?v=42','/images/apple-touch-icon.png?v=42','/images/icon-192.png?v=42','/images/icon-512.png?v=42','/lang.js?v=3','/translations/es.js?v=3','/translations/fr.js?v=3','/translations/de.js?v=3','/translations/it.js?v=3','/translations/pt.js?v=3','/translations/ru.js?v=3','/translations/ja.js?v=3','/translations/zh.js?v=3','/translations/ar.js?v=3','/translations/hi.js?v=3','/translations/ko.js?v=3','/translations/nl.js?v=3','/translations/pl.js?v=3','/translations/he.js?v=3','/i18n.js?v=52','/data/starter-en.json','/features.js?v=65','/','/app.js?v=76','/atlas.js?v=56','/manifest.json','/images/icon-192.png','/images/icon-512.png'];
+const CACHE='wikiscroll-atlas-v89';
+const SHELL=['/discovery.js?v=49','/about/','/about.css?v=51','/about.js?v=48','/images/wordmark-dark.svg','/images/wordmark-light.svg','/styles.css?v=72','/images/favicon.ico?v=42','/images/apple-touch-icon.png?v=42','/images/icon-192.png?v=42','/images/icon-512.png?v=42','/lang.js?v=4','/translations/es.js?v=4','/translations/fr.js?v=4','/translations/de.js?v=4','/translations/it.js?v=4','/translations/pt.js?v=4','/translations/ru.js?v=4','/translations/ja.js?v=4','/translations/zh.js?v=4','/translations/ar.js?v=4','/translations/hi.js?v=4','/translations/ko.js?v=4','/translations/nl.js?v=4','/translations/pl.js?v=4','/translations/he.js?v=4','/i18n.js?v=52','/data/starter-en.json','/features.js?v=66','/webmcp.js?v=1','/','/app.js?v=79','/atlas.js?v=56','/manifest.json','/images/icon-192.png','/images/icon-512.png'];
 // Wikimedia serves article images from both hosts (thumb.wikimedia.org since 2026).
 const IMAGE_HOSTS=new Set(['upload.wikimedia.org','thumb.wikimedia.org']);
 self.addEventListener('install',event=>{
@@ -30,6 +30,8 @@ self.addEventListener('fetch',event=>{
     })());
     return;
   }
+  // The About film streams with range requests straight from the network; it is never cached.
+  if(req.destination==='video'||url.pathname.startsWith('/media/'))return;
   const local=url.origin===self.location.origin;
   const image=IMAGE_HOSTS.has(url.hostname)&&req.destination==='image';
   if(!local&&!image)return;

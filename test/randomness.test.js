@@ -2,9 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
+const savedKeys = (src => src.slice(src.indexOf('// Page IDs repeat across editions'), src.indexOf('// Saves from before language-aware keys')))(fs.readFileSync(new URL('../public/app.js', import.meta.url), 'utf8'));
 
 const source=fs.readFileSync(new URL('../public/app.js',import.meta.url),'utf8');
-const likes=source.slice(source.indexOf('function toggleLike('),source.indexOf('function updateBadge('))+source.slice(source.indexOf('function articleLang('),source.indexOf('// Earlier versions stored'));
+const likes=source.slice(source.indexOf('function toggleLike('),source.indexOf('function updateBadge('));
 const workerFetch=source.slice(source.indexOf('async function fetchWorkerBatch('),source.indexOf('function fillQueue('));
 
 function likesHarness(){
@@ -27,6 +28,7 @@ function likesHarness(){
     let articles=[{id:'w48895',title:'Tom Cruise'},{id:'w25308',title:'Rock climbing'}];
     let queue=[{id:'w12566',title:'Ginkgo biloba'},{id:'w30487',title:'Superconductivity'},{id:'w26845',title:'Saffron'}];
     let liked=new Map(),curTopics=new Set(['science']),depthLevel=4,curMode='wiki',fillGeneration=7;
+    ${savedKeys}
     ${likes}
   `,context);
   const state=()=>JSON.parse(vm.runInContext('JSON.stringify({articles,queue,topics:[...curTopics],depth:depthLevel,mode:curMode,generation:fillGeneration})',context));

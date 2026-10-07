@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import worker from '../worker/index.js';
 import {collectionResponse,decodeCollection,encodeCollection} from '../worker/collections.js';
 const allow={limit:async()=>({success:true})},deny={limit:async()=>({success:false})};
@@ -57,4 +58,10 @@ test('pages run under a strict script policy with no inline scripts or handlers'
  // Every external host the reader uses is allowed.
  for(const host of ['https://cdnjs.cloudflare.com','https://static.cloudflareinsights.com','https://*.basemaps.cartocdn.com','https://nominatim.openstreetmap.org','https://*.wikipedia.org','https://*.wikivoyage.org','https://upload.wikimedia.org','https://thumb.wikimedia.org'])
   assert.ok(PAGE_CSP.includes(host),host);
+});
+
+test('robots.txt declares content signals and keeps the API out of crawlers', () => {
+  const robots = fs.readFileSync(new URL('../public/robots.txt', import.meta.url), 'utf8');
+  assert.match(robots, /^User-agent: \*\nContent-Signal: search=yes, ai-input=yes, ai-train=no\nAllow: \/\nDisallow: \/api\/$/m);
+  assert.match(robots, /^Sitemap: https:\/\/wikiscroll\.com\/sitemap\.xml$/m);
 });

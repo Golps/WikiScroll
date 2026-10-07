@@ -72,25 +72,6 @@ const TOPIC_MAP     = Object.fromEntries(TOPICS.map(t => [t.id, t]));
 // Hindi about 200 guides). Matches VOYAGE_LANGS in worker/index.js.
 const VOYAGE_LANGS  = new Set(['en','es','fr','de','it','pt','ru','ja','zh','he','nl','pl']);
 const VOYAGE_NOTE   = "Wikivoyage isn't available in this language, so travel guides are shown in English.";
-// Phrasebooks are skipped in every Wikivoyage edition: by category, or by each
-// edition's title pattern. Identical to worker/phrasebooks.js (tested), which
-// explains where they come from.
-const PHRASEBOOK_CATEGORY = {
-  en: 'Category:Phrasebooks', es: 'Categoría:Guías de conversación', fr: 'Catégorie:Guides linguistiques',
-  de: 'Kategorie:Sprachführer', it: 'Categoria:Frasari', pt: 'Categoria:Guias de conversação',
-  ru: 'Категория:Разговорники', ja: 'カテゴリ:会話集', zh: 'Category:会话手册',
-  he: 'קטגוריה:שיחונים', nl: 'Categorie:Taalgids', pl: 'Kategoria:Rozmówki',
-};
-const PHRASEBOOK_TITLE = {
-  en: / phrasebook$|^Phrasebooks?$/i, es: /^Guía de \p{Ll}/u, fr: /^Guide linguistique /u, de: /^Sprachführer(\s|$)/u,
-  pt: /^Guia de conversação(\s|$)/u, ru: /разговорник(\s*\(.*\))?$/iu, ja: /会話集$/u, zh: /(会话手册|會話手冊)$/u,
-  he: /^שיחון(\s|$)/u, nl: /^Taalgids(\s|$)/u, pl: /^Rozmówki(\s|$)/u,
-};
-function isPhrasebook(page, lang) {
-  const category = PHRASEBOOK_CATEGORY[lang];
-  if (category && (page.categories || []).some(c => c.title === category)) return true;
-  return !!PHRASEBOOK_TITLE[lang]?.test(String(page.title || ''));
-}
 // Help Wikipedia: Wikipedia editions with reliable maintenance categories
 // (identical to HELP_LANGS in worker/needs.js). Labels follow NEED_ORDER.
 const HELP_LANGS    = new Set(['en','de','fr','es']);
@@ -106,7 +87,7 @@ const BAD_TITLE_RE  = /^(list of|lists of|timeline|history of|geography of|demog
 let curMode = 'wiki', curLang = 'en';
 let curTopics = new Set();
 let travelFilters = lsGet('ws_travel_filters') || {place:'',style:''};
-let travelOffset=0, travelExhausted=false, travelSuggestion='', travelContinuing=false, travelRetries={};
+let travelOffset=0, travelExhausted=false, travelSuggestion='', travelContinuing=false, travelRetries=0;
 let swipeEnabled = true, kbBarEnabled = true, helpMode = 'off';
 let lightMode = false, depthLevel = 3;
 let history = [];
@@ -129,22 +110,53 @@ function lsSet(k, v) {
   }
 }
 
+// Page IDs repeat across editions (w123 is one article in English and another
+// in Spanish), so saved copies, collections and history use savedKey: English
+// keeps the plain ID ("w123"), other editions add their language ("es:w123").
+// The feed and shared links keep the plain ID (wireId).
+function articleLang(a) {
+  try { return new URL(a.url).hostname.split('.')[0] || 'en'; } catch { return 'en'; }
+}
+function wireId(id) { return String(id || '').replace(/^[a-z-]+:/, ''); }
+function savedKey(a) { const id = wireId(a.id), lang = articleLang(a); return lang === 'en' ? id : lang + ':' + id; }
+// The saved copy of a feed card, whatever language the reader saved it in.
+function feedKey(id) { const a = articles.find(x => x.id === id); return a ? savedKey(a) : id; }
+// Saves from before language-aware keys: re-key them, and point collections
+// at the new keys. Idempotent, so it runs on every start.
+function migrateSaved(items) {
+  const moved = new Map(), out = [];
+  for (const a of items) {
+    if (!a?.id || typeof a.url !== 'string') continue;
+    const key = savedKey(a);
+    if (key !== a.id) moved.set(a.id, key);
+    out.push(key === a.id ? a : {...a, id: key});
+  }
+  return {out, moved};
+}
 function loadPersistedState() {
+  collections = (lsGet('ws_collections') || []).filter(c => c && Array.isArray(c.ids));
+  const retarget = moved => {
+    if (!moved.size) return false;
+    collections.forEach(c => { c.ids = [...new Set(c.ids.map(id => moved.get(id) ?? id))]; });
+    return true;
+  };
   const savedLikes = lsGet('ws_liked');
-  history = lsGet('ws_history') || [];
-  collections = lsGet('ws_collections') || [];
-  const likes = Array.isArray(savedLikes) ? savedLikes : [];
-  const moved = migrateSavedKeys(likes);
-  likes.forEach(a => liked.set(a.id, a)); updateBadge();
-  if (moved) saveLiked();
-  // Hydrate from IDB as fallback (e.g. localStorage cleared but IDB survives).
-  // Offline copies saved under an old key move to the new one.
+  if (Array.isArray(savedLikes)) {
+    const {out, moved} = migrateSaved(savedLikes);
+    out.forEach(a => liked.set(a.id, a));
+    if (moved.size) { saveLiked(); retarget(moved) && saveCollections(); }
+    updateBadge();
+  }
+  // Hydrate from IDB as fallback (e.g. localStorage cleared but IDB survives)
   IDB.getAll().then(items => {
-    const old = items.map(a => a.id);
-    const moved = migrateSavedKeys(items);
-    items.forEach((a, i) => { if (a.id !== old[i]) { IDB.delete(old[i]); IDB.put(a); } });
-    let changed = moved;
-    items.forEach(a => { if (!liked.has(a.id)) { liked.set(a.id, a); changed = true; } });
+    let changed = false;
+    const {out, moved} = migrateSaved(items), rekeyed = new Set(moved.values());
+    moved.forEach((key, old) => IDB.delete(old));
+    out.forEach(a => {
+      if (rekeyed.has(a.id)) IDB.put(a);
+      if (!liked.has(a.id)) { liked.set(a.id, a); changed = true; }
+    });
+    if (retarget(moved)) saveCollections();
     if (changed) { saveLiked(); updateBadge(); }
   });
   const savedTopics = lsGet('ws_topics');
@@ -162,37 +174,12 @@ function loadPersistedState() {
   const wantLang = urlLang || settings.lang;
   if (wantLang && LANGS.some(l => l.c === wantLang)) curLang = wantLang;
   applyLangUI();
+  history = lsGet('ws_history') || [];
   // Popular and Known no longer use the daily chart; drop its old caches.
   try { Object.keys(localStorage).filter(k => k.startsWith('ws_topchart_')).forEach(k => localStorage.removeItem(k)); } catch {}
   if (helpTopic || typeof settings.help === 'boolean') { saveTopics(); saveSettings(); }
   applyTheme();
   syncAllToggles();
-}
-
-// Saved articles, collections and history are keyed by language as well as by
-// page: Spanish w123 and English w123 are different articles. English keeps
-// the plain ID ("w123"), so English saves from earlier versions are unchanged;
-// other languages use "es:w123", with the language taken from the article's
-// address. Shared links, collection sharing and the map use the plain ID.
-function articleLang(a) { try { return new URL(a.url).hostname.split('.')[0].toLowerCase() || 'en'; } catch { return 'en'; } }
-function pageId(id) { return String(id || '').replace(/^[a-z-]+:/, ''); }
-function saveKey(a) { const id = pageId(a.id), lang = articleLang(a); return lang === 'en' ? id : lang + ':' + id; }
-function isSaved(cardId) { const a = articles.find(x => x.id === cardId); return !!a && liked.has(saveKey(a)); }
-// Earlier versions stored every save under its plain ID. Move non-English saves
-// to their language key, with their collections and history entries. Returns
-// whether anything moved; running it again changes nothing.
-function migrateSavedKeys(items) {
-  const renames = new Map();
-  items.forEach(a => { const key = saveKey(a); if (key !== a.id) { renames.set(a.id, key); a.id = key; } });
-  let moved = renames.size > 0;
-  if (moved) {
-    collections.forEach(col => { col.ids = [...new Set(col.ids.map(id => renames.get(id) || id))]; });
-    saveCollections();
-  }
-  let historyMoved = false;
-  history.forEach(h => { const key = saveKey(h); if (key !== h.id) { h.id = key; historyMoved = true; } });
-  if (historyMoved) saveHistory();
-  return moved;
 }
 function saveLiked()    { lsSet('ws_liked',    [...liked.values()]); }
 function saveTopics()   { lsSet('ws_topics',   [...curTopics]); }
@@ -361,9 +348,9 @@ function applyTheme() {
 // ── HISTORY TRACKING ──────────────────────────────────────────────────────
 function trackHistory(a) {
   // Remove duplicate if exists
-  const key = saveKey(a);
-  history = history.filter(h => h.id !== key);
-  history.unshift({ id:key, src:a.src, title:a.title, body:a.body?.slice(0,150)||'', url:a.url, img:a.img||'', time:Date.now() });
+  const key = savedKey(a);
+  history = history.filter(h => savedKey(h) !== key);
+  history.unshift({ id:wireId(a.id), src:a.src, title:a.title, body:a.body?.slice(0,150)||'', url:a.url, img:a.img||'', time:Date.now() });
   if (history.length > 50) history.length = 50;
   saveHistory();
 }
@@ -375,7 +362,7 @@ function renderHistory() {
   }
   const now = Date.now();
   c.innerHTML = history.map(h => {
-    const image = h.img || liked.get(h.id)?.img || articles.find(a => saveKey(a) === h.id)?.img || '';
+    const key = savedKey(h), image = h.img || liked.get(key)?.img || articles.find(a => savedKey(a) === key)?.img || '';
     const ago = now - h.time;
     // Localized by the browser ("5 min ago", "hace 3 h", "vor 2 Tagen").
     let timeStr = 'Just now';
@@ -581,14 +568,15 @@ async function fetchVoyage() {
     // Random fallback — ONE Action API call for 20 candidates. The previous
     // REST approach fired 16 parallel requests per call (up to 80 per fill),
     // which tripped Wikimedia's per-IP rate limiting and killed the feed.
-    const url = [`https://${lang}.wikivoyage.org/w/api.php`,'?action=query','&generator=random','&grnnamespace=0','&grnlimit=20','&prop=extracts%7Cpageimages%7Ccategories','&exintro=1','&exchars=600','&explaintext=1','&exlimit=max','&piprop=thumbnail','&pithumbsize=640','&pilimit=max','&format=json','&origin=*',PHRASEBOOK_CATEGORY[lang]?'&cllimit=max&clcategories='+encodeURIComponent(PHRASEBOOK_CATEGORY[lang]):''].join('');
+    const url = [`https://${lang}.wikivoyage.org/w/api.php`,'?action=query','&generator=random','&grnnamespace=0','&grnlimit=20','&prop=extracts%7Cpageimages','&exintro=1','&exchars=600','&explaintext=1','&exlimit=max','&piprop=thumbnail','&pithumbsize=640','&pilimit=max','&format=json','&origin=*'].join('');
     const data = await fetchOne(url);
     if(requestGen!==fillGeneration)return [];
     if (data?.query?.pages) {
       const good = Object.values(data.query.pages).filter(p => {
         if (!Number.isSafeInteger(p.pageid) || p.pageid<1 || !isValidTitle(p.title)) return false;
         const s = stripHtml(p.extract||'').slice(0,500);
-        return s.length >= 40 && !isPhrasebook(p, lang) && !/^(travel topics?|itineraries)(?:[ :/]|$)/i.test(p.title);
+        // Same phrasebook titles as worker/travel.js (this direct fallback has no categories).
+        return s.length >= 40 && !/^(travel topics?|itineraries)(?:[ :/]|$)/i.test(p.title) && !/\bphrasebooks?\b|^Sprachführer\b|^Guías? de conversación\b|^Guides? linguistiques?\b|^שיחו[ןנ]|^Frasari[oi]?\b|会話集$|^Taalgids\b|^Rozmówki\b|^Guias? de conversação\b|разговорник|会话手册|會話手冊/iu.test(p.title) && !/^Guía de \p{Ll}/u.test(p.title);
       }).slice(0,20).map(p => ({
         id:'v'+p.pageid, src:'how', title:p.title, body:stripHtml(p.extract||''), img:p.thumbnail?.source||'',
         url:`https://${lang}.wikivoyage.org/wiki/${encodeURIComponent(p.title.replace(/ /g,'_'))}`,
@@ -830,6 +818,38 @@ document.getElementById('feed').addEventListener('scroll', () => {
 }, {passive:true});
 
 // ── BOOT ───────────────────────────────────────────────────────────────────
+// Opening text of a Wikivoyage guide that has no introduction. Same rules as
+// leadFromText in worker/extracts.js (a test keeps the two identical).
+const LEAD_HEADING = /^\s*=+[^=].*=+\s*$/;
+// "Tokio - la moderna capital…": a list entry, not prose.
+const LEAD_LIST_ENTRY = /^[^.!?。！？]{1,60}\s[-–—:]\s/;
+const LEAD_SENTENCE_END = /[.!?。！？…]["'”’»)]*$/u;
+// Chinese, Japanese and Korean say as much in far fewer characters.
+const LEAD_CJK = /[\u3040-\u30ff\u3400-\u9fff\uac00-\ud7af]/;
+const leadMinimum = text => LEAD_CJK.test(text) ? 25 : 60;
+
+function leadFromText(text) {
+  const paragraphs = [];
+  let current = [];
+  const flush = () => { if (current.length) paragraphs.push(current.join(' ')); current = []; };
+  for (const raw of String(text || '').split('\n')) {
+    const line = raw.trim();
+    if (!line || LEAD_HEADING.test(line)) { flush(); continue; }
+    if (LEAD_LIST_ENTRY.test(line)) { flush(); continue; }
+    current.push(line);
+  }
+  flush();
+  let lead = '';
+  for (let p of paragraphs) {
+    p = p.replace(/\s+/g, ' ').trim();
+    // A paragraph that leads into a list ("…the regions are:") loses that sentence.
+    if (/[:：]$/.test(p)) p = p.replace(/[^.!?。！？]*[:：]$/u, '').trim();
+    if (p.length < leadMinimum(p) || !/[.!?。！？]/u.test(p)) continue;
+    lead = lead ? lead + ' ' + p : p;
+    if (lead.length >= 300) break;
+  }
+  return lead.length >= leadMinimum(lead) && LEAD_SENTENCE_END.test(lead) ? lead : lead.replace(/[^.!?。！？]*$/u, '').trim();
+}
 async function resolveDeepLink() {
   // Check for ?a=w12345 or ?a=v12345 deep link
   const params = new URLSearchParams(window.location.search);
@@ -858,6 +878,13 @@ async function resolveDeepLink() {
       url: p.fullurl || `https://${domain}/wiki/${encodeURIComponent(p.title.replace(/ /g,'_'))}`,
       ...(desc ? {desc} : {}),
     };
+    // A Wikivoyage guide without an introduction: use its opening text instead.
+    if (art.body.length < 30 && prefix === 'v') {
+      try {
+        const full = await fetch(`https://${domain}/w/api.php?action=query&format=json&origin=*&pageids=${pageid}&prop=extracts&explaintext=1&exsectionformat=wiki&exchars=1200`, {signal: AbortSignal.timeout(6000)});
+        if (full.ok) art.body = leadFromText((await full.json())?.query?.pages?.[pageid]?.extract);
+      } catch {}
+    }
     if (art.body.length < 30) return null;
     toast(`📎 Opened shared article`);
     return art;
@@ -899,7 +926,7 @@ async function boot() {
 }
 function resetFeed() {
   window.dispatchEvent(new Event('feed-reset'));
-  travelOffset=0;travelExhausted=false;travelSuggestion='';travelContinuing=false;travelRetries={};sentinel?.disconnect();
+  travelOffset=0;travelExhausted=false;travelSuggestion='';travelContinuing=false;travelRetries=0;sentinel?.disconnect();
   fillGeneration++;pendingDeepGeneration=-1;
   supplyControllers.forEach(controller=>controller.abort());
   articles=[];queue=[];feedSeen.clear();filling=false;supplyTask=null;
@@ -962,7 +989,7 @@ function resetFeed() {
 
 // ── RENDER ─────────────────────────────────────────────────────────────────
 function renderCard(a) {
-  const isHow   = a.src==='how', isLiked=liked.has(saveKey(a));
+  const isHow   = a.src==='how', isLiked=liked.has(savedKey(a));
   const pageid  = parseInt(a.id.slice(1));
   // The first card's photo is the page's largest paint: fetch it immediately.
   const lead    = !document.querySelector('#feed .card[data-id]');
@@ -1027,13 +1054,11 @@ function showError() {
 }
 
 // ── LIKES + IDB ────────────────────────────────────────────────────────────
-// Cards use the plain page ID; saves use its language key (saveKey).
 function toggleLike(id) {
   const a = articles.find(x => x.id===id); if (!a) return;
-  const key = saveKey(a);
-  const wasLiked = liked.has(key);
+  const key = savedKey(a), wasLiked = liked.has(key);
   if (wasLiked) { liked.delete(key); IDB.delete(key); }
-  else          { const saved = {...a, id:key}; liked.set(key, saved); IDB.put(saved); }
+  else          { const copy = {...a, id:key}; liked.set(key, copy); IDB.put(copy); }
   saveLiked(); updateBadge();
   const btn = document.getElementById('lb-'+id);
   if (btn) {
@@ -1049,9 +1074,10 @@ function toggleLike(id) {
     }
   }
 }
-function removeLike(key) {
-  liked.delete(key); IDB.delete(key); saveLiked(); updateBadge();
-  const card = articles.find(x => saveKey(x) === key);
+function removeLike(id) {
+  liked.delete(id); IDB.delete(id); saveLiked(); updateBadge();
+  // The feed card's button, only if that card is this saved article.
+  const card = articles.find(x => savedKey(x) === id);
   const btn = card && document.getElementById('lb-'+card.id);
   if (btn) { btn.className='act'; requestAnimationFrame(() => { btn.innerHTML=atlasIcon.bookmark + '<span>Save</span>'; }); }
   renderLikedList();
@@ -1111,7 +1137,7 @@ function renderLikedList() {
       <div class="li-body" dir="auto">${esc(a.body.slice(0,130))}</div>
       <div class="li-acts">
         <button class="li-btn" data-read="${esc(a.url)}">${atlasIcon.arrow}<span>Read</span></button>
-        <button class="li-btn" data-share-url="${esc(a.url)}" data-share-title="${esc(a.title)}" data-share-id="${esc(pageId(a.id))}">${atlasIcon.share}<span>Share</span></button>
+        <button class="li-btn" data-share-url="${esc(a.url)}" data-share-title="${esc(a.title)}" data-share-id="${esc(a.id)}">${atlasIcon.share}<span>Share</span></button>
         <button class="li-btn" data-collect="${esc(a.id)}" aria-label="Save to collection">${atlasIcon.bookmark}<span>Collect</span></button>
         <button class="li-btn" ${activeCollection !== null ? `data-uncollect="${esc(a.id)}" aria-label="Remove from this collection" title="Remove from this collection"` : `data-unlike="${esc(a.id)}"`}><svg class="atlas-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7m4-7v7"/></svg><span>Remove</span></button>
       </div>
@@ -1128,7 +1154,7 @@ function undoNotice() {
 document.getElementById('likedList').addEventListener('click', ev => {
   const btn = ev.target.closest('.li-btn'); if (!btn) return;
   if (btn.dataset.read) {
-    if (!navigator.onLine) { const a = [...liked.values()].find(a => a.url === btn.dataset.read); if(a) openAmbient({dataset:{id:a.id}}, a); }
+    if (!navigator.onLine) { const a = [...liked.values()].find(a => a.url === btn.dataset.read); if(a) openAmbient({article:a}); }
     else window.open(btn.dataset.read,'_blank','noopener');
   }
   else if (btn.dataset.collect) openCollectionChooser(btn.dataset.collect);
@@ -1161,7 +1187,7 @@ function deepLinkUrl(a) {
   const base = /^https?:$/.test(location.protocol) ? location.origin + '/' : 'https://wikiscroll.com/';
   let lang = 'en';
   try { lang = new URL(a.url).hostname.split('.')[0]; } catch {}
-  return `${base}?a=${encodeURIComponent(a.id)}${lang !== 'en' && LANGS.some(l=>l.c===lang) ? '&lang='+lang : ''}`;
+  return `${base}?a=${encodeURIComponent(wireId(a.id))}${lang !== 'en' && LANGS.some(l=>l.c===lang) ? '&lang='+lang : ''}`;
 }
 async function doShare(a) {
   // Share the Worker deep link so messaging apps can render its article preview.
@@ -1465,7 +1491,7 @@ document.getElementById('historyList').addEventListener('click', ev => {
   const hi = ev.target.closest('.hi'); if (!hi?.dataset.url) return;
   // Offline, a saved article opens from its offline copy, as in Saved Articles.
   const saved = !navigator.onLine && [...liked.values()].find(a => a.url === hi.dataset.url);
-  if (saved) openAmbient({dataset: {id: saved.id}}, saved);
+  if (saved) openAmbient({article: saved});
   else window.open(hi.dataset.url, '_blank', 'noopener');
 });
 
@@ -1553,10 +1579,8 @@ document.addEventListener('keydown', ev => {
 });
 
 // ── AMBIENT MODE ───────────────────────────────────────────────────────────
-// Saved Articles and History pass the saved copy itself: its key may match a
-// different language's card in the feed.
-function openAmbient(card, saved) {
-  const a = saved || articles.find(x => x.id===card.dataset.id) || liked.get(card.dataset.id); if (!a) return;
+function openAmbient(card) {
+  const a = card.article || articles.find(x => x.id===card.dataset.id) || liked.get(card.dataset.id); if (!a) return;
   document.getElementById('ambientTitle').textContent   = a.title;
   document.getElementById('ambientExcerpt').textContent = a.body;
   const bg = document.getElementById('ambientBg');
@@ -1770,7 +1794,7 @@ document.getElementById('ambientClose').addEventListener('click', closeAmbient);
 
     // Like on right: saves, never un-saves an already saved card. Guarded so
     // nothing about liking can ever jam flyLock.
-    if (dir > 0 && !isSaved(card.dataset.id)) { try { toggleLike(card.dataset.id); } catch(err) { console.error(err); } }
+    if (dir > 0 && !liked.has(feedKey(card.dataset.id))) { try { toggleLike(card.dataset.id); } catch(err) { console.error(err); } }
 
     // Geometry (single upfront read pass — none inside the loop)
     const startX = fromDx || 0;
@@ -2035,7 +2059,7 @@ document.getElementById('ambientClose').addEventListener('click', closeAmbient);
     if(now-lt<340&&Math.hypot(x-lx,y-ly)<40){
       ev.preventDefault();
       // Double-tap only ever saves (the heart confirms it), like the swipe.
-      if(!isSaved(card.dataset.id))toggleLike(card.dataset.id);
+      if(!liked.has(feedKey(card.dataset.id)))toggleLike(card.dataset.id);
       const h=document.createElement('div');h.className='heart';h.textContent='❤️';
       h.style.cssText=`left:${x}px;top:${y}px`;
       document.body.appendChild(h);setTimeout(()=>h.remove(),750);lt=0;
@@ -2046,7 +2070,7 @@ document.getElementById('ambientClose').addEventListener('click', closeAmbient);
 // ── MAP EXPLORER (Wikivoyage) ─────────────────────────────────────────────
 // Public browser key: restrict it to wikiscroll.com in the CARTO dashboard.
 // Browser-visible key; domain restrictions are managed by the owner in CARTO.
-const CARTO_BASEMAP_KEY = '';
+const CARTO_BASEMAP_KEY = document.querySelector('meta[name="carto-basemap-key"]')?.content || '';
 function cartoTileURL(isDark,key=CARTO_BASEMAP_KEY) {
   const style=isDark?'dark_all':'voyager';
   return 'https://{s}.basemaps.cartocdn.com/rastertiles/'+style+'/{z}/{x}/{y}{r}.png?key='+encodeURIComponent(key);
@@ -2061,7 +2085,7 @@ let mapRequest = 0;
 async function geocodePlace(article) {
   const title = typeof article === 'string' ? article : String(article?.title || '');
   try {
-    const id = String(article?.id || '').replace(/^[a-z-]+:/, ''), host = new URL(article?.url || '').hostname;
+    const id = wireId(article?.id), host = new URL(article?.url || '').hostname;
     if (/^v[1-9]\d{0,11}$/.test(id) && /^[a-z-]+\.wikivoyage\.org$/.test(host)) {
       const pageid = id.slice(1);
       const resp = await fetch(`https://${host}/w/api.php?action=query&format=json&origin=*&prop=coordinates&coprimary=primary&pageids=${pageid}`, {signal:AbortSignal.timeout(6000)});
@@ -2244,7 +2268,7 @@ function loadToday() {
 }
 function todayShown(md) {
   const saved = lsGet('ws_today_shown');
-  return new Set(saved?.md === md && Array.isArray(saved.ids) ? saved.ids : []);
+  return new Set(saved?.md === md && saved.lang === curLang && Array.isArray(saved.ids) ? saved.ids : []);
 }
 function rollTodaySurprise() {
   cardsSinceToday++;
@@ -2255,7 +2279,7 @@ function rollTodaySurprise() {
   const pick = shuffled(info.seeds).find(a => !feedSeen.has(a.id) && !shown.has(a.id) && !articles.some(x => x.id === a.id));
   if (!pick) return null;
   feedSeen.add(pick.id); shown.add(pick.id);
-  lsSet('ws_today_shown', {md: info.md, ids: [...shown].slice(-200)});
+  lsSet('ws_today_shown', {md: info.md, lang: curLang, ids: [...shown].slice(-200)});
   cardsSinceToday = 0;
   return {...pick};
 }

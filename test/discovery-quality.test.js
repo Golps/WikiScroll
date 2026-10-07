@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
+const savedKeys = (src => src.slice(src.indexOf('// Page IDs repeat across editions'), src.indexOf('// Saves from before language-aware keys')))(fs.readFileSync(new URL('../public/app.js', import.meta.url), 'utf8'));
 
 const app = fs.readFileSync(new URL('../public/app.js', import.meta.url), 'utf8');
 const slice = (from, to) => app.slice(app.indexOf(from), app.indexOf(to, app.indexOf(from)));
@@ -55,7 +56,7 @@ function geocoder(responses) {
   const requests = [];
   const c = vm.createContext({URL, AbortSignal, console, encodeURIComponent,
     fetch: async url => { requests.push(new URL(url)); return Response.json(responses(new URL(url))); }});
-  vm.runInContext(slice('async function geocodePlace(', 'let mapLibraryPromise'), c);
+  vm.runInContext(savedKeys + slice('async function geocodePlace(', 'let mapLibraryPromise'), c);
   return {geocodePlace: a => c.geocodePlace(a), requests};
 }
 test('the map pins Wikivoyage coordinates and keeps disambiguation in the fallback search', async () => {
@@ -140,7 +141,7 @@ test('earlier Help Wikipedia choices migrate to the three-choice setting', () =>
       TOPIC_MAP: {science: {}}, curTopics: new Set(), syncTopicUI() {}, LANGS: [{c: 'en'}], window: {location: {search: ''}}, applyLangUI() {},
       localStorage: {}, applyTheme() {}, syncAllToggles() {}, curLang: 'en', URLSearchParams,
     });
-    vm.runInContext(slice('const HELP_MODES', '\n') + slice('function loadPersistedState(', 'function saveHistory('), c);
+    vm.runInContext(slice('const HELP_MODES', '\n') + slice('// Page IDs repeat across editions', 'function saveHistory('), c);
     vm.runInContext('loadPersistedState()', c);
     return {mode: c.helpMode, topics: store.ws_topics, saved: store.ws_settings};
   };

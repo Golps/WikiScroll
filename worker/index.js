@@ -3,13 +3,13 @@ import {topicResponse} from './topics.js';
 import {verifiedArticle} from './verified.js';
 import { collectionResponse } from './collections.js';
 import {averageViews,lagDays,completePageviews,scaleBand} from './pageviews.js';
-import {completeExtracts,extractParams,completeLeadText,leadParams} from './extracts.js';
+import {completeExtracts,extractParams,completeLeadFallback,fullTextParams,guideReadable,FALLBACK_MAX} from './extracts.js';
 import {vitalArticles} from './vital.js';
 import {completeNeeds,HELP_LANGS} from './needs.js';
 import {todayResponse} from './today.js';
 import {LANGS} from './languages.js';
-import {parsePlaces,parseCursor,formatCursor,namesPlace,interleave,fold} from './travel.js';
-import {isPhrasebook,phrasebookParams} from './phrasebooks.js';
+import {wantsMarkdown,htmlToMarkdown,markdownResponse} from './markdown.js';
+import {parsePlaces,parseCursor,formatCursor,namesPlace,interleave,fold,isPhrasebook,phrasebookParams,isDisambiguation} from './travel.js';
 /** WikiScroll Worker: explicit routing, static assets and article unfurls.
  * Handles article requests and social previews.
  * No GitHub integration, Pages runtime, KV or framework is required.
@@ -18,7 +18,6 @@ import {isPhrasebook,phrasebookParams} from './phrasebooks.js';
 // Hindi has about 200 guides. Those readers get English guides instead.
 export const VOYAGE_LANGS = new Set(['en','es','fr','de','it','pt','ru','ja','zh','he','nl','pl']);
 const voyageLang = lang => VOYAGE_LANGS.has(lang) ? lang : 'en';
-const DISAMBIGUATION = /^topics referred to by the same term$/i;
 // Link-preview services only. Search crawlers receive the same app shell as
 // people, so article previews are never indexed as thin duplicates of Wikipedia.
 const BOTS = /facebookexternalhit|facebot|twitterbot|linkedinbot|slackbot|discordbot|whatsapp|telegrambot|applebot|imessagebot|pinterestbot|redditbot/i;
@@ -60,7 +59,7 @@ async function upstream(url) {
   const timeout=new Promise(resolve=>{timer=setTimeout(()=>{controller.abort();resolve(null);},UPSTREAM_TIMEOUT_MS);});
   try {
     return await Promise.race([timeout,(async()=>{
-      const response=await fetch(url,{headers:{'User-Agent':'WikiScroll/4.0 (https://wikiscroll.com)'},signal:controller.signal});
+      const response=await fetch(url,{headers:{'User-Agent':'WikiScroll/4.0 (https://wikiscroll.com; contact@wikiscroll.com)'},signal:controller.signal});
       if(response.status===429||(response.status===503&&response.headers.has('Retry-After'))){
         cooldowns.set(host,Date.now()+retryDelay(response.headers.get('Retry-After')));
         return null;
@@ -88,8 +87,8 @@ function shuffle(values) {
 }
 
 function selectArticles(pages,lang,mode,depth) {
-  const minimum=mode==='how'?40:80;
-  const candidates=shuffle([...pages.values()].filter(p=>strip(p.extract).length>=minimum));
+  // Wikivoyage: 40 characters (20 in Chinese, Japanese, Korean); Wikipedia: 80.
+  const candidates=shuffle([...pages.values()].filter(p=>mode==='how'?guideReadable(strip(p.extract)):strip(p.extract).length>=80));
   if(mode!=='wiki')return candidates.slice(0,20).map(p=>article(p,lang,mode));
   // Discovery depth measures article popularity only. There is no saved-item,
   // previous-card, category-similarity or other personalization input here.
@@ -149,11 +148,10 @@ function startBatch(key,lang,mode,depth,cache,ctx) {
       const fresh=[];
       for(const p of Object.values(data?.query?.pages||{})){
         if(!Number.isSafeInteger(p.pageid)||p.pageid<1||(mode==='wiki'&&!p.thumbnail?.source)||!p.title||BAD_TITLE.test(p.title))continue;
-        // Wikivoyage includes travel topics as well as destinations. Skip
-        // phrasebooks in every edition (phrasebooks.js) and obvious English
-        // index pages, without rejecting other non-English guides.
-        if(mode==='how'&&(isPhrasebook(p,lang)||/^(?:travel topics?|itineraries)(?:[ :/]|$)/i.test(p.title)))continue;
-        if(DISAMBIGUATION.test(p.description||''))continue;
+        // Wikivoyage includes travel topics as well as destinations. Avoid
+        // obvious non-destination pages without rejecting non-English guides.
+        if(mode==='how'&&(isPhrasebook(p)||/^(?:travel topics?|itineraries)(?:[ :/]|$)/i.test(p.title)))continue;
+        if(isDisambiguation(p))continue;
         if(!pages.has(p.pageid))fresh.push(p);
       }
       // Registered before their text arrives: selection skips pages without an
@@ -163,7 +161,8 @@ function startBatch(key,lang,mode,depth,cache,ctx) {
       // candidates so depth sees the whole sample, not A-to-D titles.
       await Promise.all([
         mode==='wiki'?completePageviews(fresh,ids=>upstream(apiURL(lang,mode,{prop:'pageviews',pvipdays:'14',pageids:ids}))):null,
-        completeExtracts(fresh,ids=>upstream(apiURL(lang,mode,extractParams(ids)))),
+        // Wikivoyage guides without an introduction fall back to their opening text.
+        completeExtracts(fresh,ids=>upstream(apiURL(lang,mode,extractParams(ids)))).then(()=>mode==='how'?completeLeadFallback(fresh,id=>upstream(apiURL(lang,mode,fullTextParams(id)))):null),
         // Maintenance tags for the optional "Needs citations" card label.
         mode==='wiki'&&HELP_LANGS.has(lang)?completeNeeds(lang,fresh,params=>upstream(apiURL(lang,mode,params))):null,
       ]);
@@ -225,6 +224,32 @@ export function renderUnfurl(meta,url,lang) {
   return `<!doctype html><html lang="${lang}"><head><meta charset="utf-8"><title>${title}</title><meta name="robots" content="noindex,follow"><meta name="description" content="${description}"><link rel="canonical" href="${canonical}"><meta property="og:type" content="article"><meta property="og:url" content="${canonical}"><meta property="og:title" content="${title}"><meta property="og:description" content="${description}"><meta property="og:image" content="${img}"><meta property="og:site_name" content="WikiScroll"><meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="${title}"><meta name="twitter:description" content="${description}"><meta name="twitter:image" content="${img}"></head><body><h1>${title}</h1><p>${description}</p><a href="${canonical}">Open in WikiScroll</a></body></html>`;
 }
 
+// Opening texts already read for guides without an introduction (extracts.js
+// completeLeadFallback): kept in this isolate and in the edge cache for a day,
+// so a retried travel page makes progress. Subrequest budget per travel answer
+// on the Workers Free plan (50, Cache API calls included): page cache 2,
+// searches 3, introduction chunks 6 (30 results), stored texts checked 20,
+// opening texts read 8 and saved 8 = 47.
+// Agent discovery (RFC 8288): the homepage points to its machine-readable
+// description and its Markdown version. There is deliberately no api-catalog
+// or service-desc: /api/ is the reader's own rate-limited backend, not a
+// public API (robots.txt disallows it).
+const HOME_LINKS='</llms.txt>; rel="describedby"; type="text/markdown", </about/>; rel="service-doc"; type="text/html", </>; rel="alternate"; type="text/markdown"';
+const LEAD_LOOKUPS=20,leads=new Map();
+function leadStore(lang,ctx){
+  const cache=globalThis.caches?.default,key=id=>new Request(`https://wikiscroll.com/__lead/v1/${lang}/${id}`);
+  const remember=(id,text)=>{if(leads.size>=4000)leads.delete(leads.keys().next().value);leads.set(lang+'|'+id,text);};
+  return {
+    async lookup(ids){
+      const found=new Map(),rest=[];
+      for(const id of ids){const k=lang+'|'+id;if(leads.has(k))found.set(id,leads.get(k));else rest.push(id);}
+      await Promise.all(rest.slice(0,LEAD_LOOKUPS).map(async id=>{try{const hit=await cache?.match(key(id));if(hit){const text=await hit.text();found.set(id,text);remember(id,text);}}catch{}}));
+      return found;
+    },
+    save(id,text){remember(id,text);if(cache)ctx.waitUntil(cache.put(key(id),new Response(text,{headers:{'Content-Type':'text/plain;charset=utf-8','Cache-Control':'public, max-age=86400'}})).catch(()=>{}));},
+  };
+}
+
 async function handle(request,env,ctx) {
     const url=new URL(request.url);
     if(['/collection','/collection.png','/api/collection'].includes(url.pathname)) return collectionResponse(request,ctx,env);
@@ -242,50 +267,36 @@ async function handle(request,env,ctx) {
         const lang=voyageLang(requested);
         // Many readers ask for the same destination and style: complete result
         // pages are shared from the edge cache for an hour, before any upstream work.
-        const key=new Request(`${url.origin}/api/travel?v=4&lang=${lang}&place=${encodeURIComponent(places.map(fold).join('|'))}&style=${style}&offset=${cursor.map(c=>c??'-').join('.')}`),cache=globalThis.caches?.default;
+        const key=new Request(`${url.origin}/api/travel?v=8&lang=${lang}&place=${encodeURIComponent(places.map(fold).join('|'))}&style=${style}&offset=${cursor.map(c=>c??'-').join('.')}`),cache=globalThis.caches?.default;
         try{const hit=await cache?.match(key);if(hit)return json(await hit.json(),200,{'X-Cache':'HIT'});}catch{}
         if(!await permit(env,'WORK_LIMIT','travel'))return limited();
-        const started=Date.now(),limit=String(Math.ceil(30/Math.max(1,places.length)));
+        const started=Date.now(),limit=String(places.length>1?Math.ceil(30/places.length):30);
         const searches=await Promise.all((places.length?places:[null]).map(async(place,i)=>{
           if(cursor[i]===null)return {place,pages:[],next:null};
           const query=[place?JSON.stringify(place):'',style?'('+styles[style]+')':''].filter(Boolean).join(' ');
           const data=await upstream(apiURL(lang,'how',{generator:'search',gsrsearch:query,gsrnamespace:'0',gsrlimit:limit,gsroffset:String(cursor[i]),prop:'pageimages|info|description|categories',piprop:'thumbnail',pithumbsize:'800',pilimit:'max',inprop:'url',...phrasebookParams(lang)}));
           if(!data||data.error)return null;
           // Search relevance order (the generator's index), not page-ID order.
-          const pages=Object.values(data.query?.pages||{}).filter(p=>p.pageid>0&&!DISAMBIGUATION.test(p.description||'')&&!isPhrasebook(p,lang)).sort((a,b)=>(a.index??0)-(b.index??0));
+          const pages=Object.values(data.query?.pages||{}).filter(p=>p.pageid>0&&!isDisambiguation(p)&&!isPhrasebook(p)).sort((a,b)=>(a.index??0)-(b.index??0));
           return {place,pages,next:data.continue?.gsroffset??null};
         }));
         if(searches.includes(null))return json({error:'Travel search temporarily unavailable'},503);
         const found=searches.flatMap(s=>s.pages);
-        // Guides without a usable introduction get their first paragraphs instead,
-        // most relevant first (title names the place, then search order), at
-        // most LEAD_FALLBACK_LIMIT per answer. The text read for this search page
-        // is kept at the edge for a day in one entry (one read, one write), so a
-        // repeated request continues with the next guides instead of re-reading
-        // the first ones. Cloudflare's Free plan allows 50 subrequests per request.
-        const placeOf=new Map(searches.flatMap(s=>s.pages.map(p=>[p.pageid,s.place])));
-        const titled=p=>placeOf.get(p.pageid)&&fold(p.title).includes(fold(placeOf.get(p.pageid)))?1:0;
-        const byImportance=[...found].sort((a,b)=>titled(b)-titled(a)||(a.index??0)-(b.index??0));
-        const leadsKey=new Request(key.url.replace('/api/travel?','/__leads/v1?'));
-        let known={};const learned={};
-        await within((async()=>{
-          await completeExtracts(found,ids=>upstream(apiURL(lang,'how',extractParams(ids))));
-          if(found.some(p=>typeof p.extract==='string'&&!p.extractMissing&&strip(p.extract).length<40)){
-            try{const hit=await cache?.match(leadsKey);if(hit)known=await hit.json()||{};}catch{}
-          }
-          await completeLeadText(byImportance,id=>upstream(apiURL(lang,'how',leadParams(id))),undefined,known,learned);
-        })(),Math.max(0,TRAVEL_BUDGET_MS-(Date.now()-started)));
-        if(cache&&Object.keys(learned).length)ctx.waitUntil(cache.put(leadsKey,Response.json({...known,...learned},{headers:{'Cache-Control':'public, max-age=86400'}})).catch(()=>{}));
+        // Guides whose introduction misses the budget are left out of this page.
+        // Guides without an introduction use their opening text: texts read
+        // before come from leadStore, at most FALLBACK_MAX more are read now, and
+        // the rest leave the page unfinished, so the browser's retry reads them.
+        await within(completeExtracts(found,ids=>upstream(apiURL(lang,'how',extractParams(ids)))).then(()=>completeLeadFallback(found,id=>upstream(apiURL(lang,'how',fullTextParams(id))),FALLBACK_MAX,leadStore(lang,ctx))),Math.max(0,TRAVEL_BUDGET_MS-(Date.now()-started)));
         // Keep guides that are about the place: named in the title or introduction.
-        const ready=searches.map(s=>s.pages.filter(p=>strip(p.extract).length>=40&&(!s.place||namesPlace(p,s.place))));
+        const ready=searches.map(s=>s.pages.filter(p=>guideReadable(strip(p.extract))&&(!s.place||namesPlace(p,s.place))));
         const body={articles:interleave(ready).map(p=>article(p,lang,'how')),next:formatCursor(searches.map(s=>s.next))};
-        // Guides still loading, failed, or left for later must not be skipped:
-        // "resume" keeps each such place on its page, and the browser asks again
-        // (a few times at most) before moving on with "next".
-        const unfinished=p=>typeof p.extract!=='string'||p.extractMissing||p.leadPending||p.leadSkipped;
-        const resume=searches.map((s,i)=>s.pages.some(unfinished)?cursor[i]:s.next);
-        if(resume.some((r,i)=>r!==searches[i].next))body.resume=formatCursor(resume);
-        let complete=!found.some(unfinished);
+        const unfinished=s=>s.pages.some(p=>typeof p.extract!=='string'||p.extractMissing);
+        let complete=!searches.some(unfinished);
+        // Some guides' text did not arrive in time: moving on would skip them for
+        // good (and could end the feed early). "retry" keeps each unfinished
+        // place on its current page; the browser asks again, skipping guides it
+        // already has, and only then follows "next".
+        if(!complete)body.retry=formatCursor(searches.map((s,i)=>unfinished(s)?cursor[i]:s.next));
         // A misspelled place finds nothing: offer the search engine's correction.
         if(!found.length&&places.length===1&&cursor[0]===0){
           const hint=await upstream(apiURL(lang,'how',{list:'search',srsearch:places[0],srnamespace:'0',srinfo:'suggestion',srlimit:'1',srprop:''}));
@@ -321,10 +332,33 @@ async function handle(request,env,ctx) {
         return new Response(request.method==='HEAD'?null:renderUnfurl(meta,url.href,lang),{headers:{'Content-Type':'text/html;charset=UTF-8','Content-Security-Policy':"default-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'",'Cache-Control':'private, no-store','Vary':'User-Agent','X-Robots-Tag':'noindex'}});
       }
     }
+    // Agents that ask for Markdown get the page's text: llms.txt stands for the
+    // reader (a JavaScript app with no text of its own), About is converted.
+    const page=url.pathname==='/'||url.pathname==='/index.html'?'home':/^\/about(?:\/|\/index\.html)?$/.test(url.pathname)?'about':null;
+    if(page&&wantsMarkdown(request.headers.get('Accept'))){
+      const source=await env.ASSETS.fetch(new Request(new URL(page==='home'?'/llms.txt':'/about/',url.origin)));
+      if(source.ok){
+        const text=await source.text();
+        const response=markdownResponse(page==='home'?text:htmlToMarkdown(text,url.origin+'/about/'),request.method==='HEAD');
+        if(page==='home')response.headers.set('Link',HOME_LINKS);
+        return response;
+      }
+    }
+    // About is a static page: only its Vary header changes, since the same URL can answer in Markdown.
+    if(page==='about'){
+      const response=await env.ASSETS.fetch(request),headers=new Headers(response.headers);
+      headers.set('Vary','Accept');
+      return new Response(response.body,{status:response.status,headers});
+    }
     let response=await env.ASSETS.fetch(request);
     if(response.headers.get('content-type')?.includes('text/html')){
-      const headers=new Headers(response.headers);headers.set('Cache-Control','no-cache');headers.set('Vary','User-Agent');
+      const headers=new Headers(response.headers);headers.set('Cache-Control','no-cache');headers.set('Vary','Accept, User-Agent');
+      if(page==='home')headers.set('Link',HOME_LINKS);
       response=new Response(response.body,{status:response.status,headers});
+      const mapKey=env.CARTO_BASEMAP_KEY;
+      if(page==='home'&&typeof mapKey==='string'&&/^[A-Za-z0-9_-]{1,200}$/.test(mapKey)){
+        response=new HTMLRewriter().on('meta[name="carto-basemap-key"]',{element(el){el.setAttribute('content',mapKey);}}).transform(response);
+      }
       const beacon=env.WEB_ANALYTICS_TOKEN;
       if(beacon&&/^[a-f0-9]{32}$/i.test(beacon)){
         response=new HTMLRewriter().on('body',{element(el){el.append(`<script defer src="https://static.cloudflareinsights.com/beacon.min.js" data-cf-beacon='{"token":"${beacon}"}'></script>`,{html:true});}}).transform(response);

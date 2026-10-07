@@ -2,12 +2,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
+const savedKeys = (src => src.slice(src.indexOf('// Page IDs repeat across editions'), src.indexOf('// Saves from before language-aware keys')))(fs.readFileSync(new URL('../public/app.js', import.meta.url), 'utf8'));
 
 const source = fs.readFileSync(new URL('../public/app.js', import.meta.url), 'utf8');
 const geometry = source.slice(source.indexOf('// ── FEED GEOMETRY'), source.indexOf('// ── BOOT'));
 const navigationStart = source.indexOf('(function() {', source.indexOf('// rAF-driven swipe engine'));
 const navigation = source.slice(navigationStart, source.indexOf('// ── KEYBOARD BAR', navigationStart));
-const saveKeys = source.slice(source.indexOf('function articleLang('), source.indexOf('// Earlier versions stored'));
 
 function harness(count, height = 700) {
   const handlers = {document: new Map(), window: new Map(), feed: new Map()};
@@ -80,7 +80,7 @@ function harness(count, height = 700) {
     liked: new Map(), feedSeen: new Set(cards.map(card => card.dataset.id)),
     fillGeneration: 0, swipeEnabled: true,
   });
-  vm.runInContext(saveKeys + geometry + navigation, context);
+  vm.runInContext(savedKeys + geometry + navigation, context);
   function dispatch(scope, type, event = {}) {
     const ev = {target: {closest: () => null}, cancelable: true, prevented: false, preventDefault() { this.prevented = true; }, ...event};
     for (const handler of handlers[scope].get(type) || []) handler(ev);

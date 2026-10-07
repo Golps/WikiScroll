@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- Consolidate production Worker source and public repository while preserving public documentation and attribution.
+- Include the latest travel recovery, language-aware saved articles, Markdown responses, WebMCP, branding and About film.
+- Test changes on GitHub and support deployment through Cloudflare Workers Builds.
+- Move map configuration and deployment credentials out of source; verify that uploaded versions actually receive production traffic.
+
+
 Releases of this repository. Each entry describes what changed in the code; [docs/ENGINEERING.md](docs/ENGINEERING.md#known-issues) has the details and the tests behind each change.
 
 ## 1.4.1 (September 27, 2026)

@@ -28,14 +28,14 @@ There is no front-end build step. Edit `public/*` and reload. When you test offl
 
 ## Configuration
 
-WikiScroll uses a few settings. None of the maintainer's values are in this repository.
+WikiScroll uses a few settings. Deployment credentials and map configuration live outside the repository.
 
 | Setting | Where | Visibility | Needed for |
 |---|---|---|---|
-| `CARTO_BASEMAP_KEY` | constant in `public/app.js` | **Public**: sent by every browser that loads a map | Optional. Maps load without it; a key ties map usage to your CARTO account. |
+| `CARTO_BASEMAP_KEY` | Worker secret (or `.dev.vars` locally) | **Public**: sent by every browser that loads a map | Optional. Maps load without it; a key ties map usage to your CARTO account. |
 | `WEB_ANALYTICS_TOKEN` | Worker variable (`.dev.vars` locally, dashboard in production) | **Public** once injected into pages | Optional Cloudflare Web Analytics beacon |
 | `CLOUDFLARE_API_TOKEN` | `.env` or the shell environment | **Secret** | Deploying |
-| `CLOUDFLARE_ACCOUNT_ID` | `.env` or the shell environment | Private | Deploying |
+| `CLOUDFLARE_ACCOUNT_ID` | `.env` or the shell environment | Account identifier, kept in configuration | Deploying |
 
 Some values are **browser-visible keys**. They end up in every visitor's browser, so they can't be kept secret. Protect them by restricting where they work, for example the allowed domains for your CARTO key. The production values are still left out of this repository, so contributors use their own keys and forks don't run on the maintainer's quota.
 
@@ -48,7 +48,7 @@ cp .env.example .env              # deployment credentials (git-ignored)
 cp .dev.vars.example .dev.vars    # optional Worker variables for wrangler dev (git-ignored)
 ```
 
-Maps work out of the box: with an empty `CARTO_BASEMAP_KEY`, tiles load from CARTO's public basemaps. For a public deployment, create a CARTO key restricted to your domain, set it in `CARTO_BASEMAP_KEY`, and check [CARTO's terms](https://carto.com/legal) for your expected traffic.
+For maps, create a CARTO key restricted to your domain and set the Worker secret `CARTO_BASEMAP_KEY`. The Worker injects it into a metadata element on the reader page. This key is public to browsers even though it is stored as a Worker secret; domain restrictions are essential. Without a key, CARTO may display an API-key watermark. Check [CARTO's terms](https://carto.com/legal) for your expected traffic.
 
 ## Tests and checks
 
@@ -57,13 +57,30 @@ node --test test/*.test.js   # the full suite, ~2 seconds, no network needed
 pnpm check                   # syntax check of every script, then the suite
 ```
 
-The same checks run on GitHub for every push to `main` and every pull request (`.github/workflows/test.yml`). They only test; nothing is deployed.
+The same checks run on GitHub for every push to `main` and every pull request (`.github/workflows/test.yml`). GitHub only tests; Cloudflare runs its own tests before deploying connected main-branch changes.
 
 [ENGINEERING.md](ENGINEERING.md#testing) explains what the suite covers and what it doesn't. Please also check changes by hand in a real browser, on a phone-sized viewport and on desktop. Test with reduced motion enabled and in a right-to-left language (Hebrew or Arabic) when your change affects layout.
 
 ## Deploying
 
-WikiScroll is deployed **directly to Cloudflare Workers** with Wrangler. There is no GitHub Pages site and no automatic deployment from this repository; wikiscroll.com itself is deployed by hand.
+WikiScroll is deployed **directly to Cloudflare Workers** with Wrangler. Cloudflare Workers Builds connects this repository to the existing Worker and deploys main-branch changes after its build checks pass. GitHub Actions runs tests independently. There is no GitHub Pages deployment.
+
+### Automatic production deployment
+
+Connect the **existing** `wikiscroll` Worker, rather than creating another application:
+
+1. In Cloudflare, open Workers & Pages → wikiscroll → Settings → Builds → Connect.
+2. Authorize the Cloudflare GitHub app for **only** `Golps/WikiScroll` and select that repository.
+3. Set production branch to `main` and root directory to the repository root (`/`). The local `site/` folder is the repository root; do not enter `site` in Cloudflare.
+4. Set the build command to `pnpm check` and the deploy command to `npx wrangler deploy`. Cloudflare installs dependencies using the committed pnpm lockfile; use Node 22 or newer.
+5. Disable non-production branch deployments unless intentionally testing isolated previews. Do not use the production deploy command for other branches.
+6. Start the first build and verify the new active version and live asset versions.
+
+Cloudflare manages the build's deployment authentication. No Cloudflare deployment token needs to be uploaded to GitHub. Keep the existing Worker name, domain connection, runtime secrets, rate-limit bindings and `keep_vars`. If using a restricted build token causes the documented `/workers/subdomain` error after upload, use `bash scripts/deploy.sh` as the deploy command with the build's deployment credentials available in its environment; it verifies a new full-traffic deployment before accepting that specific error. Do not broaden permissions merely to silence it.
+
+Once connected, pushes to `main` trigger builds. The build command runs the tests again, so a failed test prevents deployment even if the independent GitHub check is still running. Do not edit production code in the Cloudflare editor: make changes here and push them.
+
+The local checkout is the same source as GitHub. Private local configuration, credentials and handoff notes are ignored and must never be force-added.
 
 ### 1. Create a narrowly scoped API token
 
@@ -135,7 +152,7 @@ jobs:
       - uses: actions/deploy-pages@v4
 ```
 
-This workflow isn't included in this repository, because wikiscroll.com is deployed to Cloudflare by hand. It's an example for your own fork.
+This static-hosting workflow is not included in this repository. It is an example for your own fork; the included workflow deploys a Worker.
 
 **Turning it on, step by step (in your fork):**
 
@@ -146,7 +163,7 @@ This workflow isn't included in this repository, because wikiscroll.com is deplo
 
 **Don't use the "Deploy from a branch → /docs" option.** In this repository `docs/` holds documentation, not the app. Publishing it would put these Markdown files online instead of WikiScroll, and GitHub already displays them in the repository.
 
-**Maps.** Maps work without a key. If you add one, restrict it to your own domain and set it in `CARTO_BASEMAP_KEY` (see [Configuration](#configuration)). Every visitor can see it.
+**Maps.** For static copies, populate the `carto-basemap-key` metadata element in `public/index.html` with your own domain-restricted key. Every visitor can see it.
 
 Before publishing a static copy, also apply the relevant items in [Make it your own](#make-it-your-own). In particular, the collection share button builds `wikiscroll.com` links.
 
@@ -162,7 +179,7 @@ WikiScroll was written for one deployment, at `wikiscroll.com`. Before deploying
 | **Page metadata** | `public/index.html` and `public/about/index.html` (title, canonical URL, Open Graph and structured data, contact address), `public/manifest.json`, `public/robots.txt`, `public/sitemap.xml`, `public/llms.txt` |
 | **Name and logo** | `branding/` sources, then `node scripts/build-branding.mjs`. The wordmark is also embedded in `worker/wordmark.js` for generated images. |
 | **Worker name** | `name` in `wrangler.jsonc`, and the `Uploaded wikiscroll` check in `scripts/deploy.sh` |
-| **Map key** | `CARTO_BASEMAP_KEY` in `public/app.js`: optional, but recommended for public deployments, restricted to your domain |
+| **Map key** | Worker secret `CARTO_BASEMAP_KEY`: restrict it to your domain |
 | **Content Security Policy** | `PAGE_CSP` in `worker/security.js` and the `/*` block of `public/_headers`. Update both if you add a script, map-tile, analytics or API host. |
 | **Tests** | Several tests use `https://wikiscroll.com` as an example origin. They still pass, but update them if you change behavior that depends on the domain. |
 

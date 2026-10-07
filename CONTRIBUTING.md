@@ -4,9 +4,9 @@ Thanks for your interest in WikiScroll.
 
 ## About this repository
 
-This repository publishes the source code behind [wikiscroll.com](https://wikiscroll.com) so that people can see how it's built and use it as a starting point for their own projects. It is a **reference snapshot**, not an actively maintained open-source project:
+This repository publishes the source code behind [wikiscroll.com](https://wikiscroll.com) so that people can see how it's built and use it as a starting point for their own projects. It is the shared source for the live Worker:
 
-- The live site is developed and deployed separately, by hand, to Cloudflare Workers. Nothing here deploys automatically.
+- Changes to the main branch and pull requests run tests on GitHub. Cloudflare Workers Builds can connect the main branch to the existing live Worker.
 - Issues and pull requests are welcome, but they may not get a response or be merged.
 
 ## Forking
@@ -24,7 +24,7 @@ If you build on WikiScroll, these principles explain many of its design decision
 
 - **No engagement-driven personalization.** Likes save articles; they never shape the feed.
 - **No streaks, daily targets or pressure to return.**
-- **No accounts, ads or tracking.** Reader data stays in the browser.
+- **No accounts, ads or engagement tracking. Optional Cloudflare Web Analytics measures aggregate usage.** Reader data stays in the browser.
 - **Wikimedia content stays attributed.** Every card links to its source article.
 - **Calm, accurate copy.** Describe what a feature does, without hype.
 

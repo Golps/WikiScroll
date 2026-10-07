@@ -85,3 +85,27 @@ test('a Popular request warms the Known list in the background', async () => {
   const known = await vitalArticles('en', 2, w.upstream, c, toArticle);
   assert.ok(known.length && known.every(a => a.title.startsWith('Known ')));
 });
+
+test('ready Popular cards are available before slower introductions finish', async () => {
+  const {vitalArticles, vitalTitles} = await fresh(), w = wiki(), c = ctx();
+  await vitalTitles(3, w.upstream, c);
+  let release;
+  const gate = new Promise(r => { release = r; });
+  const slow = async address => {
+    const p = new URL(address).searchParams;
+    // One chunk of introductions stalls; the others arrive at once.
+    if (p.get('prop') === 'extracts' && p.get('pageids').split('|').includes('1000')) { await gate; }
+    return w.upstream(address);
+  };
+  const info = {};
+  const done = vitalArticles('en', 1, slow, c, toArticle, info);
+  // Wait (up to 2 s) for the unstalled chunks, not a fixed delay: the full
+  // suite runs in parallel and a short sleep made this test flaky.
+  for (let t = 0; t < 200 && !(info.snapshot?.().length >= 10); t++) await new Promise(r => setTimeout(r, 10));
+  const early = info.snapshot();
+  // 24 candidates in chunks of 5,5,5,5,4: with one chunk stalled, 19 or 20 are ready.
+  assert.ok(early.length >= 10 && early.length <= 20, `snapshot has the ${early.length} ready cards`);
+  assert.ok(early.every(a => a.id !== 'w1000'));
+  release();
+  assert.equal((await done).length, 20);
+});

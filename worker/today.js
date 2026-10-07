@@ -12,7 +12,7 @@ const FEED_TIMEOUT_MS = 15_000;
 async function fetchFeed(url) {
   const controller = new AbortController(), timer = setTimeout(() => controller.abort(), FEED_TIMEOUT_MS);
   try {
-    const response = await fetch(url, {headers: {'User-Agent': 'WikiScroll/4.0 (https://wikiscroll.com)'}, signal: controller.signal});
+    const response = await fetch(url, {headers: {'User-Agent': 'WikiScroll/4.0 (https://wikiscroll.com; contact@wikiscroll.com)'}, signal: controller.signal});
     return response.ok ? await response.json() : null;
   } catch { return null; } finally { clearTimeout(timer); }
 }
@@ -21,15 +21,16 @@ const strip = s => String(s ?? '').replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').
 const pending = new Map();
 export const MONTH_DAY = /^(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/;
 
-// Card photos use 960px thumbnails: Wikimedia serves thumbnails only in
-// standard widths, and 800px requests fail on both image hosts. Images may come
-// from upload.wikimedia.org or thumb.wikimedia.org, like everywhere else in the app.
-export const CARD_WIDTH = 960;
-function cardImage(p) {
+// Card photos are 960px: Wikimedia serves thumbnails only in standard widths
+// (250, 330, 500, 960, 1280...; 800px now fails on both hosts). The feed's own
+// thumbnails come from both upload. and thumb.wikimedia.org, with a query
+// string and, for SVG renders, a "langxx-" prefix.
+export const IMAGE_HOST = /^https:\/\/(?:upload|thumb)\.wikimedia\.org\//;
+export function cardImage(p) {
   const thumb = p.thumbnail?.source, original = p.originalimage;
-  if (!thumb || !/^https:\/\/(upload|thumb)\.wikimedia\.org\//.test(thumb)) return '';
-  if (original?.source && original.width <= CARD_WIDTH && !/\.svg$/i.test(original.source)) return original.source;
-  return thumb.replace(/\/\d+px-([^/]+)$/, `/${CARD_WIDTH}px-$1`);
+  if (!thumb || !IMAGE_HOST.test(thumb)) return '';
+  if (original?.source && IMAGE_HOST.test(original.source) && original.width <= 960 && !/\.svg(?:\?|$)/i.test(original.source)) return original.source;
+  return thumb.replace(/\/((?:lang[a-z-]+-)?)\d+px-([^/?]+)(\?[^/]*)?$/, '/$1960px-$2$3');
 }
 
 export function parseToday(feed, lang) {
@@ -61,7 +62,7 @@ export async function todayResponse(url, ctx, {langs, permit, limited, env, feed
   // A failed or timed-out feed is a temporary error, never an empty day: the
   // browser keeps retrying, and browsers never cache the failure.
   const unavailable = () => Response.json({error: 'On this day is temporarily unavailable.'}, {status: 503, headers: {'Cache-Control': 'no-store', 'Retry-After': String(RETRY_TTL)}});
-  const key = new Request(`https://wikiscroll.com/__today/v3/${lang}/${md}`), cache = globalThis.caches?.default;
+  const key = new Request(`https://wikiscroll.com/__today/v4/${lang}/${md}`), cache = globalThis.caches?.default;
   try {
     const hit = await cache?.match(key);
     if (hit) { const stored = await hit.json(); return stored?.failed ? unavailable() : Response.json(stored, {headers: {...headers(3600), 'X-Cache': 'HIT'}}); }

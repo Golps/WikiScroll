@@ -23,66 +23,72 @@ export async function completeExtracts(pages, fetchChunk) {
 
 export const extractParams = ids => ({prop: 'extracts', exintro: '1', explaintext: '1', exchars: '1000', exlimit: 'max', pageids: ids});
 
-// Many guides outside English Wikivoyage open with a heading, so their
-// introduction is empty (Spanish "Japón", "Italia") or a single short line
-// (Japanese 京都市). For those, the card uses the first paragraphs of the guide's
-// text. Full-text extracts come one page per request, so only a few pages per
-// answer get this (Wikimedia rate-limits clients that send many at once).
-export const LEAD_FALLBACK_LIMIT = 8, LEAD_FALLBACK_CONCURRENCY = 4;
-export const leadParams = id => ({prop: 'extracts', explaintext: '1', exsectionformat: 'plain', exchars: '1200', pageids: String(id)});
-const CJK = /[぀-ヿ㐀-鿿가-힯]/;
-const isListItem = line => /​/.test(line) || /^\d+[\s　]/.test(line) || /^[^.!?。]{1,60}\s[-–—]\s/u.test(line);
-const sentences = text => text.match(/[^.!?。！？]+(?:[.!?。！？]+["»”」』)]?|$)\s*/gu) || [text];
+// Many Wikivoyage guides have no introduction: the text starts under the first
+// heading (Spanish "Japón" opens with "== Regiones =="), so exintro returns ''.
+// About 40% of Spanish and Japanese guides, against 2% in English. Such guides
+// used to be dropped, which left place searches nearly empty. For those pages,
+// read the start of the full text instead. TextExtracts returns full text for
+// one page per request, and the Workers Free plan allows 50 subrequests
+// (fetch and Cache API calls together) per request, so at most FALLBACK_MAX
+// pages per answer are read from Wikivoyage.
+export const FALLBACK_MAX = 8;
+export const fullTextParams = id => ({prop: 'extracts', explaintext: '1', exsectionformat: 'wiki', exchars: '1200', pageids: String(id)});
 
-// Paragraphs only: headings, list entries ("Tokio - la capital…", "1 Roma ​ 41.9 —
-// …") and the line cut off by the character limit are skipped. A paragraph that
-// leads into a list ("…estas son nueve de las más importantes:") loses that
-// last sentence, which makes no sense without the list.
-export function firstParagraphs(text, max = 1000) {
-  const lines = String(text || '').split('\n').map(line => line.trim());
-  let out = '';
-  lines.forEach((line, i) => {
-    if (out.length >= max || !line || isListItem(line) || /(\.\.\.|…)$/.test(line)) return;
-    const next = lines.slice(i + 1).find(Boolean) || '';
-    if (/:$/.test(line) || isListItem(next)) line = sentences(line).slice(0, -1).join('').trim();
-    if (line.length < (CJK.test(line) ? 20 : 60) || !/[.!?。！？」』)"»”]$/u.test(line)) return;
-    out += (out ? (CJK.test(line) ? '' : ' ') : '') + line;
-  });
-  return out;
+const HEADING = /^\s*=+[^=].*=+\s*$/;
+// "Tokio - la moderna capital…": a list entry, not prose.
+const LIST_ENTRY = /^[^.!?。！？]{1,60}\s[-–—:]\s/;
+const SENTENCE_END = /[.!?。！？…]["'”’»)]*$/u;
+// Chinese, Japanese and Korean say as much in far fewer characters.
+const CJK = /[\u3040-\u30ff\u3400-\u9fff\uac00-\ud7af]/;
+const minimum = text => CJK.test(text) ? 25 : 60;
+// A Wikivoyage card needs 40 characters of introduction; half that in CJK.
+export const guideReadable = text => text.length >= (CJK.test(text) ? 20 : 40);
+
+export function leadFromText(text) {
+  const paragraphs = [];
+  let current = [];
+  const flush = () => { if (current.length) paragraphs.push(current.join(' ')); current = []; };
+  for (const raw of String(text || '').split('\n')) {
+    const line = raw.trim();
+    if (!line || HEADING.test(line)) { flush(); continue; }
+    if (LIST_ENTRY.test(line)) { flush(); continue; }
+    current.push(line);
+  }
+  flush();
+  let lead = '';
+  for (let p of paragraphs) {
+    p = p.replace(/\s+/g, ' ').trim();
+    // A paragraph that leads into a list ("…the regions are:") loses that sentence.
+    if (/[:：]$/.test(p)) p = p.replace(/[^.!?。！？]*[:：]$/u, '').trim();
+    if (p.length < minimum(p) || !/[.!?。！？]/u.test(p)) continue;
+    lead = lead ? lead + ' ' + p : p;
+    if (lead.length >= 300) break;
+  }
+  return lead.length >= minimum(lead) && SENTENCE_END.test(lead) ? lead : lead.replace(/[^.!?。！？]*$/u, '').trim();
 }
 
-// Pages are taken in the order given (most important first). `known` holds
-// text already read for this search page (pageid -> paragraphs, '' when the
-// guide has none); it costs no request and doesn't count toward the limit, so
-// asking again picks up where the last answer stopped. Newly read text is added
-// to `learned` as it arrives, for the caller to store. Pages that don't get
-// their turn are marked leadSkipped and are not dropped for good: the caller
-// asks for them again (/api/travel's resume cursor).
-export async function completeLeadText(pages, fetchPage, limit = LEAD_FALLBACK_LIMIT, known = {}, learned = {}) {
-  const todo = [];
-  for (const page of pages) {
-    if (typeof page.extract !== 'string' || page.extractMissing || page.extract.replace(/\s+/g, ' ').trim().length >= 40) continue;
-    if (!Object.hasOwn(known, page.pageid)) todo.push(page);
-    else if (typeof known[page.pageid] === 'string' && known[page.pageid]) page.extract = known[page.pageid];
+// store (optional): texts already read, {lookup(ids) -> Map(id -> text),
+// save(id, text)}. Known texts cost no Wikivoyage request and don't count
+// toward max, so each retry of an unfinished page reads the next guides
+// instead of the same ones again.
+export async function completeLeadFallback(pages, fetchOne, max = FALLBACK_MAX, store = null) {
+  const empty = pages.filter(p => p.extract === '' && !p.extractMissing);
+  // Pending until the text arrives: if the caller's answer budget ends first
+  // (or a page is over the cap), the result is never cached as complete.
+  for (const page of empty) page.extractMissing = true;
+  if (store && empty.length) {
+    let known = new Map();
+    try { known = await store.lookup(empty.map(p => p.pageid)); } catch {}
+    for (const page of empty) if (known.has(page.pageid)) { page.extract = known.get(page.pageid); delete page.extractMissing; }
   }
-  const turn = todo.slice(0, Math.max(0, limit));
-  for (const page of todo.slice(turn.length)) page.leadSkipped = true;
-  // Still set if the answer budget runs out first: the page is then unfinished.
-  for (const page of turn) page.leadPending = true;
-  let next = 0;
-  await Promise.all(Array.from({length: Math.min(LEAD_FALLBACK_CONCURRENCY, turn.length)}, async () => {
-    while (next < turn.length) {
-      const page = turn[next++];
-      let data;
-      try { data = await fetchPage(page.pageid); } catch {}
-      const text = data?.query?.pages?.[page.pageid]?.extract;
-      if (typeof text === 'string') {
-        const lead = firstParagraphs(text);
-        learned[page.pageid] = lead;
-        if (lead) page.extract = lead;
-      } else page.extractMissing = true;
-      delete page.leadPending;
-    }
+  await Promise.all(empty.filter(p => p.extractMissing).slice(0, max).map(async page => {
+    let data;
+    try { data = await fetchOne(page.pageid); } catch {}
+    if (!data) return;
+    page.extract = leadFromText(data?.query?.pages?.[page.pageid]?.extract);
+    delete page.extractMissing;
+    // '' is a real answer too (a page that is only lists): remember it.
+    try { store?.save(page.pageid, page.extract); } catch {}
   }));
   return pages;
 }

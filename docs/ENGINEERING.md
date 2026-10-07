@@ -54,7 +54,7 @@ Topic feeds sample 6 random branches of a topic's category tree, go down 2 or 3 
 
 **A failed lookup resumes instead of starting over.** A bounded five-minute progress map retains candidates and successful metadata for a failed topic batch. Failed tags and introductions remain retryable; they are not treated as verified empty results. Slow topic responses expose ready verified cards after nine seconds, or return a short retry interval while the shared job continues. Partial responses retain the browser's batch key. A temporary cooldown on an empty opening keeps the loading state and automatic recovery instead of immediately replacing it with a generic failure card.
 
-Nothing about the reader's behavior goes into these choices. The browser sends only the settings it displays; `test/randomness.test.js` checks that saves, unsaves and history leave the feed and its requests unchanged.
+Live sampling never uses likes, saves or history. The browser sends only the settings it displays; `test/randomness.test.js` checks that those actions do not personalize live discovery or its requests. The startup fallback orders its cached cards on the device to avoid reopening a recently read card when an unread one is available; that history is never sent to the server.
 
 ## 3. Depth from real readership
 

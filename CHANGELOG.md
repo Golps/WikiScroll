@@ -4,6 +4,8 @@ Releases of this repository. Each entry describes what changed in the code; [doc
 
 ## Unreleased
 
+- Refresh all site and collection social artwork with real photographs of Blue dragon, STEVE and Socotra, a solid charcoal background and centered photo credits. Preserve the canonical logo and discovery headline; document photo licenses.
+
 - Replace site and collection social previews with the approved article-card artwork and "Replace doomscrolling with discovery" headline.
 - Remove the obsolete globe artwork, geometry, country-highlight instructions and rendering-only font sources. Use versioned preview URLs to refresh messaging-client requests.
 

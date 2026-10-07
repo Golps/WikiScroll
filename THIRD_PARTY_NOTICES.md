@@ -52,4 +52,12 @@ The live site runs on [Cloudflare Workers](https://workers.cloudflare.com/) and 
 
 ## Social artwork
 
-The social preview is an AI-generated illustration approved for WikiScroll. Its article-card images are illustrative artwork, not Wikimedia photographs or screenshots of the live reader.
+The approved social composition uses the canonical WikiScroll logo and real Wikimedia photographs, resized and cropped to fit article cards without AI reconstruction or recoloring. Credits are embedded beneath the middle card. The composition is not a screenshot of the reader.
+
+| Photograph | Credit | License |
+|---|---|---|
+| [Blue dragon sea slug](https://commons.wikimedia.org/wiki/File:Blue_dragon-glaucus_atlanticus_(8599051974).jpg) | Sylke Rohrlach | [CC BY-SA 2.0](https://creativecommons.org/licenses/by-sa/2.0/) |
+| [STEVE atmospheric light](https://commons.wikimedia.org/wiki/File:The_Aurora_Named_STEVE_(26938621338).jpg) | Krista Trinder, via NASA Goddard | [CC0](https://creativecommons.org/publicdomain/zero/1.0/) as listed on Wikimedia Commons |
+| [Socotra dragon tree](https://commons.wikimedia.org/wiki/File:Socotra_dragon_tree.JPG) | Boris Khvostichenko | [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/) |
+
+The photographic components retain their stated licenses; adaptations of the CC BY-SA photographs are shared under their respective licenses.

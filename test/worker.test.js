@@ -88,7 +88,7 @@ test('overlapping requests share in-flight work; batch and depth have distinct c
   },cache);
 });
 test('stale edge supply is returned while a refresh runs in the background',async()=>{
-  const cache=edgeCache();const key=new Request('https://wikiscroll.com/api/articles?version=6&mode=wiki&lang=en&depth=3&batch=8');
+  const cache=edgeCache();const key=new Request('https://wikiscroll.com/api/articles?version=7&mode=wiki&lang=en&depth=3&batch=8');
   await cache.put(key,Response.json({articles:[{id:'w9',title:'Previously cached'}],cached_at:new Date(Date.now()-120000).toISOString()}));
   let finish;const slow=new Promise(resolve=>{finish=resolve;});
   await mocked(async()=>slow,async(api,jobs)=>{

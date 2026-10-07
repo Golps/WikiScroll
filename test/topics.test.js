@@ -36,7 +36,7 @@ test('invalid topic inputs do not trigger upstream work',async()=>{
 let topicModule=0;
 const freshTopics=()=>import('../worker/topics.js?test='+topicModule++);
 const topicUrl=()=>new URL('https://wikiscroll.com/api/topics?topic=tech&lang=en&depth=3&batch=8');
-const topicKey=()=>new Request('https://wikiscroll.com/api/topics?v=6&topic=tech&lang=en&depth=3&batch=8');
+const topicKey=()=>new Request('https://wikiscroll.com/api/topics?v=7&topic=tech&lang=en&depth=3&batch=8');
 function edgeCache(){
  const entries=new Map();
  return {entries,async match(key){return entries.get(key.url)?.clone();},async put(key,response){entries.set(key.url,response.clone());}};
@@ -173,4 +173,95 @@ test('translated topic branches are looked up once a day, not on every refill',a
 test('a single qualified branch yields up to three distinct cards rather than dropping two',()=>{
  const result=diverseDepth([page(1,'biology',1),page(2,'biology',1),page(3,'biology',1),page(4,'biology',1)],5);
  assert.equal(result.length,3);assert.equal(new Set(result.map(p=>p.pageid)).size,3);
+});
+
+test('a failed Help-only batch resumes its verified candidates without redrawing or refetching metadata',async()=>{
+ for(const query of ['topic=help','topic=tech&help=1'])await withTopics(edgeCache(),async(api,jobs)=>{
+  let id=0,ready=false;const calls={samples:0,metadata:0,views:0,needs:0,text:0};
+  const fixture=async address=>{
+   const p=new URL(address).searchParams;
+   if(p.has('gcmtitle')){calls.samples++;return {query:{pages:{[10000+id]:{ns:1,pageid:10000+id,subjectid:++id,associatedpage:'Opportunity '+id}}}};}
+   if(p.has('cmtitle')){calls.samples++;return {query:{categorymembers:[{ns:0,pageid:++id,title:'Opportunity '+id}]}};}
+   const ids=p.get('pageids').split('|');
+   if(p.get('prop')==='extracts'){calls.text++;return ready?{query:{pages:Object.fromEntries(ids.map(id=>[id,{pageid:Number(id),extract:'A complete and verified introduction to this article needing work. '.repeat(3)}]))}}:null;}
+   if(p.get('prop')==='categories'){calls.needs++;return {query:{pages:Object.fromEntries(ids.map(id=>[id,{pageid:Number(id),categories:[{title:'Category:All articles needing additional references'}]}]))}};}
+   if(p.get('prop')==='pageviews')calls.views++;else calls.metadata++;
+   return {query:{pages:Object.fromEntries(ids.map(id=>[id,{pageid:Number(id),ns:0,title:'Opportunity '+id,pageviews:{a:20}}]))}};
+  };
+  const url=new URL('https://wikiscroll.com/api/topics?lang=en&depth=3&batch=27&'+query),settings=options(fixture);
+  assert.equal((await api.topicResponse(url,{},jobs,settings)).status,503);await jobs.done();const before={...calls};ready=true;
+  const response=await api.topicResponse(url,{},jobs,settings),body=await response.json();await jobs.done();
+  assert.equal(response.status,200);assert.ok(body.articles.length);assert.ok(body.articles.every(a=>a.needs?.includes('citations')));
+  for(const phase of ['samples','metadata','views','needs'])assert.equal(calls[phase],before[phase],phase+' was repeated');
+  assert.ok(calls.text>before.text);
+ });
+});
+
+test('a slow Help topic shares its pending job and exposes only ready verified cards',async t=>{
+ t.mock.timers.enable({apis:['setTimeout','Date']});
+ await withTopics(edgeCache(),async(api,jobs)=>{
+  let id=0,samples=0,textCalls=0,release;const held=new Promise(resolve=>{release=resolve;});
+  const fixture=async address=>{
+   const p=new URL(address).searchParams;
+   if(p.has('cmtitle')){samples++;return {query:{categorymembers:[{pageid:++id,ns:0,title:'Opportunity '+id}]}};}
+   const ids=p.get('pageids').split('|');
+   const data={query:{pages:Object.fromEntries(ids.map(id=>[id,{pageid:Number(id),ns:0,title:'Opportunity '+id,pageviews:{a:20},categories:[{title:'Category:All articles needing additional references'}],...(p.get('prop')==='extracts'?{extract:'A verified and complete article introduction with useful information. '.repeat(3)}:{})}]))}};
+   if(p.get('prop')==='extracts'&&++textCalls===2){await held;return data;}
+   return data;
+  };
+  const url=new URL('https://wikiscroll.com/api/topics?topic=tech&help=1&depth=3&batch=30'),settings=options(fixture);
+  const first=api.topicResponse(url,{},jobs,settings);
+  for(let i=0;i<20;i++)await new Promise(setImmediate);
+  t.mock.timers.tick(9000);const response=await first,body=await response.json();
+  assert.equal(response.status,200);assert.equal(body.partial,true);assert.equal(body.articles.length,5);assert.ok(body.articles.every(a=>a.needs?.includes('citations')));
+  assert.ok(samples>=3&&samples<=6);
+  const next=api.topicResponse(url,{},jobs,settings);release();
+  const full=await next;assert.equal(full.status,200);assert.equal((await full.json()).articles.length,6);assert.equal(samples,6,'each of the six branches was sampled once');await jobs.done();
+ });
+});
+
+test('a partly failed Help batch serves ready cards without caching an incomplete batch or losing retry progress',async()=>{
+ const cache=edgeCache();await withTopics(cache,async(api,jobs)=>{
+  let id=0,ready=false,text=0,samples=0;
+  const fixture=async address=>{
+   const p=new URL(address).searchParams;
+   if(p.has('cmtitle')){samples++;return {query:{categorymembers:[{pageid:++id,ns:0,title:'Opportunity '+id}]}};}
+   if(p.get('prop')==='extracts'&&++text===2&&!ready)return null;
+   return {query:{pages:Object.fromEntries(p.get('pageids').split('|').map(id=>[id,{
+    pageid:Number(id),ns:0,title:'Opportunity '+id,pageviews:{a:20},
+    categories:[{title:'Category:All articles needing additional references'}],
+    ...(p.get('prop')==='extracts'?{extract:'An informative and verified introduction to this article requiring help. '.repeat(2)}:{})
+   }]))}};
+  };
+  const url=new URL('https://wikiscroll.com/api/topics?topic=tech&help=1&depth=3&batch=29'),settings=options(fixture);
+  const first=await api.topicResponse(url,{},jobs,settings),body=await first.json();await jobs.done();
+  assert.equal(first.status,200);assert.equal(body.articles.length,5);assert.equal(body.partial,true);assert.equal(cache.entries.size,0);
+  const before=samples;ready=true;
+  const next=await api.topicResponse(url,{},jobs,settings),full=await next.json();await jobs.done();
+  assert.equal(next.status,200);assert.equal(full.articles.length,6);assert.equal(full.partial,undefined);assert.equal(samples,before);assert.equal(cache.entries.size,1);
+ });
+});
+
+test('a slow Help-only batch without ready cards remains pending and the retry joins the original job',async t=>{
+ t.mock.timers.enable({apis:['setTimeout','Date']});
+ await withTopics(edgeCache(),async(api,jobs)=>{
+  let id=0,samples=0,release;const held=new Promise(resolve=>{release=resolve;});
+  const fixture=async address=>{
+   const p=new URL(address).searchParams;
+   if(p.has('cmtitle')){samples++;await held;return {query:{categorymembers:[{pageid:++id,ns:0,title:'Opportunity '+id}]}};}
+   return {query:{pages:Object.fromEntries(p.get('pageids').split('|').map(id=>[id,{
+    pageid:Number(id),ns:0,title:'Opportunity '+id,pageviews:{a:20},
+    categories:[{title:'Category:All articles needing additional references'}],
+    extract:'An informative and verified introduction to this article requiring help. '.repeat(2)
+   }]))}};
+  };
+  const url=new URL('https://wikiscroll.com/api/topics?topic=tech&help=1&depth=3&batch=31'),settings=options(fixture);
+  const first=api.topicResponse(url,{},jobs,settings);
+  for(let i=0;i<20;i++)await new Promise(setImmediate);
+  t.mock.timers.tick(9000);const response=await first,body=await response.json();
+  assert.equal(response.status,503);assert.equal(body.code,'batch_pending');assert.deepEqual(body.articles,[]);assert.equal(response.headers.get('Retry-After'),'2');
+  assert.ok(samples>=3&&samples<=6);
+  const next=api.topicResponse(url,{},jobs,settings);release();
+  const full=await next;assert.equal(full.status,200);assert.equal((await full.json()).articles.length,6);assert.equal(samples,6,'each of the six branches was sampled once');await jobs.done();
+ });
 });

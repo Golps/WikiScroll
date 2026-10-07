@@ -6,7 +6,7 @@
 export const EXTRACT_CHUNK = 5;
 
 export async function completeExtracts(pages, fetchChunk) {
-  const missing = pages.filter(p => typeof p.extract !== 'string');
+  const missing = pages.filter(p => p.extractMissing || typeof p.extract !== 'string');
   await Promise.all(Array.from({length: Math.ceil(missing.length / EXTRACT_CHUNK)}, async (_, i) => {
     const chunk = missing.slice(i * EXTRACT_CHUNK, (i + 1) * EXTRACT_CHUNK);
     let data;

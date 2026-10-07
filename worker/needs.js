@@ -11,6 +11,8 @@ export const NEED_CATEGORIES = {
     'Category:All articles with unsourced statements': 'unsourced',              // ~585,000
     'Category:All Wikipedia articles in need of updating': 'outdated',           // ~45,000
     'Category:All stub articles': 'stub',                                        // ~2,300,000
+    'Category:All Wikipedia articles needing copy edit': 'copyedit',
+    'Category:All Wikipedia articles needing clarification': 'clarify',
   },
   de: {
     'Kategorie:Wikipedia:Belege fehlen': 'citations',                            // ~52,000
@@ -27,25 +29,33 @@ export const NEED_CATEGORIES = {
   },
 };
 export const HELP_LANGS = new Set(Object.keys(NEED_CATEGORIES));
+// Photograph requests are on talk pages. Never infer one from a missing image.
+export const TALK_NEED_CATEGORIES={en:{'Category:Wikipedia requested photographs':'images'}};
 // Most actionable first; a card shows only the first need it has.
-export const NEED_ORDER = ['sources', 'citations', 'unsourced', 'outdated', 'incomplete', 'stub'];
+export const NEED_ORDER = ['sources', 'citations', 'unsourced', 'copyedit', 'clarify', 'images', 'outdated', 'incomplete', 'stub'];
 // The standalone feed favours sourcing work; stubs are plentiful, so rarer.
-const SAMPLE_WEIGHT = {sources: 2, citations: 3, unsourced: 3, outdated: 1, incomplete: 2, stub: 1};
+const SAMPLE_WEIGHT = {sources: 2, citations: 3, unsourced: 3, outdated: 1, incomplete: 2, stub: 1,copyedit:2,clarify:1,images:2};
 
 // Adds `needs` (ordered keys) to each page, 50 pages per request. A failed
 // lookup leaves needs empty: no tag is better than a wrong one.
 export async function completeNeeds(lang, pages, query) {
   const categories = NEED_CATEGORIES[lang];
   if (!categories) return pages;
-  const todo = pages.filter(p => !Array.isArray(p.needs));
+  const todo = pages.filter(p => p.needsMissing || !Array.isArray(p.needs));
   await Promise.all(Array.from({length: Math.ceil(todo.length / 50)}, async (_, i) => {
     const chunk = todo.slice(i * 50, i * 50 + 50);
-    let data;
-    try { data = await query({prop: 'categories', clcategories: Object.keys(categories).join('|'), cllimit: 'max', pageids: chunk.map(p => p.pageid).join('|')}); } catch {}
+    let data,talkData;
+    const talkCategories=TALK_NEED_CATEGORIES[lang],talks=chunk.filter(p=>Number.isSafeInteger(p.talkid)&&p.talkid>0);
+    await Promise.all([
+      (async()=>{try { data = await query({prop: 'categories', clcategories: Object.keys(categories).join('|'), cllimit: 'max', pageids: chunk.map(p => p.pageid).join('|')}); } catch {}})(),
+      (async()=>{if(talkCategories&&talks.length)try{talkData=await query({prop:'categories',clcategories:Object.keys(talkCategories).join('|'),cllimit:'max',pageids:talks.map(p=>p.talkid).join('|')});}catch{}})(),
+    ]);
     for (const page of chunk) {
       const found = new Set((data?.query?.pages?.[page.pageid]?.categories || []).map(c => categories[c.title]).filter(Boolean));
+      const talk=talkData?.query?.pages?.[page.talkid];
+      if(talkCategories&&talk?.ns===1&&talk.pageid===page.talkid)for(const c of talk.categories||[])if(talkCategories[c.title])found.add(talkCategories[c.title]);
       page.needs = NEED_ORDER.filter(need => found.has(need));
-      if (!data?.query?.pages?.[page.pageid]) page.needsMissing = true;
+      if (!data?.query?.pages?.[page.pageid] || talkCategories&&Number.isSafeInteger(page.talkid)&&page.talkid>0&&!talkData?.query?.pages?.[page.talkid]) page.needsMissing = true;
       else delete page.needsMissing;
     }
   }));
@@ -60,12 +70,13 @@ export function randomPrefix(random = Math.random) {
   return UPPER[Math.floor(random() * UPPER.length)] + LOWER[Math.floor(random() * LOWER.length)];
 }
 export function weightedCategories(lang, count, random = Math.random) {
-  const entries = Object.entries(NEED_CATEGORIES[lang] || {});
-  const total = entries.reduce((sum, [, need]) => sum + SAMPLE_WEIGHT[need], 0);
+  const entries = [...Object.entries(NEED_CATEGORIES[lang] || {}).map(([title,need])=>({title,need,namespace:0})),...Object.entries(TALK_NEED_CATEGORIES[lang]||{}).map(([title,need])=>({title,need,namespace:1}))];
+  if(!entries.length)return [];
+  const total = entries.reduce((sum, {need}) => sum + SAMPLE_WEIGHT[need], 0);
   return Array.from({length: count}, () => {
     let pick = random() * total;
-    for (const [title, need] of entries) { pick -= SAMPLE_WEIGHT[need]; if (pick < 0) return {title, need}; }
-    return {title: entries[0][0], need: entries[0][1]};
+    for (const entry of entries) { pick -= SAMPLE_WEIGHT[entry.need]; if (pick < 0) return entry; }
+    return entries[0];
   });
 }
 // Many short reads (10 x 8 titles) rather than a few long ones: consecutive
@@ -73,7 +84,12 @@ export function weightedCategories(lang, count, random = Math.random) {
 // keep a batch varied.
 export async function sampleNeedyTitles(lang, query, draws = 10, perDraw = 8) {
   const seen = new Map();
-  await Promise.all(weightedCategories(lang, draws).map(async ({title, need}) => {
+  await Promise.all(weightedCategories(lang, draws).map(async ({title, need,namespace}) => {
+    if(namespace===1){
+      const data=await query({generator:'categorymembers',gcmtitle:title,gcmnamespace:'1',gcmtype:'page',gcmlimit:String(perDraw),gcmstartsortkeyprefix:randomPrefix(),prop:'info',inprop:'subjectid|associatedpage'});
+      for(const page of Object.values(data?.query?.pages||{}))if(page.ns===1&&Number.isSafeInteger(page.subjectid)&&page.subjectid>0&&!seen.has(page.subjectid))seen.set(page.subjectid,{pageid:page.subjectid,title:page.associatedpage||page.title.replace(/^Talk:/,''),branch:need});
+      return;
+    }
     const data = await query({list: 'categorymembers', cmtitle: title, cmnamespace: '0', cmtype: 'page', cmlimit: String(perDraw), cmstartsortkeyprefix: randomPrefix()});
     for (const member of data?.query?.categorymembers || []) if (member.ns === 0 && !seen.has(member.pageid)) seen.set(member.pageid, {pageid: member.pageid, title: member.title, branch: need});
   }));

@@ -17,6 +17,7 @@ function harness() {
   const hint={style:{}}, spinner={remove(){}};
   const context = vm.createContext({
     console, Date, URLSearchParams, AbortController, shuffled:items=>[...items],
+    history:[],savedKey:a=>new URL(a.url).hostname+'|'+a.id,
     Image:class {},
     navigator:{onLine:true},
     window:{addEventListener(){}},
@@ -47,6 +48,7 @@ function harness() {
     add(items){context.incoming=items;return run('acceptSupply(incoming,fillGeneration)');},
     select(index){selectedIndex=index;},
     persist(){run('persistFeedReserve()');for(const [id,timer] of timers)if(timer.delay===200){timers.delete(id);timer.fn();}},
+    async fire(delay){for(const [id,timer] of [...timers])if(timer.delay===delay){timers.delete(id);await timer.fn();}},
     change(script){run('fillGeneration++;queue=[];articles=[];feedSeen.clear();supplyTask=null;'+script);nodes.length=0;selectedIndex=0;},
   };
 }
@@ -99,6 +101,15 @@ test('duplicates are rejected across queued and already-rendered articles', () =
   assert.equal(new Set([...state.articles,...state.queue]).size,21);
 });
 
+test('Only these articles rejects untagged supply while Off and Show tags leave the feed unchanged',()=>{
+ for(const mode of ['off','tags','only']){
+  const h=harness();h.run(`helpMode='${mode}';`);
+  const count=h.add([article(1),{...article(2),needs:['citations']},{...article(3),needs:['invented']},{...article(4),needs:'citations'}]);
+  assert.equal(count,mode==='only'?1:4);
+  if(mode==='only')assert.deepEqual(h.state().queue,['w2']);
+ }
+});
+
 test('a cached reserve restores only the exact source, language, and preference context', () => {
   const h=harness();h.add(batch(25));h.run('ensureFeedAhead()');h.select(5);h.persist();
   assert.equal(h.run('restoreFeedReserve().length'),20);
@@ -125,6 +136,50 @@ test('starter fallback never substitutes English random content for explicit fil
     await h.run('loadStarterLibrary(fillGeneration)');
     assert.equal(h.starterRequests,0);
     assert.equal(h.nodes.length,0);
+  }
+});
+
+test('live cards win online startup before any restored or fixed starter cards',async()=>{
+  const h=harness();h.add(batch(25));h.run('ensureFeedAhead()');h.persist();h.change('');
+  const fallback=h.run('startStartupFallback(fillGeneration)'),filling=h.run('fillQueue()');
+  assert.equal(h.nodes.length,0,'cached cards do not immediately occupy the opening');
+  h.requests[0](batch(40,1000));await tick();
+  assert.equal(h.state().articles[0],'w1000');
+  await h.fire(1800);await fallback;
+  assert.equal(h.starterRequests,0,'a successful live opening does not fetch the static library');
+  assert.ok(h.state().articles.every(id=>Number(id.slice(1))>=1000));
+  h.requests[1]([]);await filling;
+});
+
+test('slow online startup still obtains readable starter cards after the grace period',async()=>{
+  const h=harness(),fallback=h.run('startStartupFallback(fillGeneration)');
+  assert.equal(h.nodes.length,0);assert.equal(h.starterRequests,0);
+  await h.fire(1800);await fallback;
+  assert.equal(h.starterRequests,1);assert.equal(h.nodes.length,17);
+  assert.equal(h.state().articles.length+h.state().queue.length,30);
+});
+
+test('offline startup reshuffles the exact reserve and puts recently unread cards first',async()=>{
+  const h=harness();h.add(batch(25));h.run('ensureFeedAhead()');h.persist();h.change('');
+  h.context.navigator.onLine=false;h.context.history=[article(25)];
+  h.context.shuffled=items=>[...items].reverse();
+  const fallback=h.run('startStartupFallback(fillGeneration)');
+  await h.fire(0);await fallback;
+  assert.equal(h.state().articles[0],'w24');
+  assert.equal(h.state().queue.at(-1),'w25');
+  assert.equal(h.starterRequests,0);assert.equal(h.state().articles.length+h.state().queue.length,25);
+});
+
+test('a delayed starter response cannot enter a switched feed or replace live cards',async()=>{
+  for(const action of ['change','live']){
+    const h=harness();let deliver;
+    h.context.fetch=()=>new Promise(resolve=>{deliver=resolve;});
+    const fallback=h.run('startStartupFallback(fillGeneration)'),timer=h.fire(1800);
+    if(action==='change')h.change("curMode='how';");
+    h.add(batch(25,1000,action==='change'?'how':'wiki'));h.run('ensureFeedAhead()');
+    deliver(Response.json({wiki:batch(30),how:batch(30,1,'how')}));await timer;await fallback;
+    assert.ok(h.state().articles.every(id=>Number(id.slice(1))>=1000));
+    assert.ok(h.state().queue.every(id=>Number(id.slice(1))>=1000));
   }
 });
 

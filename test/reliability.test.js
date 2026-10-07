@@ -6,6 +6,7 @@ import {topicResponse} from '../worker/topics.js';
 import {verifyCollection} from '../worker/verified.js';
 import {createPlaceResolver,parsePlaces,placeMention,travelTerms,isDisambiguation} from '../worker/travel.js';
 import {VIEW_SCALE} from '../worker/pageviews.js';
+import {NEED_CATEGORIES} from '../worker/needs.js';
 
 const env={WORK_LIMIT:{limit:async()=>({success:true})}};
 const context=()=>{const tasks=[];return {waitUntil:p=>tasks.push(p),done:()=>Promise.all(tasks)};};
@@ -74,6 +75,7 @@ test('every cold topic/depth/help combination stays under Free’s combined oper
      const ids=p.get('pageids').split('|').map(Number),prop=p.get('prop');
      return {query:{pages:Object.fromEntries(ids.map((id,i)=>[id,{
       ...pages.get(id),
+      ...(prop.includes('info')?{talkid:100000+id}:{}),
       ...(prop==='pageviews'||prop.includes('pageviews')&&i<5?{pageviews:{a:views,b:views}}:{}),
       ...(prop==='extracts'?{extract:'A detailed introduction to this discovery, long enough to make a useful article card. '.repeat(2)}:{}),
       ...(prop==='categories'?{categories:[{title:lang==='fr'?'Catégorie:Article à référence nécessaire':'Category:All articles with unsourced statements'}]}:{})
@@ -106,6 +108,40 @@ test('an introduction outage yields retryable failure, not a cached successful e
  }finally{globalThis.caches=oldCache;}
 });
 
+test('standalone Help supplies verified articles at every depth in all four supported editions within the Free budget',async()=>{
+ const oldCache=globalThis.caches;globalThis.caches={default:cache()};
+ try{
+  for(const lang of ['en','de','fr','es'])for(const depth of [1,2,3,4,5]){
+   const api=await import('../worker/topics.js?standalone-help='+lang+depth);
+   let next=0;const source=new Map(),views=(depth===1?500:depth===2?200:depth===3?30:depth===4?10:1)*VIEW_SCALE[lang];
+   const category=Object.keys(NEED_CATEGORIES[lang])[0],need=NEED_CATEGORIES[lang][category];
+   const fixture=async address=>{
+    const p=new URL(address).searchParams;
+    if(p.has('cmtitle')||p.has('gcmtitle')){
+     const members=Array.from({length:8},()=>{const id=++next;const page={ns:0,pageid:id,title:'Help opportunity '+id};source.set(id,page);return page;});
+     if(p.has('gcmtitle'))return {query:{pages:Object.fromEntries(members.map(a=>[100000+a.pageid,{ns:1,pageid:100000+a.pageid,subjectid:a.pageid,associatedpage:a.title}]))}};
+     return {query:{categorymembers:members}};
+    }
+    const ids=p.get('pageids').split('|').map(Number),prop=p.get('prop');
+    return {query:{pages:Object.fromEntries(ids.map((id,i)=>[id,{
+     ...(source.get(id)||{ns:1,pageid:id}),
+     ...(prop.includes('info')?{talkid:100000+id}:{}),
+     ...(prop==='pageviews'||prop.includes('pageviews')&&i<5?{pageviews:{a:views,b:views}}:{}),
+     ...(prop==='extracts'?{extract:'An informative and verified introduction to this article requiring help. '.repeat(2)}:{}),
+     ...(prop==='categories'?{categories:id<100000?[{title:category}]:[]}:{})
+    }]))}};
+   };
+   const ctx=context(),work=createWork(env,ctx,createNetwork());
+   const response=await api.topicResponse(new URL(`https://wikiscroll.com/api/topics?topic=help&lang=${lang}&depth=${depth}`),env,ctx,{langs:new Set([lang]),permit:async()=>true,limited:()=>new Response(null,{status:429}),upstream:address=>work.request(fixture,address),work});
+   const data=await response.json();await ctx.done();
+   assert.equal(response.status,200,JSON.stringify({lang,depth,data}));
+   assert.ok(data.articles.length>0,lang+' '+depth);
+   assert.ok(data.articles.every(a=>a.needs.includes(need)&&a.url.startsWith(`https://${lang}.wikipedia.org/`)));
+   assert.ok(work.used<=SUBREQUEST_LIMIT,lang+' '+depth+' '+work.used);
+  }
+ }finally{globalThis.caches=oldCache;}
+});
+
 test('30 cold guides without introductions verify with 38 combined operations and coalesce',async()=>{
  const oldFetch=globalThis.fetch,oldCache=globalThis.caches;let calls=0,active=0,peak=0;
  globalThis.caches={default:cache()};
@@ -133,6 +169,19 @@ test('successful source records are reused across batches without extending thei
  const expired={pageid:1};supply.hydrate([expired],'en');assert.equal(expired.pageviews,undefined);assert.equal(expired.extract,known.extract);
  const otherLanguage={pageid:1};supply.hydrate([otherLanguage],'fr');assert.equal(otherLanguage.extract,undefined);
  supply.remember([{pageid:1,needs:[],needsMissing:true}],'en');
+});
+
+test('verified cached needs and text recover failed lookups without renewing the original source lifetime',async t=>{
+ let now=100000;t.mock.method(Date,'now',()=>now);
+ const supply=createSupply(),known={pageid:42,extract:'Known introduction',needs:['images']};
+ supply.remember([known],'en');now+=1800000;
+ const failed={pageid:42,extract:'',extractMissing:true,needs:[],needsMissing:true};
+ supply.hydrate([failed],'en');
+ assert.equal(failed.extract,known.extract);assert.deepEqual(failed.needs,['images']);
+ assert.equal(failed.extractMissing,undefined);assert.equal(failed.needsMissing,undefined);
+ supply.remember([failed],'en');now+=1800001;
+ const expired={pageid:42};supply.hydrate([expired],'en');
+ assert.equal(expired.needs,undefined);assert.equal(expired.extract,known.extract);
 });
 
 test('travel resolves geographic ancestry instead of confusing Elba with North Elba or Kyoto with Tokyo',async()=>{

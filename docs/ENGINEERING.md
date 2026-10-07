@@ -32,7 +32,7 @@ const QUEUE_MIN = 60, QUEUE_TARGET = 100, CARDS_AHEAD = 16;
 - **Rendering is bounded.** At most 16 cards are rendered ahead of the current one. Images for the next 24 queued articles are preloaded into an in-memory cache of 100 images.
 - **Refills are bounded.** A refill makes at most 5 requests and stops at 100 queued articles. Concurrent refill calls share the same task instead of starting new ones.
 - **Retries back off.** When the queue falls below 60, a refill is scheduled with exponential backoff (700 ms × 1.6ⁿ, capped at 10 s). Retries pause while the tab is hidden or offline, and restart when the connection returns.
-- **Starting fast.** On load, the reader first sees articles saved from the previous session for the exact same settings (up to 7 days old). With no filters set, it can also use a small bundled English starter set. Explicit filters are never replaced by that generic English content.
+- **A fresh opening with a fallback.** Online starts give live randomized cards first priority. If no cards arrive within 1.8 seconds, an exact-settings reserve (up to 7 days old) or an eligible bundled English starter set supplies the opening. Offline starts use that fallback immediately. Cached content is reshuffled with recently unviewed cards first; a late fallback never replaces live cards or enters a switched feed. Explicit filters are never replaced by generic English content.
 
 ## 2. Random discovery without repeats
 
@@ -48,7 +48,11 @@ let workerBatch = Math.floor(Math.random()*64);
 batch: String(workerBatch++ % 64)
 ```
 
-Topic feeds sample 6 random branches of a topic's category tree, go down 2 or 3 levels, and then interleave the branches so one dense branch can't fill a batch (`diverseDepth` in `worker/topics.js`). Help Wikipedia samples maintenance lists that contain hundreds of thousands of titles, sorted alphabetically. It makes 10 short reads of 8 titles, each starting at a random two-letter prefix, instead of one long run through "A" (`sampleNeedyTitles` in `worker/needs.js`).
+Topic feeds sample 6 random branches of a topic's category tree, go down 2 or 3 levels, and then interleave the branches so one dense branch can't fill a batch (`diverseDepth` in `worker/topics.js`). Help Wikipedia samples maintenance lists that contain hundreds of thousands of titles, sorted alphabetically. Its standalone feed makes 8 short reads of 8 titles, each starting at a random two-letter prefix, instead of one long run through "A" (`sampleNeedyTitles` in `worker/needs.js`). English also includes verified copy-editing, clarification and photograph requests. Photograph requests are sampled from talk pages and mapped to their actual namespace-0 articles through MediaWiki's subject IDs; missing thumbnails never imply an editing need.
+
+**Help modes stay distinct.** Off and Show tags use the same normal discovery feed; tags only change visibility of verified maintenance labels. Only these articles uses the maintenance feed, or intersects verified needs with the selected subject. The client rejects untagged supply in this mode and never inserts unrelated starter or anniversary cards. Readership bands still apply, with the measured Popular/Known Help fallback described below.
+
+**A failed lookup resumes instead of starting over.** A bounded five-minute progress map retains candidates and successful metadata for a failed topic batch. Failed tags and introductions remain retryable; they are not treated as verified empty results. Slow topic responses expose ready verified cards after nine seconds, or return a short retry interval while the shared job continues. Partial responses retain the browser's batch key. A temporary cooldown on an empty opening keeps the loading state and automatic recovery instead of immediately replacing it with a generic failure card.
 
 Nothing about the reader's behavior goes into these choices. The browser sends only the settings it displays; `test/randomness.test.js` checks that saves, unsaves and history leave the feed and its requests unchanged.
 

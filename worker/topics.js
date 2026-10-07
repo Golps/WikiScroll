@@ -19,9 +19,12 @@ geo:['Islands','Rivers','Mountains','Deserts','Caves','Volcanoes','Glaciers','We
 arts:['Painting','Sculpture','Architecture','Literature','Classical music','Cinema','Dance','Printmaking','Photography','Folk art','Textile arts','Theatre'],
 people:['Scientists','Explorers','Philosophers','Inventors','Artists','Writers','Mathematicians','Historians','Engineers','Educators','Composers','Humanitarians']};
 const shuffle=a=>{a=[...a];for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;};
-const lists=new Map(),pending=new Map(),translatedRoots=new Map();
+const lists=new Map(),pending=new Map(),translatedRoots=new Map(),progress=new Map();
 const FRESH_MS=120_000,RETAIN_SECONDS=86_400,CATEGORY_MS=15*60_000;
 const bands={1:[300,Infinity],2:[100,500],3:[10,300],4:[5,60],5:[0,10]};
+function readyArticles(chosen,topic,lang){
+ return chosen.filter(p=>!p.extractMissing&&typeof p.extract==='string'&&p.extract.length>=80).map(p=>({id:'w'+p.pageid,src:'wiki',...(topic==='help'?{}:{topic}),...(p.needs?.length?{needs:p.needs}:{}),title:p.title,body:p.extract,img:imageURL(p.thumbnail?.source),url:p.fullurl||`https://${lang}.wikipedia.org/wiki/${encodeURIComponent(p.title.replace(/ /g,'_'))}`}));
+}
 export function diverseDepth(pages,depth,lang='en'){
  const [lo,hi]=scaleBand(bands[depth],lang),groups=new Map(),lag=lagDays(pages);
  for(const p of shuffle(pages)){
@@ -36,7 +39,7 @@ export function diverseDepth(pages,depth,lang='en'){
 }
 // topic 'help' samples Wikipedia's maintenance lists; help:true narrows any
 // other topic to articles that need work (needs.js).
-export async function topicPages(topic,lang,depth,upstream,{help=false,supply=null}={}){
+export async function topicPages(topic,lang,depth,upstream,{help=false,supply=null,state={}}={}){
  const needy=topic==='help'||help;
  let sourceFailed=false;
  const query=async(language,params)=>{
@@ -57,9 +60,9 @@ export async function topicPages(topic,lang,depth,upstream,{help=false,supply=nu
   lists.set(key,{windows,next:data.continue?.cmcontinue,time:Date.now(),uses:0});
   return windows.flat();
  }
- const branches=topic==='help'?[]:shuffle(roots[topic]).slice(0,6);
+ const branches=state.branches ||= topic==='help'?[]:shuffle(roots[topic]).slice(0,6);
  const titles=new Map(branches.map(root=>[root,'Category:'+root]));
- if(lang!=='en'&&branches.length){
+ if(!state.candidates&&lang!=='en'&&branches.length){
   const missing=[];
   for(const root of branches){
    const known=translatedRoots.get(lang+'|'+root);
@@ -75,7 +78,7 @@ export async function topicPages(topic,lang,depth,upstream,{help=false,supply=nu
    }
   }
  }
- const candidates=topic==='help'?[await sampleNeedyTitles(lang,params=>query(lang,params))]:await Promise.all(branches.map(async root=>{
+ const candidates=state.candidates || (topic==='help'?[await sampleNeedyTitles(lang,params=>query(lang,params),8)]:await Promise.all(branches.map(async root=>{
   const title=titles.get(root);if(!title)return [];
   let entries=await members(title),selected=shuffle(entries.filter(p=>p.ns===0)).slice(0,3);
   for(let level=0;level<(depth>=4?3:2);level++){
@@ -83,22 +86,29 @@ export async function topicPages(topic,lang,depth,upstream,{help=false,supply=nu
    entries=await members(child.title);selected.push(...shuffle(entries.filter(p=>p.ns===0)).slice(0,5));
   }
   return shuffle(selected).slice(0,14).map(p=>({...p,branch:root}));
- }));
+ })));
+ if(!sourceFailed)state.candidates=candidates;
  // Sixty candidates reserve room for translated traversal, complete
  // readership, maintenance tags (50 per query), and chosen introductions.
  const balanced=[],candidateLimit=60;
  for(let round=0;balanced.length<candidateLimit&&candidates.some(list=>round<list.length);round++)for(const list of candidates)if(list[round]&&balanced.length<candidateLimit)balanced.push(list[round]);
  const map=new Map();for(const p of balanced)if(!map.has(p.pageid))map.set(p.pageid,p);
  const ids=[...map.keys()],pages=[];
- await Promise.all(Array.from({length:Math.ceil(ids.length/20)},async(_,i)=>{
+ state.pages ||= new Map();
+ const missing=ids.filter(id=>!state.pages.has(id));
+ await Promise.all(Array.from({length:Math.ceil(missing.length/20)},async(_,i)=>{
   // No introductions yet: they are the slow part, so only chosen pages get them.
-  const d=await query(lang,{pageids:ids.slice(i*20,i*20+20).join('|'),prop:'pageviews|pageimages|info|description',pvipdays:'14',piprop:'thumbnail',pithumbsize:'960',pilimit:'max',inprop:'url'});
-  const accepted=[];
-  for(const p of Object.values(d?.query?.pages||{}))if(p.pageid>0&&p.title&&!/^(Lists? of|Index of|Outline of|Comparison of|Category:)/i.test(p.title)&&!/^topics referred to by the same term$/i.test(p.description||''))accepted.push({...p,branch:map.get(p.pageid)?.branch});
+  const d=await query(lang,{pageids:missing.slice(i*20,i*20+20).join('|'),prop:'pageviews|pageimages|info|description',pvipdays:'14',piprop:'thumbnail',pithumbsize:'960',pilimit:'max',inprop:'url|talkid'});
+  for(const p of Object.values(d?.query?.pages||{}))if(map.has(p.pageid)&&p.pageid>0&&p.title&&(p.ns===undefined||p.ns===0)&&!/^(Lists? of|Index of|Outline of|Comparison of|Category:)/i.test(p.title)&&!/^topics referred to by the same term$/i.test(p.description||'')){const page={...p,branch:map.get(p.pageid)?.branch};state.pages.set(p.pageid,page);}
+ }));
+ await Promise.all(Array.from({length:Math.ceil(ids.length/20)},async(_,i)=>{
+  const accepted=ids.slice(i*20,i*20+20).map(id=>state.pages.get(id)).filter(Boolean);
   // Only five of every twenty pages carry views; complete the rest so depth
   // bands are not decided by alphabetical order.
   supply?.hydrate(accepted,lang);
+  for(const p of accepted)if(averageViews(p)===null)delete p.pageviews;
   await completePageviews(accepted,ids=>query(lang,{prop:'pageviews',pvipdays:'14',pageids:ids}));
+  supply?.remember(accepted,lang);
   pages.push(...accepted);
  }));
  if(pages.length&&pages.every(p=>averageViews(p)===null))sourceFailed=true;
@@ -114,10 +124,12 @@ export async function topicPages(topic,lang,depth,upstream,{help=false,supply=nu
   chosen=chosen.concat(pages.filter(p=>!taken.has(p.pageid)&&averageViews(p,lag)!==null).sort((a,b)=>distance(a)-distance(b)).slice(0,8-chosen.length));
  }
  if(!needy&&HELP_LANGS.has(lang))await completeNeeds(lang,chosen,params=>query(lang,params));
+ state.chosen=chosen;
  await completeExtracts(chosen,ids=>query(lang,extractParams(ids)));
  supply?.remember(pages,lang);
  if(chosen.some(p=>p.extractMissing))sourceFailed=true;
- const articles=chosen.filter(p=>typeof p.extract==='string'&&p.extract.length>=80).map(p=>({id:'w'+p.pageid,src:'wiki',...(topic==='help'?{}:{topic}),...(p.needs?.length?{needs:p.needs}:{}),title:p.title,body:p.extract,img:imageURL(p.thumbnail?.source),url:p.fullurl||`https://${lang}.wikipedia.org/wiki/${encodeURIComponent(p.title.replace(/ /g,'_'))}`}));
+ state.incomplete=chosen.some(p=>p.extractMissing)||(needy&&sourceFailed);
+ const articles=readyArticles(chosen,topic,lang);
  if(!articles.length&&sourceFailed)throw Error('Topic source temporarily unavailable');
  return articles;
 }
@@ -127,16 +139,21 @@ export async function topicResponse(url,env,ctx,{langs,permit,limited,upstream,w
  const helpParam=url.searchParams.get('help'),help=helpParam==='1';
  if(!(Object.hasOwn(roots,topic)||topic==='help')||!langs.has(lang)||!Number.isInteger(depth)||!bands[depth]||!Number.isInteger(batch)||batch<0||batch>63||(helpParam!==null&&!help))return Response.json({error:'Invalid topic parameters'},{status:400});
  if((topic==='help'||help)&&!HELP_LANGS.has(lang))return Response.json({error:'Help Wikipedia is not available in this language'},{status:400});
- const key=new Request(`${url.origin}/api/topics?v=6&topic=${topic}&lang=${lang}&depth=${depth}&batch=${batch}${help&&topic!=='help'?'&help=1':''}`),cache=work.cache;
+ const key=new Request(`${url.origin}/api/topics?v=7&topic=${topic}&lang=${lang}&depth=${depth}&batch=${batch}${help&&topic!=='help'?'&help=1':''}`),cache=work.cache;
  const respond=(payload,cacheState)=>Response.json(payload,{headers:{'Cache-Control':'no-store',...(cacheState?{'X-Cache':cacheState}:{})}});
  let stored;try{const hit=await cache?.match(key);if(hit)stored=await hit.json();}catch{}
  const age=Array.isArray(stored?.articles)&&stored.articles.length?Date.now()-Date.parse(stored.cached_at):Infinity;
  function refresh(){
   if(pending.has(key.url))return pending.get(key.url);
   const metered=request=>suppliedWork?upstream(request):work.request(upstream,request);
-  const task=topicPages(topic,lang,depth,metered,{help:help&&topic!=='help',supply}).then(async articles=>{
-   const payload={articles,cached_at:new Date().toISOString()};
-   if(articles.length&&cache)await cache.put(key,Response.json(payload,{headers:{'Cache-Control':`public, max-age=${RETAIN_SECONDS}`}})).catch(()=>{});
+  let state=progress.get(key.url);
+  if(!state||Date.now()-state.at>300000){state={at:Date.now()};progress.delete(key.url);if(progress.size>=128)progress.delete(progress.keys().next().value);progress.set(key.url,state);}
+  const task=topicPages(topic,lang,depth,metered,{help:help&&topic!=='help',supply,state}).then(async articles=>{
+   const payload={articles,cached_at:new Date().toISOString(),...(state.incomplete?{partial:true}:{})};
+   if(!state.incomplete){
+    if(articles.length&&cache)await cache.put(key,Response.json(payload,{headers:{'Cache-Control':`public, max-age=${RETAIN_SECONDS}`}})).catch(()=>{});
+    progress.delete(key.url);
+   }
    return payload;
   }).finally(()=>pending.delete(key.url));pending.set(key.url,task);ctx.waitUntil(task.catch(()=>{}));
   return task;
@@ -147,6 +164,18 @@ export async function topicResponse(url,env,ctx,{langs,permit,limited,upstream,w
   return respond({...stored,stale},stale?'STALE':'HIT');
  }
  if(!pending.has(key.url)&&!await permit(env,'WORK_LIMIT','topics'))return limited();
- try{return respond(await refresh(),'MISS');}
+ let timer;
+ try{
+  const task=refresh();
+  const answer=await Promise.race([task,new Promise(resolve=>{timer=setTimeout(()=>resolve(null),9000);})]);
+  if(answer)return respond(answer,'MISS');
+  const articles=readyArticles(progress.get(key.url)?.chosen||[],topic,lang);
+  if(articles.length)return respond({articles,partial:true},'MISS');
+  // The shared job continues within its original invocation budget. Retrying
+  // this key joins it instead of repeating sampling and source lookups.
+  if(work.reason==='upstream_rate_limited'||work.reason==='work_rate_limited')return unavailable(work,'Topic search temporarily unavailable');
+  return Response.json({articles:[],code:'batch_pending',error:'Articles are still loading.'},{status:503,headers:{'Cache-Control':'no-store','Retry-After':'2'}});
+ }
  catch{return unavailable(work,'Topic search temporarily unavailable');}
+ finally{clearTimeout(timer);}
 }

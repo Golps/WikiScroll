@@ -12,8 +12,8 @@ export function createSupply() {
         const r = records.get(key(lang, mode, p.pageid)); if (!r) continue;
         const flags = {}; hydrated.set(p, flags);
         if (now - r.viewsAt < METRICS_MS && averageViews(p) === null) { p.pageviews = r.pageviews; flags.views = true; }
-        if (now - r.textAt < TEXT_MS && typeof p.extract !== 'string') { p.extract = r.extract; delete p.extractMissing; flags.text = true; }
-        if (now - r.needsAt < 3600000 && !Array.isArray(p.needs)) { p.needs = r.needs; flags.needs = true; }
+        if (now - r.textAt < TEXT_MS && (p.extractMissing || typeof p.extract !== 'string')) { p.extract = r.extract; delete p.extractMissing; flags.text = true; }
+        if (now - r.needsAt < 3600000 && (p.needsMissing || !Array.isArray(p.needs))) { p.needs = r.needs; delete p.needsMissing; flags.needs = true; }
       }
       return pages;
     },

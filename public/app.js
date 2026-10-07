@@ -75,7 +75,7 @@ const VOYAGE_NOTE   = "Wikivoyage isn't available in this language, so travel gu
 // Help Wikipedia: Wikipedia editions with reliable maintenance categories
 // (identical to HELP_LANGS in worker/needs.js). Labels follow NEED_ORDER.
 const HELP_LANGS    = new Set(['en','de','fr','es']);
-const NEED_LABELS   = {sources:'No sources', citations:'Needs citations', unsourced:'Citation needed', outdated:'Needs updating', incomplete:'Needs more detail', stub:'Short article'};
+const NEED_LABELS   = {sources:'No sources', citations:'Needs citations', unsourced:'Citation needed', copyedit:'Needs copy editing',clarify:'Needs clarification',images:'Photo requested',outdated:'Needs updating', incomplete:'Needs more detail', stub:'Short article'};
 function helpAvailable(lang = curLang) { return HELP_LANGS.has(lang); }
 // Help Wikipedia: 'off', 'tags' (label cards), or 'only' (feed of articles that need work).
 const HELP_MODES = ['off', 'tags', 'only'];
@@ -632,6 +632,7 @@ function acceptSupply(batch,gen,randomize=true) {
   let added=0;
   for(const a of randomize?shuffled(batch||[]):batch||[]) {
     if(!validReserveArticle(a)||feedSeen.has(a.id))continue;
+    if(curMode==='wiki'&&helpOnly()&&(!Array.isArray(a.needs)||!a.needs.some(need=>Object.hasOwn(NEED_LABELS,need))))continue;
     feedSeen.add(a.id);queue.push(a);added++;
   }
   if(added){refillAttempts=0;preloadQueueImages();persistFeedReserve();}
@@ -640,7 +641,7 @@ function acceptSupply(batch,gen,randomize=true) {
 let starterPromise;
 function loadStarterLibrary(gen) {
   // Never silently replace language, topic, or destination choices with English random cards.
-  if((curMode==='how'?voyageLang():curLang)!=='en'||curMode==='wiki'&&(curTopics.size||helpOnly()||depthLevel!==3)||curMode==='how'&&(travelFilters.place||travelFilters.style))return Promise.resolve();
+  if((curMode==='how'?voyageLang():curLang)!=='en'||curMode==='wiki'&&(curTopics.size||helpOnly()||depthLevel!==3)||curMode==='how'&&(travelFilters.place||travelFilters.style))return Promise.resolve([]);
   const mode=curMode;
   starterPromise ||= (async()=>{
     const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),4000);
@@ -648,11 +649,28 @@ function loadStarterLibrary(gen) {
     catch {return null;} finally {clearTimeout(timer);}
   })();
   return starterPromise.then(data=>{
-    if(!data){starterPromise=null;return;}
-    if(gen!==fillGeneration)return;
-    const items=shuffled(data[mode]||[]);
-    acceptSupply(items,gen);ensureFeedAhead();
+    if(!data){starterPromise=null;return [];}
+    if(gen!==fillGeneration)return [];
+    return (data[mode]||[]).filter(validReserveArticle);
   });
+}
+function startStartupFallback(gen) {
+  // The fixed starter library must not win every online start merely because
+  // static assets arrive before live cards. Reserves remain a latency/offline
+  // fallback, not the default opening sequence.
+  return new Promise(resolve=>setTimeout(async()=>{
+    try {
+      if(gen!==fillGeneration||articles.length)return;
+      let backup=restoreFeedReserve();
+      if(!backup.length)backup=await loadStarterLibrary(gen);
+      if(gen!==fillGeneration||articles.length)return;
+      const recent=new Set(history.map(savedKey));
+      const shuffledBackup=shuffled(backup);
+      const unseen=shuffledBackup.filter(a=>!recent.has(savedKey(a)));
+      const seen=shuffledBackup.filter(a=>recent.has(savedKey(a)));
+      acceptSupply([...unseen,...seen],gen,false);ensureFeedAhead();
+    } catch {} finally {resolve();}
+  },navigator.onLine===false?0:1800));
 }
 function retryAfterMillis(value){
   if(value==null||value==='')return 5000;
@@ -686,7 +704,7 @@ async function fetchWorkerBatch(gen) {
       return [];
     }
     const data=await response.json();
-    if(pendingWorkerBatch===pending)pendingWorkerBatch=null;
+    if(!data.partial&&pendingWorkerBatch===pending)pendingWorkerBatch=null;
     return Array.isArray(data.articles)?data.articles:[];
   } catch {return [];} finally {clearTimeout(timer);supplyControllers.delete(controller);}
 }
@@ -909,9 +927,7 @@ async function boot() {
   const gen=fillGeneration;
   const deepRequested=new URLSearchParams(location.search).has('a');
   if(deepRequested)pendingDeepGeneration=gen;
-  // A previous on-device reserve makes reloads independent of Wikimedia latency.
-  if(!deepRequested){acceptSupply(restoreFeedReserve(),gen,false);ensureFeedAhead();}
-  const starter=deepRequested?Promise.resolve():loadStarterLibrary(gen);
+  const fallback=deepRequested?Promise.resolve():startStartupFallback(gen);
   const supply=fillQueue();
   try {
     if(deepRequested){
@@ -923,10 +939,10 @@ async function boot() {
         document.getElementById('spinner')?.remove();articles.unshift(deepArt);renderCard(deepArt);
       }
     }
-    await Promise.all([starter,supply]);
+    await Promise.all([fallback,supply]);
     if(gen!==fillGeneration)return;
     ensureFeedAhead();
-    if(!articles.length){document.getElementById('spinner')?.remove();showError();scheduleRefill();}
+    if(!articles.length){if(Date.now()>=workerCooldownUntil){document.getElementById('spinner')?.remove();showError();}scheduleRefill();}
   } catch(error) {
     if(gen!==fillGeneration)return;
     console.warn('Feed recovery',error);

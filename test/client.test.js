@@ -49,3 +49,11 @@ test('Worker retries retain the same batch and honor a 180-second cooldown befor
  await c.fetchWorkerBatch(0);assert.notEqual(urls[1],urls[2]);
  assert.ok(c.retryAfterMillis(new Date(now+60000).toUTCString())>59000);
 });
+
+test('partial topic cards retain their batch until the completed response arrives',async()=>{
+ const start=source.indexOf('function retryAfterMillis('),end=source.indexOf('function fillQueue(',start),urls=[];
+ const c=vm.createContext({URLSearchParams,AbortController,Date,setTimeout:()=>1,clearTimeout(){},fetch:async url=>{urls.push(url);return Response.json({articles:[{id:'w1'}],partial:urls.length===1});}});
+ vm.runInContext(`let curMode='wiki',curLang='en',depthLevel=3,workerBatch=7,workerCooldownUntil=0,pendingWorkerBatch=null,fillGeneration=0;const supplyControllers=new Set(),curTopics=new Set(['tech']);const helpOnly=()=>true,feedContextKey=()=>curLang+'|'+depthLevel;${source.slice(start,end)}`,c);
+ await c.fetchWorkerBatch(0);await c.fetchWorkerBatch(0);await c.fetchWorkerBatch(0);
+ assert.equal(urls[0],urls[1]);assert.notEqual(urls[1],urls[2]);assert.match(urls[0],/help=1/);
+});

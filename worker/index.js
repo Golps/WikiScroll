@@ -119,7 +119,7 @@ function startBatch(key,lang,mode,depth,cache,ctx,work) {
     // Candidates first, text second: the random call carries no extracts, so
     // it returns in a fraction of a second; introductions are then fetched in
     // parallel chunks for the readable candidates only (extracts.js).
-    const params={generator:'random',grnnamespace:'0',grnlimit:'20',prop:'pageimages|info|description'+(mode==='wiki'?'|pageviews':'|categories'),pvipdays:'14',piprop:'thumbnail',pithumbsize:'960',pilimit:'max',inprop:'url',...(mode==='how'?phrasebookParams(lang):{})};
+    const params={generator:'random',grnnamespace:'0',grnlimit:'20',prop:'pageimages|info|description'+(mode==='wiki'?'|pageviews':'|categories'),pvipdays:'14',piprop:'thumbnail',pithumbsize:'960',pilimit:'max',inprop:mode==='wiki'?'url|talkid':'url',...(mode==='how'?phrasebookParams(lang):{})};
     // Two concurrent Wikipedia samples yield up to 40 candidates. Wikivoyage
     // needs one: its guides need no photo, so most of the 20 are usable.
     // Publish the first usable response immediately; cache the merged result
@@ -175,7 +175,7 @@ async function articles(request,url,ctx,env,work) {
   const lang=mode==='how'?voyageLang(requested):requested;
   // n only slices a shared batch; arbitrary request sizes cannot multiply cache
   // keys. Versioning excludes earlier unfiltered batches after depth changes.
-  const key=new Request(`${url.origin}/api/articles?version=6&mode=${mode}&lang=${lang}&depth=${mode==='how'?3:depth}&batch=${batch}`);
+  const key=new Request(`${url.origin}/api/articles?version=7&mode=${mode}&lang=${lang}&depth=${mode==='how'?3:depth}&batch=${batch}`);
   const cache=work.cache;
   let stored;
   try{const hit=await cache?.match(key);if(hit)stored=await hit.json();}catch{}

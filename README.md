@@ -81,7 +81,7 @@ Wikipedia is written by volunteers, and much of it still needs work. Editors mar
 In **Settings → Discovery → Help Wikipedia** there are three choices:
 
 - **Off** (default): discovery as usual.
-- **Show tags:** cards that need work get a small tag next to their category, naming the most useful fix (*No sources*, *Needs citations*, *Citation needed*, *Needs updating*, *Needs more detail* or *Short article*). The tag links straight to the article on Wikipedia.
+- **Show tags:** cards that need work get a small tag next to their category, naming the most useful fix (*No sources*, *Needs citations*, *Citation needed*, *Needs copy editing*, *Needs clarification*, *Photo requested*, *Needs updating*, *Needs more detail* or *Short article*). The tag links straight to the article on Wikipedia.
 - **Only these articles:** the feed is filled with articles that need work, sampled from random points across Wikipedia's maintenance lists. It combines with topics and depth, so you can look for, say, history articles that need citations.
 
 <table>
@@ -92,6 +92,8 @@ In **Settings → Discovery → Help Wikipedia** there are three choices:
 </table>
 
 Help Wikipedia is available for English, German, French and Spanish Wikipedia, the editions whose maintenance lists are large and flat enough to sample reliably. WikiScroll doesn't edit anything itself: improvements happen on Wikipedia, under its own guidelines. Tags reflect Wikipedia's lists when the article was fetched, so a recently fixed article may still show one for a while.
+
+English also includes requests for copy editing, clarification and photographs. Photo requests come from Wikipedia's talk-page categories and are linked back to the article; an absent thumbnail by itself is never considered an editing request. Only these articles honors selected topics and the depth setting, and resumes unfinished source lookups after a temporary delay.
 
 ## On phones
 

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {completeNeeds, sampleNeedyTitles, randomPrefix, weightedCategories, NEED_CATEGORIES} from '../worker/needs.js';
+import {completeNeeds, sampleNeedyTitles, randomPrefix, weightedCategories, NEED_CATEGORIES,TALK_NEED_CATEGORIES} from '../worker/needs.js';
 import {topicPages} from '../worker/topics.js';
 
 test('needs come from hidden tracking categories, ordered by what to fix first, 50 pages per request', async () => {
@@ -36,17 +36,35 @@ test('huge maintenance lists are read from random points across the alphabet', a
   const seen = [];
   const titles = await sampleNeedyTitles('en', async params => {
     seen.push(params);
+    if(params.generator)return {query:{pages:{[seen.length+100]:{ns:1,pageid:seen.length+100,subjectid:seen.length,title:'Talk:T'+seen.length,associatedpage:'T'+seen.length}}}};
     return {query: {categorymembers: [{ns: 0, pageid: seen.length, title: 'T' + seen.length}, {ns: 14, pageid: 99, title: 'Category:X'}]}};
   });
   assert.equal(seen.length, 10);
-  assert.ok(seen.every(p => p.cmlimit === '8'));
-  assert.ok(seen.every(p => p.cmnamespace === '0' && /^[A-Z][a-z]$/.test(p.cmstartsortkeyprefix) && Object.hasOwn(NEED_CATEGORIES.en, p.cmtitle)));
+  assert.ok(seen.every(p => (p.cmlimit||p.gcmlimit) === '8'));
+  assert.ok(seen.every(p => p.generator?p.gcmnamespace==='1'&&Object.hasOwn(TALK_NEED_CATEGORIES.en,p.gcmtitle):p.cmnamespace === '0' && /^[A-Z][a-z]$/.test(p.cmstartsortkeyprefix) && Object.hasOwn(NEED_CATEGORIES.en, p.cmtitle)));
   assert.equal(titles.length, 10);
+});
+
+test('writing needs and photo requests come from verified article and talk categories, never missing thumbnails',async()=>{
+ const pages=[{pageid:1,talkid:101},{pageid:2,talkid:102},{pageid:3}];
+ await completeNeeds('en',pages,async p=>({query:{pages:p.pageids==='101|102'?{101:{pageid:101,ns:1,categories:[{title:'Category:Wikipedia requested photographs'}]},102:{pageid:102,ns:1,categories:[]}}:{1:{pageid:1,categories:[{title:'Category:All Wikipedia articles needing copy edit'}]},2:{pageid:2,categories:[{title:'Category:All Wikipedia articles needing clarification'}]},3:{pageid:3,categories:[]}}}}));
+ assert.deepEqual(pages[0].needs,['copyedit','images']);assert.deepEqual(pages[1].needs,['clarify']);assert.deepEqual(pages[2].needs,[]);
+});
+
+test('failed needs and introductions are retried rather than preserved as verified empty data',async()=>{
+ const {completeExtracts}=await import('../worker/extracts.js');const pages=[{pageid:1,talkid:101}];
+ await completeNeeds('en',pages,async()=>null);await completeExtracts(pages,async()=>null);
+ assert.equal(pages[0].needsMissing,true);assert.equal(pages[0].extractMissing,true);
+ await completeNeeds('en',pages,async p=>({query:{pages:{[p.pageids]:{pageid:Number(p.pageids),ns:p.pageids==='101'?1:0,categories:p.pageids==='101'?[{title:'Category:Wikipedia requested photographs'}]:[]}}}}));
+ await completeExtracts(pages,async()=>({query:{pages:{1:{extract:'A verified introduction.'}}}}));
+ assert.deepEqual(pages[0].needs,['images']);assert.equal(pages[0].needsMissing,undefined);
+ assert.equal(pages[0].extract,'A verified introduction.');assert.equal(pages[0].extractMissing,undefined);
 });
 
 function wiki({needs = () => false} = {}) {
   return async address => {
     const p = new URL(address).searchParams;
+    if(p.has('gcmtitle'))return {query:{pages:{901:{pageid:901,ns:1,subjectid:401,associatedpage:'Image opportunity'}}}};
     if (p.get('list') === 'categorymembers') {
       const base = p.get('cmtitle').length * 100;
       return {query: {categorymembers: Array.from({length: 6}, (_, i) => ({ns: 0, pageid: base + i, title: 'Page ' + (base + i)}))}};
@@ -74,4 +92,18 @@ test('Help Wikipedia with a subject keeps only that subject\'s articles that nee
 test('Popular with Help Wikipedia still fills from the most-read articles that need work', async () => {
   const articles = await topicPages('help', 'en', 1, wiki({needs: () => true}));
   assert.ok(articles.length >= 1);
+});
+
+test('a photograph-only opportunity appears as its article, with an explicit request label',async()=>{
+ const random=Math.random;Math.random=()=>0.999;
+ try{
+  const articles=await topicPages('help','en',3,async address=>{
+   const p=new URL(address).searchParams;
+   if(p.has('gcmtitle'))return {query:{pages:{901:{pageid:901,ns:1,subjectid:401,associatedpage:'A place needing a photograph'}}}};
+   if(p.get('prop')==='categories')return {query:{pages:{[p.get('pageids')]:{pageid:Number(p.get('pageids')),ns:p.get('pageids')==='901'?1:0,categories:p.get('pageids')==='901'?[{title:'Category:Wikipedia requested photographs'}]:[]}}}};
+   if(p.get('prop')==='extracts')return {query:{pages:{401:{extract:'A useful introduction to this place and why it matters, with a complete readable description. '.repeat(2)}}}};
+   return {query:{pages:{401:{pageid:401,ns:0,talkid:901,title:'A place needing a photograph',pageviews:{a:20}}}}};
+  });
+  assert.equal(articles.length,1);assert.equal(articles[0].id,'w401');assert.deepEqual(articles[0].needs,['images']);assert.equal(articles[0].img,'');
+ }finally{Math.random=random;}
 });

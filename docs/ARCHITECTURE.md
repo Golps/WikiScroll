@@ -22,7 +22,9 @@ sequenceDiagram
     W-->>R: cards (stale ones trigger a background refresh)
   else miss
     W->>M: random candidates (no introductions yet)
-    W->>M: pageviews and introductions, in parallel chunks of 5
+    W->>M: complete candidate pageviews, chunks of 5
+    W->>W: select candidates by requested depth
+    W->>M: introductions for selected candidates, chunks of 5
     W-->>R: cards that are ready within the answer budget
     W->>C: store the completed batch
   end

@@ -87,7 +87,7 @@ export const VIEW_SCALE = {en:1, ja:1, ru:0.6, de:0.5, he:0.4, fr:0.3, it:0.25, 
                            es:0.25, pl:0.2, zh:0.2, ko:0.2, hi:0.15, ar:0.15, nl:0.1};
 ```
 
-If too few candidates fall in range, at most three of the closest ones are added, so the depth steps stay distinct. *Popular* and *Known* used to be based on the daily most-read chart, but that chart is dominated by news, celebrities and automated traffic, so it was replaced with the editor-curated vital-article lists. Those lists are cached for a week, and an incomplete list is never cached.
+For the unfiltered Balanced feed only, a thin sample can borrow at most three measured candidates within a factor of two of the lower readership bound. Niche and Obscure never borrow out-of-band or unknown candidates. Topic feeds use their own readership bands; Help Wikipedia at Popular/Known can use the closest measured articles that still need work. *Popular* and *Known* used to be based on the daily most-read chart, but that chart is dominated by news, celebrities and automated traffic, so it was replaced with the editor-curated vital-article lists. Those lists are cached for a week, and an incomplete list is never cached.
 
 ## 4. The Worker's request pipeline
 
@@ -98,14 +98,15 @@ If too few candidates fall in range, at most three of the closest ones are added
 ```mermaid
 flowchart LR
   A["random candidates<br>(titles, images, 5 pageviews)"] --> B["complete pageviews<br>chunks of 5"]
-  A --> C["introductions<br>chunks of 5"]
-  A --> D["maintenance tags<br>(Help Wikipedia)"]
-  B & C & D --> E["select by depth<br>and deliver"]
+  B --> E["select by depth"]
+  E --> C["selected introductions<br>chunks of 5"]
+  E --> D["maintenance tags"]
+  C & D --> F["deliver ready cards"]
 ```
 
 **Two samples, first one wins.** For Wikipedia, two random queries run at once (up to 40 candidates). Whichever sample finishes first delivers cards immediately. The merged result is cached after both finish.
 
-**Request coalescing.** Identical requests share one in-flight task (the `inFlight` map keyed by cache URL). The same pattern appears for topics, vital-article lists, "On this day", verified metadata and collection image rendering.
+**Request coalescing.** Identical requests share one in-flight task (the `inFlight` map keyed by cache URL). The same pattern appears for topics, filtered travel, vital-article lists, "On this day", verified metadata and collection verification. Collection artwork is served as a static asset.
 
 **Stale data is served while it refreshes.** A cached batch is fresh for 60 seconds and kept for 24 hours:
 
@@ -122,7 +123,7 @@ During a Wikimedia outage, readers keep getting the last good batch while refres
 
 ## 5. Deadlines, rate limits and retries
 
-*`worker/index.js`: `upstream`, `retryDelay`, `within`. `public/app.js`: `fetchOne`, `fetchWorkerBatch`*
+*`worker/runtime.js`: `createNetwork`, `createWork`, `retryDelay`. `worker/index.js`: `within`. `public/app.js`: `fetchOne`, `fetchWorkerBatch`*
 
 **One deadline covers the whole call.** `upstream()` races the request, *including reading the response body*, against a 6-second timer. That bounds the call even if the upstream server ignores the abort signal.
 
@@ -212,8 +213,10 @@ These are known and not yet fixed. They are listed here so the notes above aren'
 |---|---|
 | About, Privacy Policy and page description | These are English only, while the rest of the interface is translated into 14 languages. |
 | Stylesheet (`public/styles.css`) | The stylesheet has grown by layering overrides (for example, `.panel` alone is the selector of 32 rule blocks, and there are 87 `!important` declarations), which makes changes harder to predict. `test/unused-css.test.js` removes dead rules but not overridden ones. |
-| Travel search, loose matches | A guide is kept when its title or introduction names the place, so a guide that only mentions it can still appear: "Elba" with *Coasts & islands* can also show Lake Placid, and "Asia" can show "Silk Road". |
+| Travel search, incomplete source hierarchy | Geographic IDs and parent chains reject unrelated destinations. When Wikivoyage has no usable hierarchy for a guide or destination, conservative title/introduction matching is still a fallback and can include a guide that only discusses the destination. Unfinished source lookups remain retryable. |
 | *Known* depth, first request | The first time a *Known* list is requested at a given edge location each week, it may be answered from Level 3 while Level 4 is still being assembled. That answer is intentionally not cached. |
+
+The historical notes below describe earlier releases. Their counts, cache layouts and retry policies may differ from the current implementation documented above.
 
 ### Changes in 1.4
 

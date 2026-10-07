@@ -101,7 +101,7 @@ function startBatch(key,lang,mode,depth,cache,ctx,work) {
   let deliver;
   const ready=new Promise(resolve=>{deliver=resolve;});
   // snapshot() returns the cards already usable if the answer budget runs out.
-  const entry={ready,complete:null,snapshot:()=>[]};
+  const entry={ready,complete:null,snapshot:()=>[],finished:false};
   inFlight.set(id,entry);
   entry.complete=(async()=>{
     // Popular and Known sample Wikipedia's vital articles (vital.js).
@@ -119,8 +119,8 @@ function startBatch(key,lang,mode,depth,cache,ctx,work) {
     // Candidates first, text second: the random call carries no extracts, so
     // it returns in a fraction of a second; introductions are then fetched in
     // parallel chunks for the readable candidates only (extracts.js).
-    const params={generator:'random',grnnamespace:'0',grnlimit:'20',prop:'pageimages|info|description'+(mode==='wiki'?'|pageviews':'|categories'),pvipdays:'14',piprop:'thumbnail',pithumbsize:'960',pilimit:'max',inprop:mode==='wiki'?'url|talkid':'url',...(mode==='how'?phrasebookParams(lang):{})};
-    // Two concurrent Wikipedia samples yield up to 40 candidates. Wikivoyage
+    const params={generator:'random',grnnamespace:'0',grnlimit:mode==='wiki'?'50':'20',prop:'pageimages|info|description'+(mode==='wiki'?'|pageviews':'|categories'),pvipdays:'14',piprop:'thumbnail',pithumbsize:'960',pilimit:'max',inprop:mode==='wiki'?'url|talkid':'url',...(mode==='how'?phrasebookParams(lang):{})};
+    // Two concurrent Wikipedia samples examine up to 100 candidates. Wikivoyage
     // needs one: its guides need no photo, so most of the 20 are usable.
     // Publish the first usable response immediately; cache the merged result
     // after its sibling finishes, without holding up the reader's next card.
@@ -161,7 +161,7 @@ function startBatch(key,lang,mode,depth,cache,ctx,work) {
       await cache.put(key,json(payload,200,{'Cache-Control':`public, max-age=${RETAIN_SECONDS}`})).catch(()=>{});
     }
     return payload;
-  })().catch(()=>{const empty={articles:[]};deliver(empty);return empty;}).finally(()=>inFlight.delete(id));
+  })().catch(()=>{const empty={articles:[]};deliver(empty);return empty;}).finally(()=>{entry.finished=true;inFlight.delete(id);});
   return entry;
 }
 
@@ -176,7 +176,7 @@ async function articles(request,url,ctx,env,work) {
   const lang=mode==='how'?voyageLang(requested):requested;
   // n only slices a shared batch; arbitrary request sizes cannot multiply cache
   // keys. Versioning excludes earlier unfiltered batches after depth changes.
-  const key=new Request(`${url.origin}/api/articles?version=7&mode=${mode}&lang=${lang}&depth=${mode==='how'?3:depth}&batch=${batch}${draw?'&draw='+draw:''}`);
+  const key=new Request(`${url.origin}/api/articles?version=8&mode=${mode}&lang=${lang}&depth=${mode==='how'?3:depth}&batch=${batch}${draw?'&draw='+draw:''}`);
   const cache=draw?openingCache:work.cache;
   let stored;
   try{const hit=await cache?.match(key);if(hit)stored=await hit.json();}catch{}
@@ -190,12 +190,13 @@ async function articles(request,url,ctx,env,work) {
   if(!inFlight.has(key.url)&&!await permit(env,'WORK_LIMIT','feed'))return limited();
   const pending=startBatch(key,lang,mode,depth,cache,ctx,work);
   ctx.waitUntil(pending.complete);
-  let result=await within(pending.ready,RESPONSE_BUDGET_MS);
+  let result=await within(url.searchParams.get('resume')==='1'?pending.complete:pending.ready,RESPONSE_BUDGET_MS);
   if(!result)result={articles:pending.snapshot(),cached_at:new Date().toISOString()};
   if(!result.articles.length){
+    if(!pending.finished&&!work.reason)return json({articles:[],partial:true,code:'batch_pending'},503,{'Retry-After':'1'});
     return unavailable(work);
   }
-  return json({...result,articles:result.articles.slice(0,n)},200,{'X-Cache':draw?'FRESH':'MISS'});
+  return json({...result,articles:result.articles.slice(0,n),partial:!pending.finished},200,{'X-Cache':draw?'FRESH':'MISS'});
 }
 
 export function renderUnfurl(meta,url,lang) {

@@ -32,7 +32,7 @@ test('reject invalid article query parameters before upstream access',async()=>{
 });
 
 test('opening draws bypass a shared completed batch, sample independently and reuse only their own retries',async()=>{
- const cache=edgeCache(),key=new Request('https://wikiscroll.com/api/articles?version=7&mode=wiki&lang=en&depth=3&batch=8');
+ const cache=edgeCache(),key=new Request('https://wikiscroll.com/api/articles?version=8&mode=wiki&lang=en&depth=3&batch=8');
  await cache.put(key,Response.json({articles:[{id:'w999'}],cached_at:new Date().toISOString()}));
  let count=0;
  await mocked(async url=>new URL(url).searchParams.has('generator')?data([page(++count)]):data([]),async(api,jobs)=>{
@@ -65,7 +65,7 @@ test('cold supply makes two concurrent calls and deduplicates candidates',async(
   await mocked(async url=>{
     if(!new URL(url).searchParams.has('generator'))return data([]); // pageview completion
     count++;active++;peak=Math.max(peak,active);
-    assert.equal(new URL(url).searchParams.get('grnlimit'),'20');
+    assert.equal(new URL(url).searchParams.get('grnlimit'),'50');
     await new Promise(r=>setTimeout(r,2));active--;
     return data([page(1),page(-1),page(2,{extract:'tiny'}),page(3,{thumbnail:null})]);
   },async(api,jobs)=>{
@@ -103,7 +103,7 @@ test('overlapping requests share in-flight work; batch and depth have distinct c
   },cache);
 });
 test('stale edge supply is returned while a refresh runs in the background',async()=>{
-  const cache=edgeCache();const key=new Request('https://wikiscroll.com/api/articles?version=7&mode=wiki&lang=en&depth=3&batch=8');
+  const cache=edgeCache();const key=new Request('https://wikiscroll.com/api/articles?version=8&mode=wiki&lang=en&depth=3&batch=8');
   await cache.put(key,Response.json({articles:[{id:'w9',title:'Previously cached'}],cached_at:new Date(Date.now()-120000).toISOString()}));
   let finish;const slow=new Promise(resolve=>{finish=resolve;});
   await mocked(async()=>slow,async(api,jobs)=>{
@@ -590,4 +590,15 @@ test('a travel answer stays within the Workers Free subrequest limit, and retrie
   assert.equal(new Set(reads).size,reads.length,'a retry reads new guides, never the ones already read');
   assert.equal(reads.length,16);
   assert.ok(second.body.articles.length>first.body.articles.length,'each retry adds guides');
+});
+
+test('a partial random answer resumes its slow sibling instead of drawing another batch',async()=>{
+ let count=0,finish;const slow=new Promise(resolve=>{finish=resolve;});
+ await mocked(async url=>!new URL(url).searchParams.has('generator')?data([]):++count===1?data([page(1)]):slow,async(api,jobs)=>{
+  const first=await api.fetch(request('batch=17&draw='+'c'.repeat(32)),env,jobs);
+  assert.equal((await first.json()).partial,true);
+  const retry=api.fetch(request('batch=17&draw='+'c'.repeat(32)+'&resume=1'),env,jobs);
+  finish(data([page(2)]));const body=await(await retry).json();
+  assert.deepEqual(new Set(body.articles.map(a=>a.id)),new Set(['w1','w2']));assert.equal(body.partial,false);assert.equal(count,2);
+ });
 });

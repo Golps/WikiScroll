@@ -73,3 +73,11 @@ test('fresh visitors use independent opening draws even with the same shared slo
  }
  assert.equal(new Set(openings).size,16);
 });
+
+test('partial random supply keeps its opening draw and asks for the unfinished batch',async()=>{
+ const start=source.indexOf('function retryAfterMillis('),end=source.indexOf('function fillQueue(',start),urls=[];
+ const c=vm.createContext({crypto:webcrypto,URLSearchParams,AbortController,Date,setTimeout:()=>1,clearTimeout(){},fetch:async url=>{urls.push(new URL(url,'https://wikiscroll.com'));return Response.json({articles:[{id:'w1'}],partial:urls.length===1});}});
+ vm.runInContext(`let curMode='wiki',curLang='en',depthLevel=3,workerBatch=7,workerCooldownUntil=0,pendingWorkerBatch=null,fillGeneration=0,articles=[],queue=[];const supplyControllers=new Set(),curTopics=new Set();const helpOnly=()=>false,feedContextKey=()=>curLang+'|'+depthLevel;${source.slice(start,end)}`,c);
+ await c.fetchWorkerBatch(0);await c.fetchWorkerBatch(0);await c.fetchWorkerBatch(0);
+ assert.equal(urls[0].searchParams.get('draw'),urls[1].searchParams.get('draw'));assert.equal(urls[1].searchParams.get('resume'),'1');assert.notEqual(urls[1].searchParams.get('draw'),urls[2].searchParams.get('draw'));
+});

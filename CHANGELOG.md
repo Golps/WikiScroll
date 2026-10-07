@@ -4,6 +4,8 @@ Releases of this repository. Each entry describes what changed in the code; [doc
 
 ## Unreleased
 
+- Improve random-feed supply by sampling 50 candidate pages per draw and retaining partial batches until their slower sibling finishes. Refills resume existing work instead of abandoning late cards or launching a competing fallback; filtering, independent openings and request budgets remain.
+
 - Refresh all site and collection social artwork with real photographs of Blue dragon, STEVE and Socotra, a solid charcoal background and centered photo credits. Preserve the canonical logo and discovery headline; document photo licenses.
 
 - Replace site and collection social previews with the approved article-card artwork and "Replace doomscrolling with discovery" headline.

@@ -709,6 +709,7 @@ async function fetchWorkerBatch(gen) {
       return [];
     }
     const data=await response.json();
+    if(data.partial&&!topical)pending.params.set('resume','1');
     if(!data.partial&&pendingWorkerBatch===pending)pendingWorkerBatch=null;
     return Array.isArray(data.articles)?data.articles:[];
   } catch {return [];} finally {clearTimeout(timer);supplyControllers.delete(controller);}
@@ -733,7 +734,7 @@ function fillQueue() {
         // Filtered travel is served by WikiScroll's own /api/travel, so a pause
         // after Wikimedia rate-limited the browser's direct calls doesn't apply.
         const ownServer=curMode==='how'&&!useWorker;
-        if(!added&&Date.now()>=workerCooldownUntil&&(ownServer||budget.remaining>0&&Date.now()>=apiCooldownUntil))added=acceptSupply(await direct(),gen,!topical);
+        if(!added&&!pendingWorkerBatch&&Date.now()>=workerCooldownUntil&&(ownServer||budget.remaining>0&&Date.now()>=apiCooldownUntil))added=acceptSupply(await direct(),gen,!topical);
         if(gen!==fillGeneration)return;
         // Render each successful batch immediately, not after a chain of API calls.
         ensureFeedAhead();

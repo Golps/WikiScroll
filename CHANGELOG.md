@@ -1,14 +1,46 @@
 # Changelog
 
-## Unreleased
+Releases of this repository. Each entry describes what changed in the code; [docs/ENGINEERING.md](docs/ENGINEERING.md#known-issues) has the details and tests behind each change.
 
-- Consolidate production Worker source and public repository while preserving public documentation and attribution.
-- Include the latest travel recovery, language-aware saved articles, Markdown responses, WebMCP, branding and About film.
-- Test changes on GitHub and support deployment through Cloudflare Workers Builds.
-- Move map configuration and deployment credentials out of source; verify that uploaded versions actually receive production traffic.
+## 2.0.0 (October 7, 2026)
 
+### Discovery
 
-Releases of this repository. Each entry describes what changed in the code; [docs/ENGINEERING.md](docs/ENGINEERING.md#known-issues) has the details and the tests behind each change.
+- Each online opening uses an independent fresh draw rather than a completed shared batch or the small bundled starter pool. Slow connections keep waiting for fresh cards; offline readers use saved reserves. Individual articles can still overlap by chance.
+- Topic discovery samples multiple category branches and rotates category windows instead of walking a small list of related subjects. Saving or skipping never personalizes the next cards.
+- Popular and Known use Wikipedia vital articles; Balanced, Niche and Obscure use complete, language-adjusted readership measurements. Missing readership is never mistaken for obscurity.
+
+### Help Wikipedia
+
+- Off, Show tags and Only these articles have distinct behavior. Only these articles intersects selected topics and depth and rejects cards without verified maintenance needs.
+- Unfinished batches retain candidates and successful lookups through temporary failures. Partial verified results can appear while remaining work continues.
+- English includes copy-editing, clarification and photograph requests. Photograph requests come from Wikipedia talk-page categories, not a missing thumbnail. English, German, French and Spanish remain supported.
+
+### Travel
+
+- Country and region matching uses Wikivoyage destination and ancestor identifiers, with conservative name matching only when hierarchy is absent.
+- Trip-style matching follows the guide's language. Unfinished guide lookups retain their cursor rather than silently skipping destinations.
+- Metadata, coordinates and introductions are reused; guides without a lead introduction can use verified opening text.
+
+### Reader and sharing
+
+- Refined typography uses Georgia article headings and system sans controls, with simpler category labels and no trailing category dot.
+- Saved articles, history, illustrated collections, multilingual controls and offline/PWA support remain part of the reader.
+- Shared collection titles, excerpts and images are verified against Wikimedia. Preview artwork is generated ahead of deployment instead of rendered inside each live request.
+
+### Reliability, security and deployment
+
+- Shared request budgets, bounded concurrency, coalesced requests and source reuse reduce wasted upstream work on Cloudflare Workers. Retry-After and cooldowns are honored without bypassing the Worker.
+- Successful source lookups retain their original expiry; failed lookups are retried rather than treated as verified data.
+- Production and the public repository now share one codebase. GitHub main is tested and deployed through the native Cloudflare Workers Builds connection.
+- Deployment credentials and map configuration are outside tracked source. The source archive contains no local handoff notes or credentials; self-hosting requires your own configuration.
+
+### Validation
+
+- 257 automated tests passed, including independent opening draws, Help recovery, depth selection, source reuse, request budgets and security checks.
+- Four clean live visits forced to the same shared slot received independent opening sets containing 23 distinct article IDs in that check, including two delayed responses.
+- Headless checks covered phone/desktop startup and Help recovery, plus eight responsive sizes and open-panel rotation. These do not constitute physical iPhone/iPad/Safari testing or measured 120 Hz performance.
+- Randomness permits chance overlaps. Offline supply is finite, and upstream outages or quotas can delay fresh openings.
 
 ## 1.4.1 (September 27, 2026)
 

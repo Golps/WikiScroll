@@ -30,7 +30,7 @@ test('reading preferences survive saves of unrelated settings',()=>{
 test('image inspection ignores drags and long presses, and supports keyboard activation',()=>{
  const handlers={},attrs={},image={dataset:{},setAttribute:(k,v)=>attrs[k]=v,addEventListener:(k,f)=>handlers[k]=f};
  let opens=0,now=0;const c=vm.createContext({performance:{now:()=>now},openImageInspection:()=>opens++});
- vm.runInContext(slice('function setupImageInspection(', "document.getElementById('imageClose')"),c);
+ vm.runInContext(slice('function setupImageInspection(', "imageDialog.addEventListener('pointerdown'"),c);
  c.setupImageInspection({querySelector:()=>image},{title:'Test'});
  handlers.pointerdown({isPrimary:true,pointerId:1,clientX:0,clientY:0});now=100;handlers.click();assert.equal(opens,1);
  handlers.pointerdown({isPrimary:true,pointerId:1,clientX:0,clientY:0});handlers.pointermove({pointerId:1,clientX:35,clientY:0});handlers.click();assert.equal(opens,1);

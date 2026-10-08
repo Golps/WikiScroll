@@ -1220,7 +1220,9 @@ function renderCard(a) {
 
 // Native dialog keeps inspection out of feed gestures and restores keyboard focus.
 const imageDialog = document.getElementById('imageDialog');
-function openImageInspection(article, image) {
+let imageInspectionOrigin = null;
+let imageInspectionKeyboard = false;
+function openImageInspection(article, image, keyboard = false) {
   if (imageDialog.open || !image.complete || !image.naturalWidth ||
       document.querySelector('dialog[open], #ambientOverlay.open, #spBackdrop.open, #burgerMenu.open') ||
       document.body.classList.contains('dragging')) return;
@@ -1231,7 +1233,10 @@ function openImageInspection(article, image) {
   viewer.hidden = false;
   viewer.alt = article.title;
   viewer.src = image.currentSrc || image.src;
+  imageInspectionOrigin = image;
+  imageInspectionKeyboard = keyboard;
   imageDialog.showModal();
+  if (!keyboard) imageDialog.focus({preventScroll:true});
 }
 function setupImageInspection(card, article) {
   const image = card.querySelector('.art-img');
@@ -1256,9 +1261,10 @@ function setupImageInspection(card, article) {
   });
   image.addEventListener('keydown', event => {
     if (event.key !== 'Enter' && event.key !== ' ') return;
-    event.preventDefault(); openImageInspection(article, image);
+    event.preventDefault(); openImageInspection(article, image, true);
   });
 }
+imageDialog.addEventListener('pointerdown', () => { imageInspectionKeyboard = false; });
 document.getElementById('imageClose').addEventListener('click', () => imageDialog.close());
 imageDialog.addEventListener('click', event => {
   if (event.target !== imageDialog) return;
@@ -1266,6 +1272,11 @@ imageDialog.addEventListener('click', event => {
   if (event.clientX < r.left || event.clientX > r.right || event.clientY < r.top || event.clientY > r.bottom) imageDialog.close();
 });
 imageDialog.addEventListener('close', () => {
+  if (!imageInspectionKeyboard) {
+    document.getElementById('imageClose').blur();
+    imageInspectionOrigin?.blur();
+  }
+  imageInspectionOrigin = null;
   // Leave the image in place until the existing dialog exit transition finishes.
   setTimeout(() => { if (!imageDialog.open) document.getElementById('inspectedImage').removeAttribute('src'); }, 300);
 });

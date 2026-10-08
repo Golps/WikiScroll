@@ -200,7 +200,8 @@ async function articles(request,url,ctx,env,work) {
     if(!pending.finished&&!work.reason)return json({articles:[],partial:true,code:'batch_pending'},503,{'Retry-After':'1'});
     return unavailable(work);
   }
-  return json({...result,articles:result.articles.slice(0,n),partial:!pending.finished},200,{'X-Cache':draw?'FRESH':'MISS'});
+  const paused=!pending.finished&&['upstream_rate_limited','work_rate_limited'].includes(work.reason);
+  return json({...result,articles:result.articles.slice(0,n),partial:!pending.finished,...(paused?{code:work.reason}:{})},200,{'X-Cache':draw?'FRESH':'MISS',...(paused?{'Retry-After':String(work.retrySeconds())}:{})});
 }
 
 export function renderUnfurl(meta,url,lang) {

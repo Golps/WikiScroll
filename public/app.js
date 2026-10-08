@@ -88,6 +88,7 @@ let curMode = 'wiki', curLang = 'en';
 let curTopics = new Set();
 let travelFilters = lsGet('ws_travel_filters') || {place:'',style:''};
 let travelOffset=0, travelExhausted=false, travelSuggestion='', travelContinuing=false, travelRetries=0;
+let ambientEnabled = true;
 let swipeEnabled = true, kbBarEnabled = true, helpMode = 'off';
 let lightMode = false, depthLevel = 3;
 let history = [];
@@ -165,6 +166,7 @@ function loadPersistedState() {
   if (Array.isArray(savedTopics)) { curTopics = new Set(savedTopics.filter(id => Object.hasOwn(TOPIC_MAP,id))); syncTopicUI(); }
   const settings = lsGet('ws_settings') || {};
   swipeEnabled = settings.swipe !== false;
+  ambientEnabled = settings.ambient !== false;
   kbBarEnabled = settings.kbBar !== false;
   helpMode = helpTopic ? 'only' : HELP_MODES.includes(settings.helpMode) ? settings.helpMode : settings.help === true ? 'tags' : 'off';
   lightMode = settings.lightMode === true;
@@ -183,7 +185,7 @@ function loadPersistedState() {
 }
 function saveLiked()    { lsSet('ws_liked',    [...liked.values()]); }
 function saveTopics()   { lsSet('ws_topics',   [...curTopics]); }
-function saveSettings() { lsSet('ws_settings', { swipe: swipeEnabled, kbBar: kbBarEnabled, helpMode: helpMode, lightMode: lightMode, depth: depthLevel, lang: curLang }); }
+function saveSettings() { lsSet('ws_settings', { ambient: ambientEnabled, swipe: swipeEnabled, kbBar: kbBarEnabled, helpMode: helpMode, lightMode: lightMode, depth: depthLevel, lang: curLang }); }
 function saveHistory()     { lsSet('ws_history', history.slice(0, 50)); }
 function saveCollections() { lsSet('ws_collections', collections); }
 
@@ -681,12 +683,12 @@ function restoreWorkerCooldown(){
  const now=Date.now();for(const [key,until] of workerSourceCooldowns)if(until<=now)workerSourceCooldowns.delete(key);
  workerCooldownUntil=Math.max(workerGlobalCooldownUntil,workerSourceCooldowns.get(workerSourceKey())||0);
 }
-async function noteWorkerCooldown(response,gen,key){
+async function noteWorkerCooldown(response,gen,key,payload){
  const delay=retryAfterMillis(response.headers.get('Retry-After'));let code='';
- try{code=(await response.json()).code||'';}catch{}
+ try{code=(payload||await response.json()).code||'';}catch{}
  if(gen!==fillGeneration)return null;
  const until=Date.now()+delay;
- if(response.status===429)workerGlobalCooldownUntil=Math.max(workerGlobalCooldownUntil,until);
+ if(response.status===429||code==='work_rate_limited')workerGlobalCooldownUntil=Math.max(workerGlobalCooldownUntil,until);
  else workerSourceCooldowns.set(key,Math.max(workerSourceCooldowns.get(key)||0,until));
  restoreWorkerCooldown();
  if(code==='upstream_rate_limited'&&pendingWorkerBatch&&key===workerSourceKey(pendingWorkerBatch.params.get('mode'),pendingWorkerBatch.params.get('lang'))){pendingWorkerBatch.cacheRecovery=true;pendingWorkerBatch.cachedScan??=0;}
@@ -731,7 +733,17 @@ async function fetchWorkerBatch(gen) {
       return [];
     }
     const data=await response.json();
-    if(data.partial&&!topical){
+    if(gen!==fillGeneration)return [];
+    if(data.partial&&['upstream_rate_limited','work_rate_limited'].includes(data.code)){
+      const pause=await noteWorkerCooldown(response,gen,workerSourceKey(params.get('mode'),params.get('lang')),data);
+      if(pause?.delay>=30000)pending.startedAt+=pause.delay;
+      return Array.isArray(data.articles)?data.articles:[];
+    }
+    if(data.partial&&topical){
+      const ids=(data.articles||[]).map(a=>a.id).sort().join('|');
+      pending.repeatedPartial=ids===pending.partialIds?(pending.repeatedPartial||0)+1:0;pending.partialIds=ids;
+    }
+    if(data.partial&&(!topical||pending.repeatedPartial>=2)){
       if(lateSupplyTasks.size<2)collectLateSupply(pending,gen);
       // The original job still finishes/caches its remainder. Full recovery
       // lanes must never force the foreground back to a slow old batch.
@@ -763,21 +775,23 @@ async function fetchCachedSupply(pending,gen){
 // Two background lanes at most; source resets abort every associated request.
 function collectLateSupply(pending,gen) {
   const token={gen};lateSupplyTasks.add(token);
-  const params=new URLSearchParams(pending.params);params.set('resume','1');
+  const params=new URLSearchParams(pending.params);if(!params.has('topic'))params.set('resume','1');
   (async()=>{
     for(let attempt=0;attempt<5&&gen===fillGeneration;attempt++){
       if(Date.now()<workerCooldownUntil)return;
       const controller=new AbortController();supplyControllers.add(controller);
-      const timer=setTimeout(()=>controller.abort(),7500);
+      const timer=setTimeout(()=>controller.abort(),params.has('topic')?10000:7500);
       try{
-        const response=await fetch('/api/articles?'+params,{signal:controller.signal,cache:'no-store'});
+        const response=await fetch((params.has('topic')?'/api/topics?':'/api/articles?')+params,{signal:controller.signal,cache:'no-store'});
         if(gen!==fillGeneration)return;
         if(!response.ok){
           if(response.status===429||response.status===503)await noteWorkerCooldown(response,gen,workerSourceKey(params.get('mode'),params.get('lang')));
           return;
         }
         const data=await response.json();
+        if(gen!==fillGeneration)return;
         acceptSupply(data.articles,gen);ensureFeedAhead();
+        if(data.partial&&['upstream_rate_limited','work_rate_limited'].includes(data.code)){await noteWorkerCooldown(response,gen,workerSourceKey(params.get('mode'),params.get('lang')),data);return;}
         if(!data.partial)return;
       }catch{return;}finally{clearTimeout(timer);supplyControllers.delete(controller);}
     }
@@ -1108,7 +1122,7 @@ function renderCard(a) {
   card.dataset.id = a.id;
   card.innerHTML = `
     <div class="cbg">${img}<div class="cveil"></div></div>
-    <div class="swipe-ind like-ind">LIKE</div>
+    <div class="swipe-ind like-ind">Save</div>
     <div class="swipe-ind skip-ind">SKIP</div>
     <div class="panel">
       <div class="chip ${isHow?'h':'w'}">${isHow?'Wikivoyage':'Wikipedia'}</div>
@@ -1503,7 +1517,8 @@ function syncAllToggles() {
   // Swipe — mobile + desktop
   setSw('swipeToggle', swipeEnabled);
   setSw('dkSwipeToggle', swipeEnabled);
-  // Rabbit Hole — mobile + desktop
+  setSw('ambientToggle', ambientEnabled);
+  setSw('dkAmbientToggle', ambientEnabled);
   // KB bar — desktop only
   setSw('dkKbToggle', kbBarEnabled);
   syncHelpUI();
@@ -1514,6 +1529,7 @@ function syncAllToggles() {
   if (ds2) ds2.value = depthLevel;
   syncDepthSteps();
 }
+function setAmbient(val) { ambientEnabled=val; if(!val)closeAmbient(); saveSettings(); syncAllToggles(); }
 function setSwipe(val) { swipeEnabled=val; saveSettings(); syncAllToggles(); }
 
 function setKbBar(val) { kbBarEnabled=val; saveSettings(); syncAllToggles(); }
@@ -1532,6 +1548,8 @@ function setTheme(val) {
   syncAllToggles();
 }
 function setDepth(val) { depthLevel=parseInt(val)||3; saveSettings(); syncAllToggles(); toast(`🔭 Depth: ${DEPTH_LABELS[depthLevel]}`); resetFeed(); }
+
+['ambientToggle','dkAmbientToggle'].forEach(id=>document.getElementById(id).addEventListener('click',()=>setAmbient(!ambientEnabled)));
 
 // Mobile toggles
 document.getElementById('swipeToggle').addEventListener('click', () => setSwipe(!swipeEnabled));
@@ -1913,7 +1931,7 @@ document.getElementById('ambientClose').addEventListener('click', closeAmbient);
     const dur = reducedMotion?.matches ? 0.01 : Math.max(0.26, Math.min(0.46, 0.46 - absVel * 0.10));
 
     // STAMP MOMENT — a fly that starts with little or no drag (keyboard
-    // arrows, micro-flicks) never showed its LIKE/SKIP stamp: the stamp
+    // arrows, micro-flicks) never showed its SAVE/SKIP stamp: the stamp
     // appeared the same instant the card launched. Hold the card briefly
     // with a small wind-up toward the exit while the stamp pops in, THEN
     // fly. Drag-triggered swipes skip this — the stamp faded in under the
@@ -1993,7 +2011,7 @@ document.getElementById('ambientClose').addEventListener('click', closeAmbient);
     startX=ev.touches[0].clientX; startY=ev.touches[0].clientY;
     swiping=false; touchCard=card;
     velReset(startX);
-    lpTimer = setTimeout(()=>{ if(!swiping){ openAmbient(card); touchCard=null; } lpTimer=null; },620);
+    if(ambientEnabled)lpTimer = setTimeout(()=>{ if(!swiping){ openAmbient(card); touchCard=null; } lpTimer=null; },620);
   },{passive:true});
 
   document.addEventListener('touchmove', ev => {
@@ -2098,6 +2116,7 @@ document.getElementById('ambientClose').addEventListener('click', closeAmbient);
     if (flyLock && ['ArrowDown','ArrowUp','ArrowLeft','ArrowRight','PageDown','PageUp','Home','End',' '].includes(ev.key)) { ev.preventDefault(); return; }
 
     if (ev.key === ' ') {
+      if(!ambientEnabled)return;
       ev.preventDefault();
       const ov = document.getElementById('ambientOverlay');
       if (ov.classList.contains('open')) { closeAmbient(); return; }
@@ -2151,7 +2170,7 @@ document.getElementById('ambientClose').addEventListener('click', closeAmbient);
   }).observe(bar, {attributes:true, attributeFilter:['class']});
 })();
 
-// ── DOUBLE-TAP TO LIKE ──────────────────────────────────────────────────────
+// ── DOUBLE-TAP TO SAVE ──────────────────────────────────────────────────────
 (function() {
   let lt=0,lx=0,ly=0,zoomed=false;
   const unzoom=()=>setTimeout(()=>{zoomed=false;},1200);

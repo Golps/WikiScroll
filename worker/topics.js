@@ -127,9 +127,12 @@ export async function topicPages(topic,lang,depth,upstream,{help=false,supply=nu
   const distance=p=>{const v=averageViews(p,lag);return v===null?Infinity:v<lo?Math.log1p(lo)-Math.log1p(v):v>hi?Math.log1p(v)-Math.log1p(hi):0;};
   chosen=chosen.concat(pages.filter(p=>!taken.has(p.pageid)&&averageViews(p,lag)!==null).sort((a,b)=>distance(a)-distance(b)).slice(0,8-chosen.length));
  }
- if(!needy&&HELP_LANGS.has(lang))await completeNeeds(lang,chosen,params=>query(lang,params));
  state.chosen=chosen;
- await completeExtracts(chosen,ids=>query(lang,extractParams(ids)));
+ // Independent enrichment shares the same bounded upstream scheduler.
+ await Promise.all([
+  !needy&&HELP_LANGS.has(lang)?completeNeeds(lang,chosen,params=>query(lang,params)):Promise.resolve(),
+  completeExtracts(chosen,ids=>query(lang,extractParams(ids)))
+ ]);
  supply?.remember(pages,lang);
  if(chosen.some(p=>p.extractMissing))sourceFailed=true;
  state.incomplete=chosen.some(p=>p.extractMissing)||(needy&&sourceFailed);
@@ -147,7 +150,10 @@ export async function topicResponse(url,env,ctx,{langs,permit,limited,upstream,w
  const key=new Request(`${url.origin}/api/topics?v=7&topic=${topic}&lang=${lang}&depth=${depth}&batch=${batch}${help&&topic!=='help'?'&help=1':''}${draw?'&draw='+draw:''}`),cache=draw?openingCache:work.cache;
  if(cached)return Response.json(await cachedWindow(work.cache,key,batch),{headers:{'Cache-Control':'no-store','X-Cache':'RECOVERY'}});
  expireJobs(pending);
- const respond=(payload,cacheState)=>Response.json(payload,{headers:{'Cache-Control':'no-store',...(cacheState?{'X-Cache':cacheState}:{})}});
+ const respond=(payload,cacheState)=>{
+  const paused=payload.partial&&['upstream_rate_limited','work_rate_limited'].includes(work.reason);
+  return Response.json({...payload,...(paused?{code:work.reason}:{})},{headers:{'Cache-Control':'no-store',...(cacheState?{'X-Cache':cacheState}:{}),...(paused?{'Retry-After':String(work.retrySeconds())}:{})}});
+ };
  let stored;try{const hit=await cache?.match(key);if(hit)stored=await hit.json();}catch{}
  const age=Array.isArray(stored?.articles)&&stored.articles.length?Date.now()-Date.parse(stored.cached_at):Infinity;
  function refresh(){

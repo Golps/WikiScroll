@@ -119,3 +119,20 @@ test('an old generation’s delayed error body cannot pause the new feed',async(
  const pending=c.noteWorkerCooldown({status:503,headers:new Headers({'Retry-After':'180'}),json:()=>body},0,'wiki|en');c.fillGeneration++;c.curMode='how';release({code:'upstream_rate_limited'});await pending;
  assert.equal(c.workerCooldownUntil,0);c.curMode='wiki';c.restoreWorkerCooldown();assert.equal(c.workerCooldownUntil,0);
 });
+
+test('successful partial cooldown preserves cards and recovers cache without repeating upstream work',async()=>{
+ const start=source.indexOf('function retryAfterMillis('),end=source.indexOf('function fillQueue(',start),urls=[];
+ const c=vm.createContext({crypto:webcrypto,URLSearchParams,AbortController,Date,setTimeout:()=>1,clearTimeout(){},fetch:async url=>{urls.push(url);return urls.length===1?Response.json({articles:[{id:'w1'}],partial:true,code:'upstream_rate_limited'},{headers:{'Retry-After':'30'}}):Response.json({articles:[{id:'w2'}],cached_only:true});}});
+ vm.runInContext(`let curMode='wiki',curLang='en',depthLevel=3,workerBatch=7,workerCooldownUntil=0,pendingWorkerBatch=null,fillGeneration=0,articles=[{id:'w0'}],queue=[];const supplyControllers=new Set(),curTopics=new Set(['tech']);const helpOnly=()=>true,feedContextKey=()=>curLang+'|'+depthLevel;${source.slice(start,end)}`,c);
+ assert.equal((await c.fetchWorkerBatch(0))[0].id,'w1');
+ assert.ok(vm.runInContext('workerCooldownUntil-Date.now()',c)>29000);
+ assert.equal((await c.fetchWorkerBatch(0))[0].id,'w2');
+ assert.match(urls[1],/cached=1/);assert.match(urls[1],/topic=tech/);assert.match(urls[1],/help=1/);
+});
+test('repeated partial topic supply releases the foreground after bounded retries',async()=>{
+ const start=source.indexOf('function retryAfterMillis('),end=source.indexOf('function fillQueue(',start),urls=[];
+ const c=vm.createContext({crypto:webcrypto,URLSearchParams,AbortController,Date,setTimeout:()=>1,clearTimeout(){},fetch:async url=>{urls.push(url);return Response.json({articles:[{id:'w1'}],partial:true});}});
+ vm.runInContext(`let curMode='wiki',curLang='en',depthLevel=3,workerBatch=7,workerCooldownUntil=0,pendingWorkerBatch=null,fillGeneration=0,articles=[{id:'w0'}],queue=[];const lateSupplyTasks=new Set([{},{}]),supplyControllers=new Set(),curTopics=new Set(['tech']);const helpOnly=()=>false,feedContextKey=()=>curLang+'|'+depthLevel;${source.slice(start,end)}`,c);
+ for(let i=0;i<4;i++)await c.fetchWorkerBatch(0);
+ assert.equal(urls[0],urls[1]);assert.equal(urls[1],urls[2]);assert.notEqual(urls[2],urls[3]);
+});

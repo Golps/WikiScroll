@@ -34,3 +34,11 @@ test('Wikivoyage random fallback ignores Wikipedia topics and accepts guides wit
  assert.equal(result.length,1);assert.equal(result[0].img,'');assert.equal(result[0].src,'how');
  assert.match(requested,/generator=random/);assert.doesNotMatch(requested,/categorymembers/);
 });
+
+test('Ambient preference closes active reading and persists its disabled state',()=>{
+ let closes=0,saves=0,syncs=0;
+ const c=vm.createContext({ambientEnabled:true,closeAmbient:()=>closes++,saveSettings:()=>saves++,syncAllToggles:()=>syncs++});
+ vm.runInContext(fn('setAmbient','function setSwipe'),c);
+ c.setAmbient(false);assert.equal(c.ambientEnabled,false);assert.equal(closes,1);assert.equal(saves,1);assert.equal(syncs,1);
+ c.setAmbient(true);assert.equal(c.ambientEnabled,true);assert.equal(closes,1);assert.equal(saves,2);
+});

@@ -16,7 +16,7 @@
     [/^Search for “(.+)”$/u, 'Search for “{name}”', 'name'],
     [/^Add (\d+) articles to a new collection on this device\.$/u, 'Add {count} articles to a new collection on this device.', 'count'],
   ];
-  const aliases = {'Article depth':'Article Depth','Reading history':'History','Explore on Map':'Map','New collection name':'New collection name…','Ambient Mode':'Ambient','LIKE':'Like','SKIP':'Skip','Close settings':'Settings','Close saved articles':'Saved Articles','Close history':'History','Close map':'Map','Close ambient mode':'Ambient','Close source guide':'Close','Toggle swipe gestures':'Swipe Gestures','Toggle light mode':'Light Mode','Toggle keyboard hints':'Show Keyboard Hints','About Wikipedia and Wikivoyage':'About'};
+  const aliases = {'Article depth':'Article Depth','Reading history':'History','Explore on Map':'Map','New collection name':'New collection name…','Ambient Mode':'Ambient','SKIP':'Skip','Close settings':'Settings','Close saved articles':'Saved Articles','Close history':'History','Close map':'Map','Close ambient mode':'Ambient','Close source guide':'Close','Toggle swipe gestures':'Swipe Gestures','Toggle light mode':'Light Mode','Toggle keyboard hints':'Show Keyboard Hints','About Wikipedia and Wikivoyage':'About'};
   function translate(source, lang = language) {
     const words = dictionaries[lang];
     if (!words) return source;

@@ -112,7 +112,7 @@ English also includes requests for copy editing, clarification and photographs. 
 
 ## Ambient reading
 
-Press <kbd>Space</kbd> on desktop, or long-press a card on a phone, and everything else steps back: the introduction is set in large serif type over a dimmed version of the article's photo. Press <kbd>Space</kbd> again or tap anywhere to return.
+Press <kbd>Space</kbd> on desktop, or long-press a card on a phone, and everything else steps back: the introduction is set in large serif type over a dimmed version of the article's photo. Press <kbd>Space</kbd> again or tap anywhere to return. Ambient Mode is enabled by default and can be switched off in Settings.
 
 <p align="center">
   <img src="docs/images/ambient-desktop.jpg" alt="Ambient mode on desktop: the title Mandarin duck and its full introduction in large serif type over a dark, softened photo of the two ducks." width="860">

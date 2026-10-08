@@ -291,3 +291,34 @@ test('a slow Help-only batch without ready cards remains pending and the retry j
   const full=await next;assert.equal(full.status,200);assert.equal((await full.json()).articles.length,6);assert.equal(samples,6,'each of the six branches was sampled once');await jobs.done();
  });
 });
+
+test('ready Help cards expose an upstream pause even with HTTP 200',async()=>{
+ const {createWork}=await import('../worker/runtime.js');
+ await withTopics(null,async(api,jobs)=>{
+  let id=0;const work=createWork({},jobs);
+  const fixture=async address=>{
+   const p=new URL(address).searchParams;
+   if(p.has('cmtitle'))return {query:{categorymembers:[{pageid:++id,ns:0,title:'Discovery '+id}]}};
+   if(p.get('prop')==='extracts'&&p.get('pageids').split('|').includes('6')){work.fail('upstream_rate_limited',30000);return null;}
+   return {query:{pages:Object.fromEntries(p.get('pageids').split('|').map(id=>[id,{pageid:Number(id),ns:0,title:'Discovery '+id,pageviews:{a:20},categories:[{title:'Category:All articles needing additional references'}],...(p.get('prop')==='extracts'?{extract:'An informative and verified introduction to this article requiring help. '.repeat(2)}:{})}]))}};
+  };
+  const response=await api.topicResponse(new URL('https://wikiscroll.com/api/topics?topic=tech&help=1&depth=3&batch=31'),{},jobs,{...options(fixture),work});
+  const data=await response.json();assert.equal(response.status,200);assert.ok(data.articles.length);assert.equal(data.partial,true);assert.equal(data.code,'upstream_rate_limited');assert.ok(Number(response.headers.get('Retry-After'))>=29);
+ });
+});
+
+test('topic introductions start while optional maintenance enrichment is still pending',async()=>{
+ let finishNeeds,extractStarted=false,serialFallback=false;
+ const blocked=new Promise(resolve=>finishNeeds=resolve),state={candidates:[[{pageid:1,ns:0,title:'Discovery'}]]};
+ const run=topicPages('tech','en',3,async address=>{
+  const p=new URL(address).searchParams;
+  if(p.get('prop')==='categories'){await blocked;return {query:{pages:{1:{pageid:1,categories:[]}}}};}
+  if(p.get('prop')==='extracts'){extractStarted=true;finishNeeds();return {query:{pages:{1:{extract:'An informative and substantive introduction about a fascinating discovery. '.repeat(3)}}}};}
+  return {query:{pages:{1:{pageid:1,ns:0,title:'Discovery',pageviews:{a:20}}}}};
+ },{state});
+ // Bound the assertion so a serial implementation fails instead of hanging.
+ const timer=setTimeout(()=>{serialFallback=true;finishNeeds();},100);
+ const cards=await run;clearTimeout(timer);
+ assert.equal(extractStarted,true);assert.equal(cards.length,1);
+ assert.equal(serialFallback,false);assert.ok(!state.chosen[0].needsMissing);
+});

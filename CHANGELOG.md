@@ -4,6 +4,10 @@ Releases of this repository. Each entry describes what changed in the code; [doc
 
 ## Unreleased
 
+- Surface upstream cooldowns in successful partial responses, preserving ready cards while allowing bounded cache recovery. Repeated partial topic batches no longer pin the foreground indefinitely.
+- Prepare topic introductions and optional maintenance tags concurrently within the existing upstream budget.
+- Label right swipes as Save, and add a persistent Ambient Mode switch, enabled by default, to desktop and mobile Settings.
+
 - Scope upstream cooldowns to the affected Wikimedia edition while keeping Worker/IP limits global; reconnecting does not erase a genuine pause. Ignore stale-generation error bodies.
 - Preserve successful article and talk maintenance checks independently through partial retries without extending their expiry. Bound resampled topic metadata and skip already-seen travel guides even after their cards are pruned.
 

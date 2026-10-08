@@ -82,7 +82,7 @@
 <link rel="preconnect" href="https://thumb.wikimedia.org">
 <link rel="preconnect" href="https://upload.wikimedia.org">
 <link rel="stylesheet" href="/styles.css?v=73">
-<script src="/lang.js?v=6"></script>
+<script src="/lang.js?v=7"></script>
 <link rel="stylesheet" href="/about.css?v=51">
 <link rel="describedby" href="/llms.txt" type="text/plain">
 </head>
@@ -163,9 +163,13 @@
     <div class="burger-row">
       <div class="burger-row-label">
         <span class="ico">👆</span>
-        <div><div>Swipe Gestures</div><div class="burger-row-sub">Left to skip · Right to like</div></div>
+        <div><div>Swipe Gestures</div><div class="burger-row-sub">Left to skip · Right to save</div></div>
       </div>
       <button class="toggle-sw on" id="swipeToggle" role="switch" aria-label="Toggle swipe gestures"></button>
+    </div>
+    <div class="burger-row">
+      <div class="burger-row-label"><span class="ico">◐</span><div><div>Ambient Mode</div><div class="burger-row-sub">Long-press for distraction-free reading.</div></div></div>
+      <button class="toggle-sw on" id="ambientToggle" role="switch" aria-label="Ambient Mode" aria-checked="true"></button>
     </div>
 
     <div class="burger-row wikipedia-only">
@@ -203,7 +207,7 @@
         <div class="sp-about-logo"><img class="wordmark wordmark-dark" src="/images/wordmark-dark.svg" alt="WikiScroll"><img class="wordmark wordmark-light" src="/images/wordmark-light.svg" alt="WikiScroll"></div>
         <div class="sp-about-body">
           Turn doomscrolling into discovery. Explore unexpected ideas and remarkable places, and leave with something worth knowing.<br><br>
-          Swipe right to like · Left to skip · Long-press for Ambient Mode.
+          Swipe right to save · Left to skip · Long-press for Ambient Mode.
         </div>
         <div class="sp-about-contact">contact@wikiscroll.com</div>
         <div class="sp-about-links"><a class="about-link" href="/about/" data-about-link>About WikiScroll</a><button type="button" class="privacy-link-btn" data-open-privacy="burger">Privacy Policy</button><a class="about-link about-link-icon" href="https://github.com/Golps/WikiScroll" target="_blank" rel="noopener" aria-label="Source Code" title="Source Code"><svg viewBox="0 0 16 16" width="20" height="20" aria-hidden="true" focusable="false"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg></a></div>
@@ -254,7 +258,7 @@
   <h2>How WikiScroll Works</h2>
   <p>WikiScroll fetches random articles from the Wikipedia and Wikivoyage APIs, keeps those with a readable introduction, and presents them as full-screen cards. Each card shows the article title, an excerpt, a thumbnail image, and auto-detected category tags. Swipe right or press Save to keep articles for later. Tap "Read full article" to visit the original Wikipedia or Wikivoyage page. For Wikivoyage travel guides, an interactive map shows the location, built with Leaflet, OpenStreetMap data and CARTO map tiles.</p>
   <h2>Privacy First</h2>
-  <p>WikiScroll requires no account and sets no tracking cookies. When enabled, Cloudflare Web Analytics measures aggregate visits and performance without identifying individual visitors. Your preferences, liked articles, and reading history stay on your device unless you explicitly share a collection. WikiScroll's source code is public, so anyone can see how it works.</p>
+  <p>WikiScroll requires no account and sets no tracking cookies. When enabled, Cloudflare Web Analytics measures aggregate visits and performance without identifying individual visitors. Your preferences, saved articles, and reading history stay on your device unless you explicitly share a collection. WikiScroll's source code is public, so anyone can see how it works.</p>
   <h2>Install WikiScroll</h2>
   <p>WikiScroll is a Progressive Web App (PWA) that works in any modern browser. Install it on your home screen for a native app-like experience. On iPhone, tap the Share button in Safari and select "Add to Home Screen." On Android, tap the menu in Chrome and select "Install app."</p>
   <p><a href="https://wikiscroll.com/">Launch WikiScroll</a>. Please enable JavaScript to use WikiScroll.</p>
@@ -293,7 +297,7 @@
 <p class="about-lead">A spare moment can leave you with something worth knowing. WikiScroll turns Wikipedia knowledge and Wikivoyage travel guides into a thoughtful, swipeable reader.</p>
 <p>Instead of another stream of reactions and headlines, discover an unfamiliar idea, a surprising life, or a place you have never considered visiting. Read a short introduction, follow the original article when something catches your attention, and stop whenever you like.</p>
 <h2>Follow your curiosity, not an engagement score</h2>
-<p>Your likes save what matters to you. They do not train a feed around your last swipe. Explore broadly or choose topics deliberately. There are no daily targets or streaks to protect, and no account is required.</p>
+<p>Save what matters to you. They do not train a feed around your last swipe. Explore broadly or choose topics deliberately. There are no daily targets or streaks to protect, and no account is required.</p>
 <h2>Two ways to explore</h2>
 <ul><li><strong>Wikipedia:</strong> discover people, science, history, nature, technology, culture, and more. Select topics to focus your discovery. Adjust article depth to favor familiar subjects or more obscure finds.</li>
 <li><strong>Wikivoyage:</strong> discover destinations through travel guides. Filter by country or region and trip style, then open the map to put a place in context. Travel controls are separate from Wikipedia topics and depth.</li></ul>
@@ -328,7 +332,7 @@
 
       <p style="margin-bottom:14px;"><strong style="color:rgba(255,255,255,.85);">Data we collect.</strong> WikiScroll does not require an account or automatically upload your saved collections. To load articles, your browser asks WikiScroll's server on Cloudflare for batches of cards, which it fetches from Wikimedia; these requests contain your chosen source, language, article depth, topics, Help Wikipedia setting and travel filters, plus technical details such as a batch number and today's date, but never your saved articles, collections or reading history. If you share a collection, its selected contents are included in the link and processed by Cloudflare to display the collection and its preview image. We do not set tracking cookies or use advertising SDKs. When enabled, Cloudflare Web Analytics provides cookieless, non-identifying measurements of visits and performance; it does not receive your saved articles, collections, or reading history. We do not know who you are.</p>
 
-      <p style="margin-bottom:14px;"><strong style="color:rgba(255,255,255,.85);">Local storage.</strong> Your preferences (liked articles, reading history, settings, theme, and collections) are stored exclusively in your browser's localStorage and IndexedDB. This data stays on your device unless you choose to share a collection. Shared links contain the selected collection name, article titles, excerpts, and article identifiers. Anyone with the link, and the messaging service generating its preview, can read that snapshot. Links cannot be revoked; deleting a local collection does not delete a previously shared snapshot. You can clear it at any time through your browser settings.</p>
+      <p style="margin-bottom:14px;"><strong style="color:rgba(255,255,255,.85);">Local storage.</strong> Your preferences (saved articles, reading history, settings, theme, and collections) are stored exclusively in your browser's localStorage and IndexedDB. This data stays on your device unless you choose to share a collection. Shared links contain the selected collection name, article titles, excerpts, and article identifiers. Anyone with the link, and the messaging service generating its preview, can read that snapshot. Links cannot be revoked; deleting a local collection does not delete a previously shared snapshot. You can clear it at any time through your browser settings.</p>
 
       <p style="margin-bottom:14px;"><strong style="color:rgba(255,255,255,.85);">Third-party services.</strong> WikiScroll loads content from the following external services:
       </p>
@@ -380,9 +384,13 @@
     <div class="sp-row">
       <div class="sp-row-label">
         <span class="ico">👆</span>
-        <div><div>Swipe Gestures</div><div class="sp-row-sub">Left to skip · Right to like</div></div>
+        <div><div>Swipe Gestures</div><div class="sp-row-sub">Left to skip · Right to save</div></div>
       </div>
       <button class="toggle-sw on" id="dkSwipeToggle" role="switch" aria-label="Toggle swipe gestures"></button>
+    </div>
+    <div class="sp-row">
+      <div class="sp-row-label"><span class="ico">◐</span><div><div>Ambient Mode</div><div class="sp-row-sub">Spacebar for distraction-free reading.</div></div></div>
+      <button class="toggle-sw on" id="dkAmbientToggle" role="switch" aria-label="Ambient Mode" aria-checked="true"></button>
     </div>
   </div>
 
@@ -437,7 +445,7 @@
       <div class="sp-about-logo"><img class="wordmark wordmark-dark" src="/images/wordmark-dark.svg" alt="WikiScroll"><img class="wordmark wordmark-light" src="/images/wordmark-light.svg" alt="WikiScroll"></div>
       <div class="sp-about-body">
         Turn doomscrolling into discovery. Explore unexpected ideas and remarkable places, and leave with something worth knowing.<br><br>
-        Swipe right to like · Left to skip · Spacebar for Ambient Mode.
+        Swipe right to save · Left to skip · Spacebar for Ambient Mode.
       </div>
       <div class="sp-about-contact">contact@wikiscroll.com</div>
       <div class="sp-about-links"><a class="about-link" href="/about/" data-about-link>About WikiScroll</a><button type="button" class="privacy-link-btn" data-open-privacy="settings">Privacy Policy</button><a class="about-link about-link-icon" href="https://github.com/Golps/WikiScroll" target="_blank" rel="noopener" aria-label="Source Code" title="Source Code"><svg viewBox="0 0 16 16" width="20" height="20" aria-hidden="true" focusable="false"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg></a></div>
@@ -481,7 +489,7 @@
 <div class="kb-bar" id="kbBar" role="region" aria-label="Keyboard shortcuts">
   <div class="kb-hint"><span class="kb-key">↑</span><span class="kb-key">↓</span> Scroll</div>
   <div class="kb-hint"><span class="kb-key">←</span><span class="kb-key">→</span> Swipe</div>
-  <div class="kb-hint"><span class="kb-key">L</span> Like</div>
+  <div class="kb-hint"><span class="kb-key">L</span> Save</div>
   <div class="kb-hint"><span class="kb-key">S</span> Share</div>
   <div class="kb-hint"><span class="kb-key">R</span> Read</div>
 
@@ -497,9 +505,9 @@
 <section><h3>Wikivoyage <span>Explore places</span></h3><p>Community-written travel guides to places around the world.</p></section>
 <p class="source-footnote">Free knowledge. Switch sources anytime; your saved articles stay together.</p>
 </dialog>
-<script src="/i18n.js?v=52"></script>
+<script src="/i18n.js?v=53"></script>
 <script src="/discovery.js?v=49"></script>
-<script src="/app.js?v=88"></script>
+<script src="/app.js?v=89"></script>
 <script src="/atlas.js?v=56"></script>
 <noscript><p>WikiScroll is a free Wikipedia and Wikivoyage discovery reader. Enable JavaScript to browse articles, save favorites, and explore topics in 15 languages.</p></noscript>
 <script src="/features.js?v=68"></script>

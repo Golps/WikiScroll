@@ -4,6 +4,8 @@ Releases of this repository. Each entry describes what changed in the code; [doc
 
 ## Unreleased
 
+- Refresh social previews with a two-line serif headline, “Turn doomscrolling into discovery.”, and a new versioned image URL across site and collection previews.
+
 - Recover Wikivoyage banner photos omitted by the thumbnail API, using a bounded, cached batch of guide-linked images. Keep picture lookup failures from blocking navigation, and exclude disambiguation pages from random travel cards.
 
 - Group Settings by priority: library and history, discovery or travel filters, reading preferences, then gestures. Clear image-viewer tap/click highlights while preserving keyboard focus indicators.

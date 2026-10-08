@@ -22,7 +22,7 @@ export async function collectionResponse(request,ctx,env,work=createWork(env,ctx
  if(request.method==='HEAD')return new Response(null,{headers:{'Content-Type':u.pathname.endsWith('.png')?'image/png':u.pathname.startsWith('/api/')?'application/json':'text/html;charset=utf-8','Cache-Control':'no-store'}});
  if(u.pathname==='/collection.png'){
   if(!work.charge(true))return new Response('Please retry shortly.',{status:503,headers:{'Retry-After':'5'}});
-  const asset=await env.ASSETS.fetch(new Request(new URL('/images/og-discovery-v10.png',u)));
+  const asset=await env.ASSETS.fetch(new Request(new URL('/images/og-discovery-v11.png',u)));
   return new Response(asset.body,{status:asset.status,headers:{'Content-Type':'image/png','Cache-Control':asset.ok?'public,max-age=86400':'no-store'}});
  }
  try{c=await verifyCollection(c,env,ctx,work);}catch(error){console.warn('Collection verification:',error.message);return new Response('These articles cannot be verified right now. Please retry shortly.',{status:503,headers:{'Retry-After':String(work.retrySeconds()),'Cache-Control':'no-store'}});}

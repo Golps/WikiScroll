@@ -52,7 +52,7 @@ The live site runs on [Cloudflare Workers](https://workers.cloudflare.com/) and 
 
 ## Social artwork
 
-The approved social composition uses the canonical WikiScroll logo and real Wikimedia photographs, resized and cropped to fit article cards without AI reconstruction or recoloring. Credits are embedded beneath the middle card. The composition is not a screenshot of the reader.
+The approved social composition uses the canonical WikiScroll logo and Wikimedia photograph references composed into article cards. The current social image is an AI-edited derivative, including its typography and visual presentation. Credits are embedded beneath the middle card. The composition is not a screenshot of the reader.
 
 | Photograph | Credit | License |
 |---|---|---|

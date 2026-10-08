@@ -4,6 +4,8 @@ Releases of this repository. Each entry describes what changed in the code; [doc
 
 ## Unreleased
 
+- Prioritize nearby card images with four background loads at a time, and retry temporary image failures once without delaying article fetching or swipe navigation.
+
 - Request the article's selected thumbnail explicitly, including images omitted by Wikipedia's free-only API default. Apply the same policy to topic, random, vital, travel, shared-article and collection metadata. Refresh affected caches without discarding compatible cache-only outage reserves.
 - Resume loading at the server's Retry-After deadline rather than adding up to ten seconds of client backoff.
 

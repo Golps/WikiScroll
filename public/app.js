@@ -216,15 +216,26 @@ const IDB = (() => {
 // ── HELPERS ────────────────────────────────────────────────────────────────
 function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
 function stripHtml(s) { return String(s||'').replace(/<[^>]+>/g,''); }
-// Images that fail to load are removed, or replaced by the card's globe
-// fallback. One listener instead of inline onerror attributes, which the
-// Content Security Policy does not allow. Error events do not bubble, so it
-// listens in the capture phase.
+// A transient image failure gets one delayed retry without holding the feed.
+// Capture listeners keep fallback handling compatible with the site's CSP.
+function finishImageFallback(img) {
+  if (img.dataset.fallback === 'media') img.closest('.art-media')?.classList.add('image-unavailable');
+  (img.dataset.fallback === 'parent' ? img.parentElement : img).remove();
+}
 document.addEventListener('error', event => {
   const img = event.target;
   if (!(img instanceof HTMLImageElement) || !img.dataset.fallback) return;
-  if (img.dataset.fallback === 'media') img.closest('.art-media')?.classList.add('image-unavailable');
-  (img.dataset.fallback === 'parent' ? img.parentElement : img).remove();
+  if (!img.dataset.imageRetried && navigator.onLine) {
+    img.dataset.imageRetried = '1';
+    const source = img.getAttribute('src');
+    setTimeout(() => {
+      if (!img.isConnected || img.getAttribute('src') !== source) return;
+      if (!navigator.onLine) { finishImageFallback(img); return; }
+      img.src = source;
+    }, 1500);
+    return;
+  }
+  finishImageFallback(img);
 }, true);
 
 function toast(msg, ms = 2200) {
@@ -591,13 +602,55 @@ let supplyTask = null, reserveTimer = null, pendingDeepGeneration = -1;
 let workerBatch = Math.floor(Math.random()*64), workerCooldownUntil = 0, pendingWorkerBatch = null;
 const supplyControllers = new Set(), feedSeen = new Set(), lateSupplyTasks = new Set();
 const _imgCache = new Map();
+let imageLoads = 0;
+let imageTargets = [];
 function preloadImg(url) {
   if (!url || _imgCache.has(url)) return;
-  const img = new Image(); img.decoding='async'; img.src=url;
-  _imgCache.set(url,img);
-  if (_imgCache.size>100) _imgCache.delete(_imgCache.keys().next().value);
+  _imgCache.set(url,{url,state:'queued',attempts:0,img:null});
+  // Keep active work, but release settled references from long sessions.
+  for (const [key,item] of _imgCache) {
+    if (_imgCache.size <= 100) break;
+    if (item.state === 'loaded' || item.state === 'failed') _imgCache.delete(key);
+  }
 }
-function preloadQueueImages() { queue.slice(0,24).forEach(a=>preloadImg(a.img)); }
+function pumpImageLoads() {
+  if (!navigator.onLine || document.hidden) return;
+  for (const url of imageTargets) {
+    if (imageLoads >= 4) break;
+    const item = _imgCache.get(url);
+    if (!item || item.state !== 'queued') continue;
+    const img = new Image();
+    item.img=img;item.state='loading';item.attempts++;imageLoads++;
+    img.decoding='async';img.fetchPriority='low';
+    let finished=false;
+    const finish = ok => {
+      if(finished)return;finished=true;clearTimeout(timeout);
+      img.onload=null;img.onerror=null;imageLoads--;
+      item.state=ok?'loaded':'failed';
+      if(!ok && item.attempts<2) {
+        setTimeout(()=>{
+          if(_imgCache.get(url)!==item || !imageTargets.includes(url))return;
+          item.state='queued';pumpImageLoads();
+        },1500);
+      }
+      pumpImageLoads();
+    };
+    const timeout=setTimeout(()=>{finish(false);img.src='';},15000);
+    img.onload=()=>finish(true);img.onerror=()=>finish(false);
+    img.src=url;
+  }
+}
+function preloadQueueImages() {
+  // Rendered upcoming cards are nearer than the tail of the data queue.
+  const cards=Array.from(document.querySelectorAll('#feed .card[data-id]'));
+  const current=getCurrentFeedCard();
+  const start=Math.max(0,cards.indexOf(current));
+  const nearby=cards.slice(start,start+6).map(c=>c.querySelector('.art-img')?.getAttribute('src'));
+  imageTargets=[...new Set([...nearby,...queue.slice(0,24).map(a=>a.img)].filter(Boolean))];
+  for(const [url,item] of _imgCache)if(item.state==='queued'&&!imageTargets.includes(url))_imgCache.delete(url);
+  imageTargets.forEach(preloadImg);
+  pumpImageLoads();
+}
 function feedContextKey() {
   return ['topics-v5',curMode,curLang,curMode==='wiki'?depthLevel:3,curMode==='wiki'?[...curTopics,...(helpOnly()?['help']:[])].sort().join(','):'',curMode==='how'?JSON.stringify(travelFilters):''].join('|');
 }
@@ -849,8 +902,8 @@ function scheduleRefill() {
     if(queue.length<QUEUE_MIN)scheduleRefill();
   },delay);
 }
-window.addEventListener('online',()=>{refillAttempts=0;restoreWorkerCooldown();fillQueue();});
-document.addEventListener('visibilitychange',()=>{if(!document.hidden){ensureFeedAhead();fillQueue();}});
+window.addEventListener('online',()=>{refillAttempts=0;restoreWorkerCooldown();preloadQueueImages();fillQueue();});
+document.addEventListener('visibilitychange',()=>{if(!document.hidden){ensureFeedAhead();preloadQueueImages();fillQueue();}});
 function flushQueue(n=8) {
   const batch=withTodaySurprises(queue.splice(0,n));
   if(batch.length){

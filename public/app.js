@@ -555,10 +555,6 @@ async function fetchWiki() {
   return fetchWikiRandom();
 }
 
-async function fetchWikiByTopic() {
-  return fetchWorkerBatch(fillGeneration);
-}
-
 async function fetchVoyage() {
   const requestGen=fillGeneration;
   if (travelFilters.place || travelFilters.style) return fetchFilteredTravel();
@@ -685,7 +681,7 @@ async function fetchWorkerBatch(gen) {
   const topical=subjects.length>0||help;
   const timer=setTimeout(()=>controller.abort(),topical?28000:7500);
   const context=feedContextKey();
-  if(!pendingWorkerBatch||pendingWorkerBatch.context!==context){
+  if(!pendingWorkerBatch||pendingWorkerBatch.context!==context||Date.now()-pendingWorkerBatch.startedAt>=30000){
     const slot=workerBatch++%64;
     const params=new URLSearchParams({mode:curMode,lang:curMode==='how'?voyageLang():curLang,n:'40',depth:String(curMode==='wiki'?depthLevel:3),batch:String(slot)});
     if(!articles.length&&!queue.length){
@@ -695,7 +691,7 @@ async function fetchWorkerBatch(gen) {
     }
     if(subjects.length){params.set('topic',subjects[slot%subjects.length]);if(help)params.set('help','1');}
     else if(help)params.set('topic','help');
-    pendingWorkerBatch={context,params};
+    pendingWorkerBatch={context,params,startedAt:Date.now(),failures:0};
   }
   const pending=pendingWorkerBatch,params=pending.params;
   try {
@@ -703,19 +699,27 @@ async function fetchWorkerBatch(gen) {
     if(gen!==fillGeneration)return [];
     if(!response.ok){
       if(response.status===429||response.status===503){
-        workerCooldownUntil=Date.now()+retryAfterMillis(response.headers.get('Retry-After'));
+        const delay=retryAfterMillis(response.headers.get('Retry-After'));
+        workerCooldownUntil=Date.now()+delay;
+        // A genuine long server cooldown is not a hung-batch timeout.
+        if(delay>=30000)pending.startedAt+=delay;
       }
       else if(pendingWorkerBatch===pending)pendingWorkerBatch=null;
       return [];
     }
     const data=await response.json();
-    if(data.partial&&!topical&&lateSupplyTasks.size<2){
-      collectLateSupply(pending,gen);
+    if(data.partial&&!topical){
+      if(lateSupplyTasks.size<2)collectLateSupply(pending,gen);
+      // The original job still finishes/caches its remainder. Full recovery
+      // lanes must never force the foreground back to a slow old batch.
       if(pendingWorkerBatch===pending)pendingWorkerBatch=null;
-    }else if(data.partial&&!topical)pending.params.set('resume','1');
+    }
     if(!data.partial&&pendingWorkerBatch===pending)pendingWorkerBatch=null;
     return Array.isArray(data.articles)?data.articles:[];
-  } catch {return [];} finally {clearTimeout(timer);supplyControllers.delete(controller);}
+  } catch {
+    if(gen===fillGeneration&&++pending.failures>=2&&pendingWorkerBatch===pending)pendingWorkerBatch=null;
+    return [];
+  } finally {clearTimeout(timer);supplyControllers.delete(controller);}
 }
 // Recover unfinished random batches without blocking the next fresh refill.
 // Two background lanes at most; source resets abort every associated request.
@@ -750,8 +754,8 @@ function fillQueue() {
   task.promise=(async()=>{
     const budget={remaining:5};fillBudget=budget;
     const topical=curMode==='wiki'&&(curTopics.size>0||helpOnly());
-    const useWorker=curMode==='how' ? !travelFilters.place&&!travelFilters.style : !topical;
-    const direct=curMode==='wiki'?(topical?fetchWikiByTopic:fetchWiki):fetchVoyage;
+    const useWorker=curMode==='wiki'||!travelFilters.place&&!travelFilters.style;
+    const direct=curMode==='wiki'?fetchWiki:fetchVoyage;
     let requests=0;
     try {
       while(gen===fillGeneration&&queue.length<QUEUE_TARGET&&requests++<5){
@@ -761,7 +765,7 @@ function fillQueue() {
         // Filtered travel is served by WikiScroll's own /api/travel, so a pause
         // after Wikimedia rate-limited the browser's direct calls doesn't apply.
         const ownServer=curMode==='how'&&!useWorker;
-        if(!added&&!pendingWorkerBatch&&Date.now()>=workerCooldownUntil&&(ownServer||budget.remaining>0&&Date.now()>=apiCooldownUntil))added=acceptSupply(await direct(),gen,!topical);
+        if(!added&&!topical&&!pendingWorkerBatch&&Date.now()>=workerCooldownUntil&&(ownServer||budget.remaining>0&&Date.now()>=apiCooldownUntil))added=acceptSupply(await direct(),gen,!topical);
         if(gen!==fillGeneration)return;
         // Render each successful batch immediately, not after a chain of API calls.
         ensureFeedAhead();

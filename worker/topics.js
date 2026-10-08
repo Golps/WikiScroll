@@ -1,7 +1,7 @@
 import {averageViews,lagDays,completePageviews,scaleBand} from './pageviews.js';
 import {completeExtracts,extractParams} from './extracts.js';
 import {completeNeeds,sampleNeedyTitles,HELP_LANGS} from './needs.js';
-import {createWork,unavailable} from './runtime.js';
+import {createWork,unavailable,expireJobs} from './runtime.js';
 import {imageURL,validOpeningDraw,createOpeningCache} from './supply.js';
 // Each refill samples several branches; neither likes nor previous cards enter
 // this pipeline. Bounds keep category traversal and upstream work finite.
@@ -142,6 +142,7 @@ export async function topicResponse(url,env,ctx,{langs,permit,limited,upstream,w
  if(!(Object.hasOwn(roots,topic)||topic==='help')||!langs.has(lang)||!Number.isInteger(depth)||!bands[depth]||!Number.isInteger(batch)||batch<0||batch>63||(helpParam!==null&&!help)||!validOpeningDraw(draw))return Response.json({error:'Invalid topic parameters'},{status:400});
  if((topic==='help'||help)&&!HELP_LANGS.has(lang))return Response.json({error:'Help Wikipedia is not available in this language'},{status:400});
  const key=new Request(`${url.origin}/api/topics?v=7&topic=${topic}&lang=${lang}&depth=${depth}&batch=${batch}${help&&topic!=='help'?'&help=1':''}${draw?'&draw='+draw:''}`),cache=draw?openingCache:work.cache;
+ expireJobs(pending);
  const respond=(payload,cacheState)=>Response.json(payload,{headers:{'Cache-Control':'no-store',...(cacheState?{'X-Cache':cacheState}:{})}});
  let stored;try{const hit=await cache?.match(key);if(hit)stored=await hit.json();}catch{}
  const age=Array.isArray(stored?.articles)&&stored.articles.length?Date.now()-Date.parse(stored.cached_at):Infinity;
@@ -157,7 +158,7 @@ export async function topicResponse(url,env,ctx,{langs,permit,limited,upstream,w
     progress.delete(key.url);
    }
    return payload;
-  }).finally(()=>pending.delete(key.url));pending.set(key.url,task);ctx.waitUntil(task.catch(()=>{}));
+  }).finally(()=>{if(pending.get(key.url)===task)pending.delete(key.url);});task.deadline=Date.now()+work.timeLeft();pending.set(key.url,task);ctx.waitUntil(task.catch(()=>{}));
   return task;
  }
  if(Number.isFinite(age)&&age>=0&&age<RETAIN_SECONDS*1000){

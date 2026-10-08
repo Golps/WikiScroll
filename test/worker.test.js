@@ -602,3 +602,20 @@ test('a partial random answer resumes its slow sibling instead of drawing anothe
   assert.deepEqual(new Set(body.articles.map(a=>a.id)),new Set(['w1','w2']));assert.equal(body.partial,false);assert.equal(count,2);
  });
 });
+
+test('a cancelled background batch cannot pin the same key after its work deadline',async t=>{
+ t.mock.timers.enable({apis:['setTimeout','Date'],now:100000});
+ const originalTimer=globalThis.setTimeout;globalThis.setTimeout=(fn,ms,...args)=>ms===6000||ms===24000?0:originalTimer(fn,ms,...args);
+ let count=0;const settle=async()=>{for(let i=0;i<25;i++)await new Promise(setImmediate);};
+ try{
+  await mocked(async url=>{
+   if(!new URL(url).searchParams.has('generator'))return data([]);
+   return ++count<=2?new Promise(()=>{}):data([page(count)]);
+  },async(api,jobs)=>{
+   let answer;const first=api.fetch(request('batch=51'),env,jobs).then(r=>answer=r);await settle();t.mock.timers.tick(6500);await settle();await first;
+   assert.equal(answer.status,503);assert.equal((await answer.json()).code,'batch_pending');
+   t.mock.timers.tick(18000);await settle();
+   const retry=await api.fetch(request('batch=51'),env,jobs);assert.equal(retry.status,200);assert.ok((await retry.json()).articles.length);assert.equal(count,4);
+  });
+ }finally{globalThis.setTimeout=originalTimer;}
+});

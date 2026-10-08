@@ -83,3 +83,12 @@ test('late random supply retains its opening draw without blocking the next fres
  assert.equal(urls[0].searchParams.get('draw'),urls[1].searchParams.get('draw'));assert.equal(urls[1].searchParams.get('resume'),'1');assert.notEqual(urls[1].searchParams.get('draw'),urls[2].searchParams.get('draw'));
  finish(Response.json({articles:[{id:'w3'}],partial:false}));await new Promise(setImmediate);
 });
+
+test('topic and Help fills keep requesting their partial batch rather than stopping after the first cards',async()=>{
+ for(const help of [false,true]){
+  const start=source.indexOf('function fillQueue()'),end=source.indexOf('let refillTimer=',start);let calls=0;const urls=[];
+  const c=vm.createContext({Promise,Date,URLSearchParams,fillGeneration:0,queue:[],QUEUE_MIN:60,QUEUE_TARGET:100,curMode:'wiki',curTopics:new Set(help?[]:['tech']),helpOnly:()=>help,travelFilters:{},apiCooldownUntil:0,workerCooldownUntil:0,scheduleRefill(){},syncTravelEnd(){},ensureFeedAhead(){},fetchWiki:()=>{throw Error('a filtered feed must not request unfiltered fallback');},fetchVoyage:()=>{},fetchWorkerBatch:async()=>{calls++;urls.push(calls);return [{id:'w'+calls}];},acceptSupply(batch){c.queue.push(...batch);return batch.length;}});
+  vm.runInContext(`let supplyTask=null,filling=false,fillBudget=null,pendingWorkerBatch={params:new URLSearchParams({topic:'tech'})};${source.slice(start,end)}`,c);
+  await c.fillQueue();assert.equal(calls,5);assert.equal(c.queue.length,5);
+ }
+});

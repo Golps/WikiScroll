@@ -1,3 +1,4 @@
+import {expireJobs,WORK_TIMEOUT_MS} from './runtime.js';
 import {completeExtracts, extractParams} from './extracts.js';
 import {completeNeeds, HELP_LANGS} from './needs.js';
 // Popular and Known draw on Wikipedia's editor-curated vital articles instead
@@ -46,7 +47,8 @@ async function build(level, upstream) {
 
 // Cached lists: memory, then the edge cache, then a rebuild. A partial or
 // failed rebuild is never cached.
-export async function vitalTitles(level, upstream, ctx, {wait = true,cache = globalThis.caches?.default} = {}) {
+export async function vitalTitles(level, upstream, ctx, {wait = true,cache = globalThis.caches?.default, deadline = Date.now()+WORK_TIMEOUT_MS} = {}) {
+  expireJobs(building);
   const now = Date.now(), held = memory.get(level);
   if (held && now - held.time < RETAIN_SECONDS * 1000) return held.titles;
   const key = new Request(`https://wikiscroll.com/__vital/v1/level-${level}`);
@@ -66,8 +68,8 @@ export async function vitalTitles(level, upstream, ctx, {wait = true,cache = glo
       memory.set(level, {titles, time: Date.now()});
       await cache?.put(key, Response.json({titles, at: new Date().toISOString()}, {headers: {'Cache-Control': `public, max-age=${RETAIN_SECONDS}`}})).catch(() => {});
       return titles;
-    }).catch(() => held?.titles || null).finally(() => building.delete(level));
-    building.set(level, job);
+    }).catch(() => held?.titles || null).finally(() => {if(building.get(level)===job)building.delete(level);});
+    job.deadline=deadline;building.set(level, job);
     ctx?.waitUntil?.(job);
   }
   return wait ? building.get(level) : held?.titles || null;
@@ -76,16 +78,16 @@ export async function vitalTitles(level, upstream, ctx, {wait = true,cache = glo
 // `info.borrowed` is set when Known had to answer from Level 3; callers must
 // not cache that answer, or other readers keep receiving Popular as Known.
 export async function vitalArticles(lang, depth, upstream, ctx, toArticle, info = {}, work = null) {
-  const level3 = await vitalTitles(3, upstream, ctx, {cache: work ? work.cache : globalThis.caches?.default});
+  const level3 = await vitalTitles(3, upstream, ctx, {cache: work ? work.cache : globalThis.caches?.default, deadline: Date.now()+(work?.timeLeft()??WORK_TIMEOUT_MS)});
   if (!level3?.length) return [];
   // Warm Known's larger list on any depth 1-2 request, so it is usually ready
   // before a reader moves from Popular to Known.
-  if (depth === 1) vitalTitles(4, upstream, ctx, {wait: false, cache: work ? work.cache : globalThis.caches?.default});
+  if (depth === 1) vitalTitles(4, upstream, ctx, {wait: false, cache: work ? work.cache : globalThis.caches?.default, deadline: Date.now()+(work?.timeLeft()??WORK_TIMEOUT_MS)});
   let pool = level3;
   if (depth === 2) {
     // Level 4 takes a few seconds to assemble; until it is cached, Known
     // borrows from Level 3 rather than keeping the reader waiting.
-    const level4 = await vitalTitles(4, upstream, ctx, {wait: false, cache: work ? work.cache : globalThis.caches?.default});
+    const level4 = await vitalTitles(4, upstream, ctx, {wait: false, cache: work ? work.cache : globalThis.caches?.default, deadline: Date.now()+(work?.timeLeft()??WORK_TIMEOUT_MS)});
     if (level4?.length) { const essential = new Set(level3); pool = level4.filter(t => !essential.has(t)); }
     else info.borrowed = true;
   }

@@ -1,4 +1,4 @@
-import {createWork} from './runtime.js';
+import {createWork,expireJobs} from './runtime.js';
 import {fullTextParams,leadFromText,guideReadable} from './extracts.js';
 import {imageURL} from './supply.js';
 const pending=new Map();
@@ -17,6 +17,7 @@ async function opening(p,id,lang,work){
  p.extract=leadFromText(data.query.pages[id.slice(1)].extract);return true;
 }
 export async function verifiedArticle(id,lang,env,ctx,work=createWork(env,ctx)) {
+ expireJobs(pending);
  const key=new Request(`https://wikiscroll.com/__verified/v4/${lang}/${id}`),cache=work.cache;
  try {const hit=await cache?.match(key);if(hit)return await hit.json();}catch{}
  if(pending.has(key.url))return pending.get(key.url);
@@ -29,8 +30,8 @@ export async function verifiedArticle(id,lang,env,ctx,work=createWork(env,ctx)) 
   if(cache)work.keep(cache.put(key,Response.json(result,{headers:{'Cache-Control':`public,max-age=${result?86400:300}`}})));
   return result;
  })();
- pending.set(key.url,job);work.keep(job);
- try{return await job;}finally{pending.delete(key.url);}
+ job.deadline=Date.now()+work.timeLeft();pending.set(key.url,job);work.keep(job);
+ try{return await job;}finally{if(pending.get(key.url)===job)pending.delete(key.url);}
 }
 
 // One canonical pack per article selection, independent of its untrusted name
@@ -39,6 +40,7 @@ export async function verifiedArticle(id,lang,env,ctx,work=createWork(env,ctx)) 
 export async function verifyCollection(c,env,ctx,work=createWork(env,ctx)){
  const selection=c.items.map(a=>a.lang+'|'+a.id).sort().join(',');
  const digest=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(selection))),b=>b.toString(16).padStart(2,'0')).join('');
+ expireJobs(pending);
  const key=new Request('https://wikiscroll.com/__verified-collection/v1/'+digest),cache=work.cache;
  let stored;try{const hit=await cache?.match(key);if(hit)stored=await hit.json();}catch{}
  const lookup=new Map((stored?.items||[]).map(a=>[a.lang+'|'+a.id,a]));
@@ -64,6 +66,6 @@ export async function verifyCollection(c,env,ctx,work=createWork(env,ctx)){
   if(cache)await cache.put(key,Response.json({items:[...lookup.values()],pending:[...rows.values()]},{headers:{'Cache-Control':`public,max-age=${complete?86400:300}`}}));
   return lookup;
  })();
- pending.set(key.url,job);work.keep(job);
- try{return finish(await job);}finally{pending.delete(key.url);}
+ job.deadline=Date.now()+work.timeLeft();pending.set(key.url,job);work.keep(job);
+ try{return finish(await job);}finally{if(pending.get(key.url)===job)pending.delete(key.url);}
 }

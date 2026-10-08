@@ -1,5 +1,5 @@
 import {permit,limited,secure} from './security.js';
-import {createWork,createNetwork,unavailable} from './runtime.js';
+import {createWork,createNetwork,unavailable,expireJobs} from './runtime.js';
 import {createSupply,imageURL,validOpeningDraw,createOpeningCache} from './supply.js';
 export {retryDelay} from './runtime.js';
 import {topicResponse} from './topics.js';
@@ -97,11 +97,13 @@ function selectArticles(pages,lang,mode,depth) {
 function startBatch(key,lang,mode,depth,cache,ctx,work) {
   const upstream=work.upstream;
   const id=key.url;
-  if(inFlight.has(id))return inFlight.get(id);
+  const existing=inFlight.get(id);
+  if(existing&&existing.deadline>Date.now())return existing;
+  if(existing){existing.finished=true;inFlight.delete(id);}
   let deliver;
   const ready=new Promise(resolve=>{deliver=resolve;});
   // snapshot() returns the cards already usable if the answer budget runs out.
-  const entry={ready,complete:null,snapshot:()=>[],finished:false};
+  const entry={ready,complete:null,snapshot:()=>[],finished:false,deadline:Date.now()+work.timeLeft()};
   inFlight.set(id,entry);
   entry.complete=(async()=>{
     // Popular and Known sample Wikipedia's vital articles (vital.js).
@@ -161,7 +163,7 @@ function startBatch(key,lang,mode,depth,cache,ctx,work) {
       await cache.put(key,json(payload,200,{'Cache-Control':`public, max-age=${RETAIN_SECONDS}`})).catch(()=>{});
     }
     return payload;
-  })().catch(()=>{const empty={articles:[]};deliver(empty);return empty;}).finally(()=>{entry.finished=true;inFlight.delete(id);});
+  })().catch(()=>{const empty={articles:[]};deliver(empty);return empty;}).finally(()=>{entry.finished=true;if(inFlight.get(id)===entry)inFlight.delete(id);});
   return entry;
 }
 
@@ -177,6 +179,7 @@ async function articles(request,url,ctx,env,work) {
   // n only slices a shared batch; arbitrary request sizes cannot multiply cache
   // keys. Versioning excludes earlier unfiltered batches after depth changes.
   const key=new Request(`${url.origin}/api/articles?version=8&mode=${mode}&lang=${lang}&depth=${mode==='how'?3:depth}&batch=${batch}${draw?'&draw='+draw:''}`);
+  expireJobs(inFlight);
   const cache=draw?openingCache:work.cache;
   let stored;
   try{const hit=await cache?.match(key);if(hit)stored=await hit.json();}catch{}
@@ -252,6 +255,7 @@ async function handle(request,env,ctx,work) {
         // Many readers ask for the same destination and style: complete result
         // pages are shared from the edge cache for an hour, before any upstream work.
         const key=new Request(`${url.origin}/api/travel?v=9&lang=${lang}&place=${encodeURIComponent(places.map(fold).join('|'))}&style=${style}&offset=${cursor.map(c=>c??'-').join('.')}`),cache=work.cache;
+        expireJobs(travelPending);
         try{const hit=await cache?.match(key);if(hit)return json(await hit.json(),200,{'X-Cache':'HIT'});}catch{}
         if(travelPending.has(key.url))return (await travelPending.get(key.url)).clone();
         if(!await permit(env,'WORK_LIMIT','travel'))return limited();
@@ -316,8 +320,8 @@ async function handle(request,env,ctx,work) {
         if(!body.articles.length&&!complete&&work.reason)return unavailable(work,'Travel guides are temporarily unavailable');
         return json(body,200,{'X-Cache':'MISS'});
         })();
-        travelPending.set(key.url,job);work.keep(job);
-        try{return (await job).clone();}finally{travelPending.delete(key.url);}
+        job.deadline=Date.now()+work.timeLeft();travelPending.set(key.url,job);work.keep(job);
+        try{return (await job).clone();}finally{if(travelPending.get(key.url)===job)travelPending.delete(key.url);}
       }
       if(url.pathname==='/api/today'){
         const response=await todayResponse(url,ctx,{langs:LANGS,permit,limited,env,work,feed:address=>work.upstream(address,{timeoutMs:15000})});

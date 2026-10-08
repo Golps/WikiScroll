@@ -209,3 +209,11 @@ test('travel resolves geographic ancestry instead of confusing Elba with North E
  assert.match(travelTerms('ja','nature'),/自然/);assert.doesNotMatch(travelTerms('es','coast'),/beach/);
  const unavailable=await resolver.resolve('fr',['Paris'],async()=>null);assert.equal(unavailable.has('Paris'),false);
 });
+
+test('abandoned active leases are reclaimed when their original work deadline passes',async t=>{
+ let now=100000;t.mock.method(Date,'now',()=>now);const network=createNetwork();let cancelled=0;
+ const abandoned=Array.from({length:3},()=>network.schedule(()=>new Promise(()=>{}),{timeLeft:()=>100,fail(){}},()=>{cancelled++;}));
+ await new Promise(setImmediate);now+=101;
+ const fresh=await network.schedule(async()=>({ready:true}),{timeLeft:()=>100,fail(){}});
+ assert.deepEqual(fresh,{ready:true});assert.equal(cancelled,3);assert.deepEqual(await Promise.all(abandoned),[null,null,null]);
+});

@@ -20,11 +20,6 @@ test('language switch updates a deep-link language so refresh cannot revert the 
  vm.runInContext('setLang("es")',context);assert.equal(context.curLang,'es');assert.equal(replaced,'https://wikiscroll.com/?a=w123&lang=es');assert.equal(resets,1);assert.equal(saves,1);
  vm.runInContext('setLang("bogus")',context);assert.equal(context.curLang,'es');assert.equal(resets,1);
 });
-test('topic refill delegates to the generation-safe Worker request',async()=>{
- let generation;const context=vm.createContext({fillGeneration:17,fetchWorkerBatch:async gen=>{generation=gen;return [{id:'w123'}];}});
- vm.runInContext(source.slice(source.indexOf('async function fetchWikiByTopic'),source.indexOf('async function fetchVoyage')),context);
- const result=await vm.runInContext('fetchWikiByTopic()',context);assert.equal(generation,17);assert.equal(result[0].id,'w123');
-});
 test('cards do not present excerpt reading-time estimates as article reading times',()=>{
  assert.doesNotMatch(source,/function readingTime\(/);
  assert.doesNotMatch(source,/class="read-time"/);

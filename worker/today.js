@@ -1,3 +1,4 @@
+import {expireJobs,WORK_TIMEOUT_MS} from './runtime.js';
 // "On this day" Easter egg. Wikipedia's own daily feed names the articles
 // behind today's anniversaries; cards are matched by exact page ID, never by
 // guessing dates from article text. Only each entry's first linked page (its
@@ -62,13 +63,14 @@ export async function todayResponse(url, ctx, {langs, permit, limited, env, feed
   // A failed or timed-out feed is a temporary error, never an empty day: the
   // browser keeps retrying, and browsers never cache the failure.
   const unavailable = () => Response.json({error: 'On this day is temporarily unavailable.'}, {status: 503, headers: {'Cache-Control': 'no-store', 'Retry-After': String(RETRY_TTL)}});
+  expireJobs(pending);
   const key = new Request(`https://wikiscroll.com/__today/v4/${lang}/${md}`), cache = work ? work.cache : globalThis.caches?.default;
   try {
     const hit = await cache?.match(key);
     if (hit) { const stored = await hit.json(); return stored?.failed ? unavailable() : Response.json(stored, {headers: {...headers(3600), 'X-Cache': 'HIT'}}); }
   } catch {}
   if (!pending.has(key.url)) {
-    pending.set(key.url, (async () => {
+    const job = (async () => {
       if (!await permit(env, 'WORK_LIMIT', 'today')) return null;
       const [month, day] = md.split('-');
       const data = await feed(`https://${lang}.wikipedia.org/api/rest_v1/feed/onthisday/all/${month}/${day}`);
@@ -82,7 +84,8 @@ export async function todayResponse(url, ctx, {langs, permit, limited, env, feed
       const body = parseToday(data, lang);
       await cache?.put(key, Response.json(body, {headers: {'Cache-Control': `public, max-age=${FEED_TTL}`}})).catch(() => {});
       return {body, ttl: FEED_TTL};
-    })().finally(() => pending.delete(key.url)));
+    })().finally(() => {if(pending.get(key.url)===job)pending.delete(key.url);});
+    job.deadline=Date.now()+(work?.timeLeft()??WORK_TIMEOUT_MS);pending.set(key.url,job);
   }
   const result = await pending.get(key.url);
   if (!result) return limited();

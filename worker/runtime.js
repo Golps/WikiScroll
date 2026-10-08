@@ -13,18 +13,37 @@ export function retryDelay(value, now = Date.now()) {
   return Number.isFinite(date) ? Math.max(1000, date - now) : 30000;
 }
 
+// Cancelled Worker contexts may leave promises unsettled. Only live jobs
+// coalesce requests; late cleanup must also check ownership of the map entry.
+export function expireJobs(jobs, now = Date.now()) {
+  for (const [key, job] of jobs) if (job.deadline <= now) {
+    if ('finished' in job) job.finished = true;
+    jobs.delete(key);
+  }
+}
+
 export function createNetwork() {
-  let active = 0;
+  const active = new Set();
   const waiting = [], cooldowns = new Map();
+  // A Worker can cancel background work after a response. Its promise/finally
+  // may never settle, so an isolate-wide counter must not retain that lease.
+  function expire(job) {
+    job.expired=true;clearTimeout(job.timer);active.delete(job);
+    job.work?.fail('deadline_exceeded');try{job.cancel?.();}catch{}job.resolve(null);
+  }
   function drain() {
-    while (active < CONCURRENCY && waiting.length) {
-      const job = waiting.shift(); if(job.expired)continue; clearTimeout(job.timer); active++;
-      Promise.resolve().then(job.run).then(job.resolve, job.reject).finally(() => { active--; drain(); });
+    const now=Date.now();
+    for(const job of active)if(job.deadline<=now)expire(job);
+    for(let i=waiting.length-1;i>=0;i--)if(waiting[i].deadline<=now){const [job]=waiting.splice(i,1);expire(job);}
+    while (active.size < CONCURRENCY && waiting.length) {
+      const job = waiting.shift(); if(job.expired)continue; clearTimeout(job.timer);active.add(job);
+      Promise.resolve().then(job.run).then(job.resolve, job.reject).finally(() => {active.delete(job);drain();});
     }
   }
-  const schedule = (run, work) => new Promise((resolve, reject) => {
+  const schedule = (run, work, cancel) => new Promise((resolve, reject) => {
+    drain();
     if(waiting.length>=128){work?.fail('work_rate_limited',5000);resolve(null);return;}
-    const job={run,resolve,reject,expired:false};
+    const job={run,resolve,reject,work,cancel,expired:false,deadline:Date.now()+(work?.timeLeft()??WORK_TIMEOUT_MS)};
     if(work)job.timer=setTimeout(()=>{job.expired=true;work.fail('deadline_exceeded');const index=waiting.indexOf(job);if(index>=0)waiting.splice(index,1);resolve(null);},work.timeLeft());
     waiting.push(job);drain();
   });
@@ -33,13 +52,14 @@ export function createNetwork() {
     schedule, delay,
     async json(url, work, timeoutMs = UPSTREAM_TIMEOUT_MS) {
       const host = new URL(url).hostname;
+      const controller = new AbortController();
       return schedule(async () => {
         const pause = delay(host);
         if (pause) { work.fail('upstream_rate_limited', pause); return null; }
         if (!work.available()) return null;
         if (!await permit(work.env, 'WORK_LIMIT', 'upstream:'+host)) { work.fail('work_rate_limited', 60000); return null; }
         if (!work.charge(true)) return null;
-        const controller = new AbortController(); let timer;
+        let timer;
         const timeout = new Promise(resolve => { timer = setTimeout(() => { controller.abort(); work.fail('upstream_timeout'); resolve(null); }, Math.min(timeoutMs, work.timeLeft())); });
         try {
           return await Promise.race([timeout, (async () => {
@@ -60,7 +80,7 @@ export function createNetwork() {
           })()]);
         } catch { work.fail('upstream_unavailable'); return null; }
         finally { clearTimeout(timer); }
-      }, work);
+      }, work,()=>controller.abort());
     }
   };
 }

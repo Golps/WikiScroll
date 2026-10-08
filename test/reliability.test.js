@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createWork,createNetwork,FETCH_LIMIT,SUBREQUEST_LIMIT} from '../worker/runtime.js';
-import {createSupply,createOpeningCache,validOpeningDraw} from '../worker/supply.js';
+import {createSupply,createOpeningCache,validOpeningDraw,cachedWindow} from '../worker/supply.js';
 import {topicResponse} from '../worker/topics.js';
 import {verifyCollection} from '../worker/verified.js';
 import {createPlaceResolver,parsePlaces,placeMention,travelTerms,isDisambiguation} from '../worker/travel.js';
@@ -234,5 +234,17 @@ test('independent invocation queues still share Wikimedia Retry-After cooldowns'
   assert.equal(await a.upstream('https://en.wikipedia.org/w/api.php'),null);
   assert.equal(await b.upstream('https://en.wikipedia.org/w/api.php'),null);
   assert.equal(calls,1);assert.ok(b.retrySeconds()>175);
+ }finally{globalThis.fetch=original;}
+});
+
+test('cooldown recovery reads eight cache slots, deduplicates, excludes expired/partial cards and never fetches',async()=>{
+ const store=cache(),base=new Request('https://wikiscroll.com/api/topics?v=7&topic=help&lang=en&depth=3&batch=60');
+ let reads=0;const original=globalThis.fetch;globalThis.fetch=()=>{throw Error('cache recovery must not fetch upstream');};
+ try{
+  for(const [slot,body] of [[60,{articles:[{id:'w1'},{id:'w2'}]}],[61,{articles:[{id:'w1'},{id:'w3'}]}],[62,{articles:[{id:'w4'}],partial:true}],[63,{articles:[{id:'w5'}],cached_at:new Date(Date.now()-86400001).toISOString()}],[0,{articles:[{id:'w6'}]}]]){
+   const key=new URL(base.url);key.searchParams.set('batch',String(slot));await store.put(new Request(key),Response.json({cached_at:new Date().toISOString(),...body}));
+  }
+  const result=await cachedWindow({match:async k=>{reads++;return store.match(k);}},base,60);
+  assert.equal(reads,8);assert.equal(result.cached_only,true);assert.deepEqual(result.articles.map(a=>a.id),['w1','w2','w3','w6']);
  }finally{globalThis.fetch=original;}
 });

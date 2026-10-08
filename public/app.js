@@ -674,7 +674,10 @@ function retryAfterMillis(value){
   return Math.max(1000,Number.isFinite(seconds)?seconds*1000:Number.isFinite(date)?date-Date.now():5000);
 }
 async function fetchWorkerBatch(gen) {
-  if(Date.now()<workerCooldownUntil)return [];
+  if(Date.now()<workerCooldownUntil){
+    if(pendingWorkerBatch?.cacheRecovery&&articles.length)return fetchCachedSupply(pendingWorkerBatch,gen);
+    return [];
+  }
   const controller=new AbortController();supplyControllers.add(controller);
   const subjects=curMode==='wiki'?[...curTopics]:[];
   const help=curMode==='wiki'&&helpOnly();
@@ -703,6 +706,7 @@ async function fetchWorkerBatch(gen) {
         workerCooldownUntil=Date.now()+delay;
         // A genuine long server cooldown is not a hung-batch timeout.
         if(delay>=30000)pending.startedAt+=delay;
+        try{const error=await response.json();pending.cacheRecovery=error.code==='upstream_rate_limited';pending.cachedScan=0;}catch{pending.cacheRecovery=false;}
       }
       else if(pendingWorkerBatch===pending)pendingWorkerBatch=null;
       return [];
@@ -720,6 +724,21 @@ async function fetchWorkerBatch(gen) {
     if(gen===fillGeneration&&++pending.failures>=2&&pendingWorkerBatch===pending)pendingWorkerBatch=null;
     return [];
   } finally {clearTimeout(timer);supplyControllers.delete(controller);}
+}
+// Reuse complete edge batches while upstream is paused; cached=1 guarantees
+// the Worker performs cache reads only. Never use this for a fresh opening.
+async function fetchCachedSupply(pending,gen){
+ if((pending.cachedScan||0)>=8)return [];
+ const params=new URLSearchParams(pending.params);params.delete('draw');params.delete('resume');params.set('cached','1');
+ const scan=pending.cachedScan||0;pending.cachedScan=scan+1;
+ params.set('batch',String((Number(params.get('batch'))+scan*8)%64));
+ const controller=new AbortController();supplyControllers.add(controller);const timer=setTimeout(()=>controller.abort(),3000);
+ try{
+  const response=await fetch((params.has('topic')?'/api/topics?':'/api/articles?')+params,{signal:controller.signal,cache:'no-store'});
+  if(gen!==fillGeneration)return [];
+  if(!response.ok){pending.cacheRecovery=false;if(response.status===429||response.status===503)workerCooldownUntil=Math.max(workerCooldownUntil,Date.now()+retryAfterMillis(response.headers.get('Retry-After')));return [];}
+  const data=await response.json();return data.cached_only&&Array.isArray(data.articles)?data.articles:[];
+ }catch{return [];}finally{clearTimeout(timer);supplyControllers.delete(controller);}
 }
 // Recover unfinished random batches without blocking the next fresh refill.
 // Two background lanes at most; source resets abort every associated request.

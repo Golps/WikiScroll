@@ -1,6 +1,6 @@
 import {permit,limited,secure} from './security.js';
 import {createWork,createNetwork,unavailable,expireJobs} from './runtime.js';
-import {createSupply,imageURL,validOpeningDraw,createOpeningCache} from './supply.js';
+import {createSupply,imageURL,validOpeningDraw,createOpeningCache,cachedWindow} from './supply.js';
 export {retryDelay} from './runtime.js';
 import {topicResponse} from './topics.js';
 import {verifiedArticle} from './verified.js';
@@ -173,12 +173,13 @@ async function articles(request,url,ctx,env,work) {
   const n=Number(url.searchParams.get('n')||20);
   const depth=Number(url.searchParams.get('depth')||3);
   const batch=Number(url.searchParams.get('batch')||0);
-  const draw=url.searchParams.get('draw');
-  if(!['wiki','how'].includes(mode)||!LANGS.has(requested)||!Number.isInteger(n)||n<1||n>40||!Number.isInteger(depth)||depth<1||depth>5||!Number.isInteger(batch)||batch<0||batch>63||!validOpeningDraw(draw)) return json({error:'Use mode=wiki|how, a supported lang, n=1..40, depth=1..5, batch=0..63, and a valid optional opening draw.'},400);
+  const draw=url.searchParams.get('draw'),cached=url.searchParams.get('cached');
+  if(!['wiki','how'].includes(mode)||!LANGS.has(requested)||!Number.isInteger(n)||n<1||n>40||!Number.isInteger(depth)||depth<1||depth>5||!Number.isInteger(batch)||batch<0||batch>63||!validOpeningDraw(draw)||(cached!==null&&cached!=='1')||(cached&&draw)) return json({error:'Use mode=wiki|how, a supported lang, n=1..40, depth=1..5, batch=0..63, and a valid optional opening draw.'},400);
   const lang=mode==='how'?voyageLang(requested):requested;
   // n only slices a shared batch; arbitrary request sizes cannot multiply cache
   // keys. Versioning excludes earlier unfiltered batches after depth changes.
   const key=new Request(`${url.origin}/api/articles?version=8&mode=${mode}&lang=${lang}&depth=${mode==='how'?3:depth}&batch=${batch}${draw?'&draw='+draw:''}`);
+  if(cached){const recovered=await cachedWindow(work.cache,key,batch);return json({...recovered,articles:recovered.articles.slice(0,n)},200,{'X-Cache':'RECOVERY'});}
   expireJobs(inFlight);
   const cache=draw?openingCache:work.cache;
   let stored;

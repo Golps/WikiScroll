@@ -4,6 +4,8 @@ Releases of this repository. Each entry describes what changed in the code; [doc
 
 ## Unreleased
 
+- During a Wikimedia cooldown, continuing readers can recover complete, matching batches from a bounded edge-cache window. This path starts no upstream work and is never used to replace an independent online opening.
+
 - Retire old card elements and payloads after each completed swipe, keeping long sessions bounded even when the idle cleanup timer cannot run between gestures.
 
 - Fix topic and Help refills stopping after partial responses. Expire abandoned batch jobs and bound client retries so stale work cannot pin a feed indefinitely.

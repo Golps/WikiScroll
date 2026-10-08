@@ -56,3 +56,19 @@ export function imageURL(source) {
   if (!/^https:\/\/(?:upload|thumb)\.wikimedia\.org\//.test(source || '')) return '';
   return source.replace(/\/((?:lang[a-z-]+-)?)\d+px-([^/?]+)(\?[^/]*)?$/, '/$1960px-$2$3');
 }
+
+// During a Wikimedia cooldown, edge-cache reads remain safe: no refresh,
+// fresh job or upstream request is allowed in this bounded recovery window.
+export async function cachedWindow(cache,key,batch,maxAge=86400000){
+ const articles=[],seen=new Set();
+ for(let offset=0;offset<8;offset++){
+  const url=new URL(key.url);url.searchParams.set('batch',String((batch+offset)%64));
+  try{
+   const hit=await cache?.match(new Request(url));if(!hit)continue;
+   const data=await hit.json(),age=Date.now()-Date.parse(data.cached_at);
+   if(data.partial||!Number.isFinite(age)||age<0||age>=maxAge||!Array.isArray(data.articles))continue;
+   for(const a of data.articles)if(!seen.has(a.id)){seen.add(a.id);articles.push(a);}
+  }catch{}
+ }
+ return {articles:articles.slice(0,40),cached_only:true};
+}

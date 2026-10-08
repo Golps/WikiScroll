@@ -622,3 +622,17 @@ test('a cancelled background batch cannot pin the same key after its work deadli
   });
  }finally{globalThis.setTimeout=originalTimer;}
 });
+
+test('cache-only recovery serves the exact source and depth without starting upstream work',async()=>{
+ const store=edgeCache();
+ for(const [path,id] of [['/api/articles?version=8&mode=wiki&lang=en&depth=5&batch=8','w1'],['/api/topics?v=7&topic=help&lang=en&depth=3&batch=8','w2']])
+  await store.put(new Request('https://wikiscroll.com'+path),Response.json({articles:[{id}],cached_at:new Date().toISOString()}));
+ await mocked(()=>{throw Error('upstream must remain paused');},async api=>{
+  for(const [path,id] of [['/api/articles?cached=1&depth=5&batch=8','w1'],['/api/topics?cached=1&topic=help&batch=8','w2']]){
+   const response=await api.fetch(new Request('https://wikiscroll.com'+path),env,ctx),body=await response.json();
+   assert.equal(response.status,200);assert.equal(body.cached_only,true);assert.deepEqual(body.articles.map(a=>a.id),[id]);
+  }
+  assert.equal((await api.fetch(request('cached=1&draw='+'a'.repeat(32)),env,ctx)).status,400);
+  assert.equal((await api.fetch(request('cached=bad'),env,ctx)).status,400);
+ },store);
+});

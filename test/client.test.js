@@ -92,3 +92,12 @@ test('topic and Help fills keep requesting their partial batch rather than stopp
   await c.fillQueue();assert.equal(calls,5);assert.equal(c.queue.length,5);
  }
 });
+
+test('an upstream cooldown can use cache-only cards without restarting a Wikimedia batch',async()=>{
+ const start=source.indexOf('function retryAfterMillis('),end=source.indexOf('function fillQueue(',start),urls=[];
+ const c=vm.createContext({crypto:webcrypto,URLSearchParams,AbortController,Date,setTimeout:()=>1,clearTimeout(){},fetch:async url=>{urls.push(new URL(url,'https://wikiscroll.com'));return urls.length===1?Response.json({code:'upstream_rate_limited'},{status:503,headers:{'Retry-After':'28'}}):Response.json({articles:[{id:'w99'}],cached_only:true});}});
+ vm.runInContext(`let curMode='wiki',curLang='en',depthLevel=3,workerBatch=7,workerCooldownUntil=0,pendingWorkerBatch=null,fillGeneration=0,articles=[{id:'w1'}],queue=[];const supplyControllers=new Set(),curTopics=new Set();const helpOnly=()=>true,feedContextKey=()=>curLang+'|'+depthLevel;${source.slice(start,end)}`,c);
+ await c.fetchWorkerBatch(0);assert.equal((await c.fetchWorkerBatch(0))[0].id,'w99');
+ assert.equal(urls[1].pathname,'/api/topics');assert.equal(urls[1].searchParams.get('topic'),'help');assert.equal(urls[1].searchParams.get('cached'),'1');assert.equal(urls[1].searchParams.has('draw'),false);
+ await c.fetchWorkerBatch(0);assert.notEqual(urls[1].searchParams.get('batch'),urls[2].searchParams.get('batch'));
+});

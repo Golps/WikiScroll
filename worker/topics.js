@@ -2,7 +2,7 @@ import {averageViews,lagDays,completePageviews,scaleBand} from './pageviews.js';
 import {completeExtracts,extractParams} from './extracts.js';
 import {completeNeeds,sampleNeedyTitles,HELP_LANGS} from './needs.js';
 import {createWork,unavailable,expireJobs} from './runtime.js';
-import {imageURL,validOpeningDraw,createOpeningCache} from './supply.js';
+import {imageURL,validOpeningDraw,createOpeningCache,cachedWindow} from './supply.js';
 // Each refill samples several branches; neither likes nor previous cards enter
 // this pipeline. Bounds keep category traversal and upstream work finite.
 export const roots={
@@ -138,10 +138,11 @@ export async function topicResponse(url,env,ctx,{langs,permit,limited,upstream,w
  const suppliedWork=!!work;work ||= createWork(env,ctx);
  const topic=url.searchParams.get('topic'),lang=url.searchParams.get('lang')||'en',depth=Number(url.searchParams.get('depth')||3),batch=Number(url.searchParams.get('batch')||0);
  const helpParam=url.searchParams.get('help'),help=helpParam==='1';
- const draw=url.searchParams.get('draw');
- if(!(Object.hasOwn(roots,topic)||topic==='help')||!langs.has(lang)||!Number.isInteger(depth)||!bands[depth]||!Number.isInteger(batch)||batch<0||batch>63||(helpParam!==null&&!help)||!validOpeningDraw(draw))return Response.json({error:'Invalid topic parameters'},{status:400});
+ const draw=url.searchParams.get('draw'),cached=url.searchParams.get('cached');
+ if(!(Object.hasOwn(roots,topic)||topic==='help')||!langs.has(lang)||!Number.isInteger(depth)||!bands[depth]||!Number.isInteger(batch)||batch<0||batch>63||(helpParam!==null&&!help)||!validOpeningDraw(draw)||(cached!==null&&cached!=='1')||(cached&&draw))return Response.json({error:'Invalid topic parameters'},{status:400});
  if((topic==='help'||help)&&!HELP_LANGS.has(lang))return Response.json({error:'Help Wikipedia is not available in this language'},{status:400});
  const key=new Request(`${url.origin}/api/topics?v=7&topic=${topic}&lang=${lang}&depth=${depth}&batch=${batch}${help&&topic!=='help'?'&help=1':''}${draw?'&draw='+draw:''}`),cache=draw?openingCache:work.cache;
+ if(cached)return Response.json(await cachedWindow(work.cache,key,batch),{headers:{'Cache-Control':'no-store','X-Cache':'RECOVERY'}});
  expireJobs(pending);
  const respond=(payload,cacheState)=>Response.json(payload,{headers:{'Cache-Control':'no-store',...(cacheState?{'X-Cache':cacheState}:{})}});
  let stored;try{const hit=await cache?.match(key);if(hit)stored=await hit.json();}catch{}

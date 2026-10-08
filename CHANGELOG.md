@@ -4,6 +4,9 @@ Releases of this repository. Each entry describes what changed in the code; [doc
 
 ## Unreleased
 
+- Scope upstream cooldowns to the affected Wikimedia edition while keeping Worker/IP limits global; reconnecting does not erase a genuine pause. Ignore stale-generation error bodies.
+- Preserve successful article and talk maintenance checks independently through partial retries without extending their expiry. Bound resampled topic metadata and skip already-seen travel guides even after their cards are pruned.
+
 - During a Wikimedia cooldown, continuing readers can recover complete, matching batches from a bounded edge-cache window. This path starts no upstream work and is never used to replace an independent online opening.
 
 - Retire old card elements and payloads after each completed swipe, keeping long sessions bounded even when the idle cleanup timer cannot run between gestures.

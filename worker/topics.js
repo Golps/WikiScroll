@@ -96,6 +96,9 @@ export async function topicPages(topic,lang,depth,upstream,{help=false,supply=nu
  const map=new Map();for(const p of balanced)if(!map.has(p.pageid))map.set(p.pageid,p);
  const ids=[...map.keys()],pages=[];
  state.pages ||= new Map();
+ // If a failed category sample is redrawn, retain metadata only for its
+ // current candidates; prolonged retries must not grow an unbounded map.
+ for(const id of state.pages.keys())if(!map.has(id))state.pages.delete(id);
  const missing=ids.filter(id=>!state.pages.has(id));
  await Promise.all(Array.from({length:Math.ceil(missing.length/20)},async(_,i)=>{
   // No introductions yet: they are the slow part, so only chosen pages get them.

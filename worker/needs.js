@@ -36,26 +36,41 @@ export const NEED_ORDER = ['sources', 'citations', 'unsourced', 'copyedit', 'cla
 // The standalone feed favours sourcing work; stubs are plentiful, so rarer.
 const SAMPLE_WEIGHT = {sources: 2, citations: 3, unsourced: 3, outdated: 1, incomplete: 2, stub: 1,copyedit:2,clarify:1,images:2};
 
-// Adds `needs` (ordered keys) to each page, 50 pages per request. A failed
-// lookup leaves needs empty: no tag is better than a wrong one.
+// Adds verified `needs` (ordered keys), 50 pages per request. Retry only
+// missing checks; partial results stay incomplete and never invent tags.
+const checkedParts=new WeakMap(), NEED_TTL=3600000;
 export async function completeNeeds(lang, pages, query) {
   const categories = NEED_CATEGORIES[lang];
   if (!categories) return pages;
   const todo = pages.filter(p => p.needsMissing || !Array.isArray(p.needs));
   await Promise.all(Array.from({length: Math.ceil(todo.length / 50)}, async (_, i) => {
-    const chunk = todo.slice(i * 50, i * 50 + 50);
+    const chunk = todo.slice(i * 50, i * 50 + 50),now=Date.now();
+    const talkCategories=TALK_NEED_CATEGORIES[lang];
+    const state=page=>{
+      let parts=checkedParts.get(page);if(!parts||parts.lang!==lang){parts={lang};checkedParts.set(page,parts);}
+      if(parts.article&&now-parts.article.at>=NEED_TTL)delete parts.article;
+      if(parts.talk&&(parts.talk.id!==page.talkid||now-parts.talk.at>=NEED_TTL))delete parts.talk;
+      return parts;
+    };
+    const articles=chunk.filter(p=>!state(p).article);
+    const talks=talkCategories?chunk.filter(p=>Number.isSafeInteger(p.talkid)&&p.talkid>0&&!state(p).talk):[];
     let data,talkData;
-    const talkCategories=TALK_NEED_CATEGORIES[lang],talks=chunk.filter(p=>Number.isSafeInteger(p.talkid)&&p.talkid>0);
     await Promise.all([
-      (async()=>{try { data = await query({prop: 'categories', clcategories: Object.keys(categories).join('|'), cllimit: 'max', pageids: chunk.map(p => p.pageid).join('|')}); } catch {}})(),
-      (async()=>{if(talkCategories&&talks.length)try{talkData=await query({prop:'categories',clcategories:Object.keys(talkCategories).join('|'),cllimit:'max',pageids:talks.map(p=>p.talkid).join('|')});}catch{}})(),
+      (async()=>{if(articles.length)try { data = await query({prop: 'categories', clcategories: Object.keys(categories).join('|'), cllimit: 'max', pageids: articles.map(p => p.pageid).join('|')}); } catch {}})(),
+      (async()=>{if(talks.length)try{talkData=await query({prop:'categories',clcategories:Object.keys(talkCategories).join('|'),cllimit:'max',pageids:talks.map(p=>p.talkid).join('|')});}catch{}})(),
     ]);
+    for(const page of articles){
+      const p=data?.query?.pages?.[page.pageid];
+      if(p?.pageid===page.pageid&&p.missing===undefined&&(p.ns===undefined||p.ns===0))state(page).article={at:Date.now(),needs:(p.categories||[]).map(c=>categories[c.title]).filter(Boolean)};
+    }
+    for(const page of talks){
+      const p=talkData?.query?.pages?.[page.talkid];
+      if(p?.ns===1&&p.pageid===page.talkid&&p.missing===undefined)state(page).talk={id:page.talkid,at:Date.now(),needs:(p.categories||[]).map(c=>talkCategories[c.title]).filter(Boolean)};
+    }
     for (const page of chunk) {
-      const found = new Set((data?.query?.pages?.[page.pageid]?.categories || []).map(c => categories[c.title]).filter(Boolean));
-      const talk=talkData?.query?.pages?.[page.talkid];
-      if(talkCategories&&talk?.ns===1&&talk.pageid===page.talkid)for(const c of talk.categories||[])if(talkCategories[c.title])found.add(talkCategories[c.title]);
+      const parts=state(page),found=new Set([...(parts.article?.needs||[]),...(parts.talk?.needs||[])]);
       page.needs = NEED_ORDER.filter(need => found.has(need));
-      if (!data?.query?.pages?.[page.pageid] || talkCategories&&Number.isSafeInteger(page.talkid)&&page.talkid>0&&!talkData?.query?.pages?.[page.talkid]) page.needsMissing = true;
+      if (!parts.article || talkCategories&&Number.isSafeInteger(page.talkid)&&page.talkid>0&&!parts.talk) page.needsMissing = true;
       else delete page.needsMissing;
     }
   }));

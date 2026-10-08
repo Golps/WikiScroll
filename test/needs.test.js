@@ -107,3 +107,21 @@ test('a photograph-only opportunity appears as its article, with an explicit req
   assert.equal(articles.length,1);assert.equal(articles[0].id,'w401');assert.deepEqual(articles[0].needs,['images']);assert.equal(articles[0].img,'');
  }finally{Math.random=random;}
 });
+
+test('partial maintenance retries reuse successful article checks and retry only missing talk checks',async()=>{
+ const pages=[{pageid:1,talkid:101}],calls=[];let failing=true;
+ const query=async p=>{calls.push(p.pageids);if(p.pageids==='101')return failing?null:{query:{pages:{101:{pageid:101,ns:1,categories:[{title:'Category:Wikipedia requested photographs'}]}}}};return {query:{pages:{1:{pageid:1,ns:0,categories:[{title:'Category:All articles needing additional references'}]}}}};};
+ await completeNeeds('en',pages,query);assert.equal(pages[0].needsMissing,true);assert.deepEqual(pages[0].needs,['citations']);
+ failing=false;await completeNeeds('en',pages,query);assert.deepEqual(calls,['1','101','101']);assert.deepEqual(pages[0].needs,['citations','images']);assert.equal(pages[0].needsMissing,undefined);
+});
+test('partial maintenance retries reuse successful talk checks and retry only missing article checks',async()=>{
+ const pages=[{pageid:2,talkid:102}],calls=[];let failing=true;
+ const query=async p=>{calls.push(p.pageids);if(p.pageids==='2')return failing?null:{query:{pages:{2:{pageid:2,ns:0,categories:[]}}}};return {query:{pages:{102:{pageid:102,ns:1,categories:[{title:'Category:Wikipedia requested photographs'}]}}}};};
+ await completeNeeds('en',pages,query);failing=false;await completeNeeds('en',pages,query);assert.deepEqual(calls,['2','102','2']);assert.deepEqual(pages[0].needs,['images']);assert.equal(pages[0].needsMissing,undefined);
+});
+test('partial maintenance reuse keeps its original expiry instead of renewing on retry',async t=>{
+ let now=100000;t.mock.method(Date,'now',()=>now);const pages=[{pageid:3,talkid:103}],calls=[];
+ const query=async p=>{calls.push(p.pageids);return p.pageids==='3'?{query:{pages:{3:{pageid:3,ns:0,categories:[]}}}}:null;};
+ await completeNeeds('en',pages,query);now+=1800000;await completeNeeds('en',pages,query);now+=1800001;await completeNeeds('en',pages,query);
+ assert.deepEqual(calls,['3','103','103','3','103']);assert.equal(pages[0].needsMissing,true);
+});

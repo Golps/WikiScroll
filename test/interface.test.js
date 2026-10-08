@@ -215,7 +215,7 @@ test('filtered travel sends the place as typed, skips empty pages and keeps the 
   const requests = [];
   const pages = [{articles: [], next: 30}, {articles: [], next: 60}, {articles: [{id: 'v1'}, {id: 'v2'}], next: null, suggestion: 'Japan'}];
   const c = vm.createContext({
-    workerCooldownUntil:0,supplyControllers:new Set(),AbortController,Date,setTimeout:(fn,ms)=>ms===800?fn():1,clearTimeout(){},retryAfterMillis:()=>5000,
+    workerCooldownUntil:0,feedSeen:new Set(),supplyControllers:new Set(),AbortController,Date,setTimeout:(fn,ms)=>ms===800?fn():1,clearTimeout(){},retryAfterMillis:()=>5000,
     fillGeneration: 1, travelFilters: {place: 'Japan, Tuscany', style: 'coast'}, travelOffset: 0, travelExhausted: false, travelSuggestion: '',
     articles: [{id: 'v2'}], queue: [], voyageLang: () => 'en', URLSearchParams, AbortSignal: {timeout: () => undefined},
     fetch: async url => { requests.push(new URL(url, 'https://wikiscroll.com').searchParams); return {ok: true, json: async () => pages.shift()}; },
@@ -235,7 +235,7 @@ test('an incomplete travel page is asked for again before the search moves on or
   // Last page: two guides' text was late twice, then everything arrives.
   const pages = [{articles: [{id: 'v1'}], next: null, retry: 0}, {articles: [{id: 'v1'}], next: null, retry: 0}, {articles: [{id: 'v1'}, {id: 'v2'}, {id: 'v3'}], next: null}];
   const c = vm.createContext({
-    workerCooldownUntil:0,supplyControllers:new Set(),AbortController,Date,setTimeout:(fn,ms)=>ms===800?fn():1,clearTimeout(){},retryAfterMillis:()=>5000,
+    workerCooldownUntil:0,feedSeen:new Set(),supplyControllers:new Set(),AbortController,Date,setTimeout:(fn,ms)=>ms===800?fn():1,clearTimeout(){},retryAfterMillis:()=>5000,
     fillGeneration: 1, travelFilters: {place: 'Elba', style: ''}, travelOffset: 0, travelExhausted: false, travelSuggestion: '', travelRetries: 0,
     articles: [], queue: [], voyageLang: () => 'en', URLSearchParams, AbortSignal: {timeout: () => undefined},
     fetch: async url => { requests.push(new URL(url, 'https://wikiscroll.com').searchParams.get('offset')); return {ok: true, json: async () => pages.shift()}; },
@@ -309,4 +309,11 @@ test('search snippets start from the page description, not the About dialog', ()
   const description = html.match(/<meta name="description" content="([^"]+)">/)[1];
   assert.ok(html.includes(`<noscript>\n<div style="max-width:700px;margin:60px auto;padding:20px;font-family:sans-serif;color:#333;line-height:1.8;">\n  <h1>WikiScroll: Turn doomscrolling into discovery</h1>\n  <p>${description}</p>`), 'the fallback text opens with the description');
   assert.match(html, /<dialog class="privacy-dialog" id="aboutDialog" aria-labelledby="aboutTitle" data-nosnippet>/, 'About has its own page to be quoted from');
+});
+
+test('travel skips previously seen guides after their DOM cards have been pruned',async()=>{
+ const features=read('features.js'),pages=[{articles:[{id:'v1'}],next:30},{articles:[{id:'v2'}],next:null}],requests=[];
+ const c=vm.createContext({workerCooldownUntil:0,feedSeen:new Set(['v1']),supplyControllers:new Set(),AbortController,Date,setTimeout:()=>1,clearTimeout(){},fillGeneration:0,travelFilters:{place:'Japan'},travelOffset:0,travelExhausted:false,travelRetries:0,articles:[],queue:[],voyageLang:()=> 'en',URLSearchParams,fetch:async url=>{requests.push(url);return {ok:true,json:async()=>pages.shift()};}});
+ vm.runInContext(slice(features,'async function fetchFilteredTravel(','// When a travel filter runs out'),c);
+ assert.deepEqual((await c.fetchFilteredTravel()).map(a=>a.id),['v2']);assert.equal(requests.length,2);assert.equal(c.travelExhausted,true);
 });

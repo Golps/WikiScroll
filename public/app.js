@@ -673,6 +673,25 @@ function retryAfterMillis(value){
   const seconds=Number(value),date=Date.parse(value);
   return Math.max(1000,Number.isFinite(seconds)?seconds*1000:Number.isFinite(date)?date-Date.now():5000);
 }
+// Upstream pauses belong to one Wikimedia edition. Actual Worker/IP limits
+// remain global; switching source must not bypass them.
+const workerSourceCooldowns=new Map();let workerGlobalCooldownUntil=0;
+function workerSourceKey(mode=curMode,lang=mode==='how'?voyageLang():curLang){return mode+'|'+lang;}
+function restoreWorkerCooldown(){
+ const now=Date.now();for(const [key,until] of workerSourceCooldowns)if(until<=now)workerSourceCooldowns.delete(key);
+ workerCooldownUntil=Math.max(workerGlobalCooldownUntil,workerSourceCooldowns.get(workerSourceKey())||0);
+}
+async function noteWorkerCooldown(response,gen,key){
+ const delay=retryAfterMillis(response.headers.get('Retry-After'));let code='';
+ try{code=(await response.json()).code||'';}catch{}
+ if(gen!==fillGeneration)return null;
+ const until=Date.now()+delay;
+ if(response.status===429)workerGlobalCooldownUntil=Math.max(workerGlobalCooldownUntil,until);
+ else workerSourceCooldowns.set(key,Math.max(workerSourceCooldowns.get(key)||0,until));
+ restoreWorkerCooldown();
+ if(code==='upstream_rate_limited'&&pendingWorkerBatch&&key===workerSourceKey(pendingWorkerBatch.params.get('mode'),pendingWorkerBatch.params.get('lang'))){pendingWorkerBatch.cacheRecovery=true;pendingWorkerBatch.cachedScan??=0;}
+ return {delay,code};
+}
 async function fetchWorkerBatch(gen) {
   if(Date.now()<workerCooldownUntil){
     if(pendingWorkerBatch?.cacheRecovery&&articles.length)return fetchCachedSupply(pendingWorkerBatch,gen);
@@ -702,11 +721,11 @@ async function fetchWorkerBatch(gen) {
     if(gen!==fillGeneration)return [];
     if(!response.ok){
       if(response.status===429||response.status===503){
-        const delay=retryAfterMillis(response.headers.get('Retry-After'));
-        workerCooldownUntil=Date.now()+delay;
+        const pause=await noteWorkerCooldown(response,gen,workerSourceKey(params.get('mode'),params.get('lang')));
+        if(!pause)return [];const {delay,code}=pause;
         // A genuine long server cooldown is not a hung-batch timeout.
         if(delay>=30000)pending.startedAt+=delay;
-        try{const error=await response.json();pending.cacheRecovery=error.code==='upstream_rate_limited';pending.cachedScan=0;}catch{pending.cacheRecovery=false;}
+        pending.cacheRecovery=code==='upstream_rate_limited';pending.cachedScan=0;
       }
       else if(pendingWorkerBatch===pending)pendingWorkerBatch=null;
       return [];
@@ -736,7 +755,7 @@ async function fetchCachedSupply(pending,gen){
  try{
   const response=await fetch((params.has('topic')?'/api/topics?':'/api/articles?')+params,{signal:controller.signal,cache:'no-store'});
   if(gen!==fillGeneration)return [];
-  if(!response.ok){pending.cacheRecovery=false;if(response.status===429||response.status===503)workerCooldownUntil=Math.max(workerCooldownUntil,Date.now()+retryAfterMillis(response.headers.get('Retry-After')));return [];}
+  if(!response.ok){pending.cacheRecovery=false;if(response.status===429||response.status===503)await noteWorkerCooldown(response,gen,workerSourceKey(params.get('mode'),params.get('lang')));return [];}
   const data=await response.json();return data.cached_only&&Array.isArray(data.articles)?data.articles:[];
  }catch{return [];}finally{clearTimeout(timer);supplyControllers.delete(controller);}
 }
@@ -754,7 +773,7 @@ function collectLateSupply(pending,gen) {
         const response=await fetch('/api/articles?'+params,{signal:controller.signal,cache:'no-store'});
         if(gen!==fillGeneration)return;
         if(!response.ok){
-          if(response.status===429||response.status===503)workerCooldownUntil=Date.now()+retryAfterMillis(response.headers.get('Retry-After'));
+          if(response.status===429||response.status===503)await noteWorkerCooldown(response,gen,workerSourceKey(params.get('mode'),params.get('lang')));
           return;
         }
         const data=await response.json();
@@ -813,7 +832,7 @@ function scheduleRefill() {
     if(queue.length<QUEUE_MIN)scheduleRefill();
   },delay);
 }
-window.addEventListener('online',()=>{refillAttempts=0;workerCooldownUntil=0;apiCooldownUntil=0;fillQueue();});
+window.addEventListener('online',()=>{refillAttempts=0;restoreWorkerCooldown();fillQueue();});
 document.addEventListener('visibilitychange',()=>{if(!document.hidden){ensureFeedAhead();fillQueue();}});
 function flushQueue(n=8) {
   const batch=withTodaySurprises(queue.splice(0,n));
@@ -1013,7 +1032,7 @@ function resetFeed() {
   fillGeneration++;pendingDeepGeneration=-1;
   supplyControllers.forEach(controller=>controller.abort());
   articles=[];queue=[];feedSeen.clear();filling=false;supplyTask=null;
-  pendingWorkerBatch=null;lateSupplyTasks.clear();
+  pendingWorkerBatch=null;lateSupplyTasks.clear();restoreWorkerCooldown();
   clearTimeout(refillTimer);refillTimer=null;refillAttempts=0;clearTimeout(reserveTimer);
   window.WSDiscoveryHint?.hide();
   const feed=document.getElementById('feed');

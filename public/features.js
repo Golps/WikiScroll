@@ -33,7 +33,7 @@ async function fetchFilteredTravel(){
   const timer=setTimeout(()=>controller.abort(),10000);
   let data;try{const response=await fetch('/api/travel?'+params(),{signal:controller.signal,cache:'no-store'});
    if(generation!==fillGeneration)return [];
-   if(!response.ok){if(response.status===429||response.status===503)workerCooldownUntil=Date.now()+retryAfterMillis(response.headers.get('Retry-After'));return [];}
+   if(!response.ok){if(response.status===429||response.status===503)await noteWorkerCooldown(response,generation,workerSourceKey('how',lang));return [];}
    data=await response.json();
   }catch{return [];}finally{clearTimeout(timer);supplyControllers.delete(controller);}
   if(generation!==fillGeneration||!data)return [];
@@ -44,7 +44,7 @@ async function fetchFilteredTravel(){
   if(data.retry!=null){travelRetries++;travelOffset=data.retry;}
   else{travelRetries=0;travelOffset=data.next??travelOffset;travelExhausted=data.next===null;}
   if(typeof data.suggestion==='string')travelSuggestion=data.suggestion;
-  const seen=new Set(articles.map(a=>a.id).concat(queue.map(a=>a.id)));
+  const seen=new Set([...feedSeen,...articles.map(a=>a.id),...queue.map(a=>a.id)]);
   const result=(data.articles||[]).filter(a=>!seen.has(a.id));
   if(result.length)return result;
   if(travelRetries)await new Promise(resolve=>setTimeout(resolve,800));

@@ -136,6 +136,8 @@ test('rapid duplicate gestures cannot overlap, move backward, or hide the final 
   }
   h.key('ArrowLeft'); h.step();
   assert.equal(h.current(), 'w40');
+  assert.equal(h.cards.length,13,'continuous swipes retire old cards even without an idle pause');
+  assert.equal(h.context.articles.length,13);
   assert.ok(h.cards.every(card => card.style.visibility !== 'hidden'));
 });
 

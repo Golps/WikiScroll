@@ -26,7 +26,7 @@ export function createNetwork(cooldowns = new Map()) {
   const active = new Set();
   const waiting = [];
   // A Worker can cancel background work after a response. Its promise/finally
-  // may never settle, so an isolate-wide counter must not retain that lease.
+  // may never settle, so the queue must not retain an expired active lease.
   function expire(job) {
     job.expired=true;clearTimeout(job.timer);active.delete(job);
     job.work?.fail('deadline_exceeded');try{job.cancel?.();}catch{}job.resolve(null);

@@ -4,6 +4,11 @@ Releases of this repository. Each entry describes what changed in the code; [doc
 
 ## Unreleased
 
+- Retire old card elements and payloads after each completed swipe, keeping long sessions bounded even when the idle cleanup timer cannot run between gestures.
+
+- Fix topic and Help refills stopping after partial responses. Expire abandoned batch jobs and bound client retries so stale work cannot pin a feed indefinitely.
+- Give each Worker invocation its own bounded upstream queue; share cooldown data across requests without sharing timers or active I/O. Background recovery no longer occupies the foreground refill queue. Preserve depth, Help verification and Free-plan request budgets.
+
 - Improve random-feed supply by sampling 50 candidate pages per draw and retaining partial batches until their slower sibling finishes. Refills resume existing work instead of abandoning late cards or launching a competing fallback; filtering, independent openings and request budgets remain.
 
 - Refresh all site and collection social artwork with real photographs of Blue dragon, STEVE and Socotra, a solid charcoal background and centered photo credits. Preserve the canonical logo and discovery headline; document photo licenses.

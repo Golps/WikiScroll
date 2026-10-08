@@ -1786,6 +1786,9 @@ document.getElementById('ambientClose').addEventListener('click', closeAmbient);
     feed.style.overflowY = '';
     flyLock = false;
     feedMotionLocked = false;
+    // A stream of swipe animations can keep the idle scroll timer locked.
+    // Prune only after landing, preserving the visible card and its offset.
+    pruneOldCards();
   }
   function cancelMotion() {
     if (flightRaf) cancelAnimationFrame(flightRaf);

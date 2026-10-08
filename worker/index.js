@@ -29,7 +29,7 @@ const BAD_TITLE = /^(list of|index of|wikipedia:|template:|category:|portal:|dra
 // replaying one cached random selection for every refill in the same session.
 const FRESH_MS = 60_000;
 const RETAIN_SECONDS = 86_400;
-const network = createNetwork(), supply = createSupply(),openingCache=createOpeningCache();
+const cooldowns = new Map(), supply = createSupply(),openingCache=createOpeningCache();
 // One answer budget per request. A request can chain several upstream calls,
 // each with its own 6 s deadline, but the browser stops waiting at 7.5 s
 // (10 s for filtered travel). Answer with what is ready and let the rest of
@@ -385,7 +385,7 @@ export default {async fetch(request,env,ctx){
   const url=new URL(request.url);
   const dynamic=url.pathname.startsWith('/api/')||url.pathname.startsWith('/collection')||(url.searchParams.has('a')&&BOTS.test(request.headers.get('User-Agent')||''));
   if(dynamic&&!await permit(env,'REQUEST_LIMIT',request.headers.get('CF-Connecting-IP')||'unknown'))return secure(limited());
-  const work=createWork(env,ctx,network);
+  const work=createWork(env,ctx,createNetwork(cooldowns));
   try{return secure(await handle(request,env,ctx,work));}
   catch{return secure(new Response('Temporarily unavailable. Please retry.',{status:503,headers:{'Cache-Control':'no-store','Retry-After':'60'}}));}
 }};

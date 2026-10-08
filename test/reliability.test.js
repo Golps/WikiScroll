@@ -217,3 +217,22 @@ test('abandoned active leases are reclaimed when their original work deadline pa
  const fresh=await network.schedule(async()=>({ready:true}),{timeLeft:()=>100,fail(){}});
  assert.deepEqual(fresh,{ready:true});assert.equal(cancelled,3);assert.deepEqual(await Promise.all(abandoned),[null,null,null]);
 });
+
+// Requests may overlap in one Cloudflare isolate. Their timers, controllers
+// and continuation queue must belong to the originating request context.
+test('a slow invocation never occupies another invocation’s upstream slots',async()=>{
+ const a=createWork(env),b=createWork(env);assert.notEqual(a.network,b.network);
+ const waiting=Array.from({length:3},()=>a.network.schedule(()=>new Promise(()=>{}),{timeLeft:()=>1000,fail(){}}));
+ assert.deepEqual(await b.network.schedule(async()=>({ready:true}),b),{ready:true});
+});
+
+test('independent invocation queues still share Wikimedia Retry-After cooldowns',async()=>{
+ const original=globalThis.fetch,cooldowns=new Map();let calls=0;
+ globalThis.fetch=async()=>{calls++;return new Response(null,{status:429,headers:{'Retry-After':'180'}});};
+ try {
+  const a=createWork(env,{},createNetwork(cooldowns)),b=createWork(env,{},createNetwork(cooldowns));
+  assert.equal(await a.upstream('https://en.wikipedia.org/w/api.php'),null);
+  assert.equal(await b.upstream('https://en.wikipedia.org/w/api.php'),null);
+  assert.equal(calls,1);assert.ok(b.retrySeconds()>175);
+ }finally{globalThis.fetch=original;}
+});

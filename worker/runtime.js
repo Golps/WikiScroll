@@ -22,9 +22,9 @@ export function expireJobs(jobs, now = Date.now()) {
   }
 }
 
-export function createNetwork() {
+export function createNetwork(cooldowns = new Map()) {
   const active = new Set();
-  const waiting = [], cooldowns = new Map();
+  const waiting = [];
   // A Worker can cancel background work after a response. Its promise/finally
   // may never settle, so an isolate-wide counter must not retain that lease.
   function expire(job) {
@@ -84,9 +84,8 @@ export function createNetwork() {
     }
   };
 }
-const defaultNetwork = createNetwork();
 const priority = {upstream_unavailable: 1, upstream_timeout: 2, deadline_exceeded: 3, budget_exhausted: 4, work_rate_limited: 5, upstream_rate_limited: 6};
-export function createWork(env = {}, ctx = {}, network = defaultNetwork) {
+export function createWork(env = {}, ctx = {}, network = createNetwork()) {
   const started = Date.now(); let used = 0, fetched = 0, reason = '', retryUntil = 0;
   const work = {
     env, ctx, network,

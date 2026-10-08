@@ -612,6 +612,9 @@ test('a cancelled background batch cannot pin the same key after its work deadli
    if(!new URL(url).searchParams.has('generator'))return data([]);
    return ++count<=2?new Promise(()=>{}):data([page(count)]);
   },async(api,jobs)=>{
+   // A cancelled request's background promises never settle: do not await
+   // them in fixture teardown, just as the runtime discards that context.
+   jobs.done=async()=>{};
    let answer;const first=api.fetch(request('batch=51'),env,jobs).then(r=>answer=r);await settle();t.mock.timers.tick(6500);await settle();await first;
    assert.equal(answer.status,503);assert.equal((await answer.json()).code,'batch_pending');
    t.mock.timers.tick(18000);await settle();

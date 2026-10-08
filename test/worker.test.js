@@ -525,7 +525,7 @@ test('a travel guide without an introduction is found through its opening text',
     assert.match(body.articles[0].body,/^Japón está formado por cuatro islas/);
     assert.deepEqual(asked,['2577'],'only the guide without an introduction reads its full text');
   },cache);
-  assert.ok([...cache.entries.keys()].some(k=>k.includes('/api/travel?v=10')),'a complete page is cached');
+  assert.ok([...cache.entries.keys()].some(k=>k.includes('/api/travel?v=11')),'a complete page is cached');
 });
 test('random and searched Wikivoyage feeds leave out phrasebooks in any language',async()=>{
   const seen=[];
@@ -643,4 +643,33 @@ test('verified previews use the selected article image rather than the free-only
   const p=new URL(address).searchParams;assert.equal(p.get('pilicense'),'any');
   return data([page(36687454,{title:'Ralph Patt',thumbnail:{source:'https://upload.wikimedia.org/wikipedia/en/9/96/Ralph_Patt.jpg'}})]);
  },async()=>{const article=await verifiedArticle('w36687454','en',env,{waitUntil(){}});assert.match(article.img,/Ralph_Patt\.jpg/);});
+});
+
+test('random Wikivoyage recovers guide-linked banners and excludes hidden disambiguation pages',async()=>{
+ let commons=0;
+ await mocked(async input=>{
+  const u=new URL(input);
+  if(u.hostname==='commons.wikimedia.org'){commons++;return Response.json({query:{pages:{1:{title:'File:Worker-random-image-banner.jpg',imageinfo:[{thumburl:'https://thumb.wikimedia.org/wikipedia/commons/thumb/a/ab/Test.jpg/960px-Test.jpg',width:2100,height:300}]}}}});}
+  if(u.searchParams.get('generator')==='random'){
+   assert.match(u.searchParams.get('prop'),/images/);assert.match(u.searchParams.get('prop'),/pageprops/);
+   return data([page(1,{title:'Banner guide',thumbnail:undefined,images:[{title:'File:Worker-random-image-banner.jpg'}]}),page(2,{title:'Hidden ambiguity',pageprops:{disambiguation:''}})]);
+  }
+  return data([page(1)]);
+ },async(worker,jobs)=>{
+  const response=await worker.fetch(request('mode=how&lang=en&batch=12'),env,jobs),body=await response.json();
+  assert.equal(response.status,200);assert.equal(body.articles.length,1);assert.equal(body.articles[0].title,'Banner guide');assert.match(body.articles[0].img,/thumb.wikimedia.org/);assert.equal(commons,1);
+ });
+});
+
+test('filtered Wikivoyage shares the banner recovery and keeps image failures usable',async()=>{
+ let commons=0;
+ await mocked(async input=>{
+  const u=new URL(input);
+  if(u.hostname==='commons.wikimedia.org'){commons++;return new Response('Unavailable',{status:503});}
+  if(u.searchParams.get('generator')==='search')return data([page(1,{title:'Filtered banner guide',thumbnail:undefined,images:[{title:'File:Worker-filtered-image-banner.jpg'}]})]);
+  return data([page(1)]);
+ },async(worker,jobs)=>{
+  const response=await worker.fetch(new Request('https://wikiscroll.com/api/travel?lang=en&style=nature'),env,jobs),body=await response.json();
+  assert.equal(response.status,200);assert.equal(body.articles.length,1);assert.equal(body.articles[0].title,'Filtered banner guide');assert.equal(body.articles[0].img,'');assert.equal(commons,1);
+ });
 });

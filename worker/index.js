@@ -1,3 +1,4 @@
+import {completeVoyageImages,voyageImageParams} from './voyage-images.js';
 import {permit,limited,secure} from './security.js';
 import {createWork,createNetwork,unavailable,expireJobs} from './runtime.js';
 import {createSupply,imageURL,validOpeningDraw,createOpeningCache,cachedWindow} from './supply.js';
@@ -90,7 +91,7 @@ function selectCandidates(values,lang,mode,depth) {
   return selected;
 }
 function selectArticles(pages,lang,mode,depth) {
-  const readable=[...pages.values()].filter(p=>mode==='how'?guideReadable(strip(p.extract)):strip(p.extract).length>=80);
+  const readable=[...pages.values()].filter(p=>mode==='how'?!p.voyageImagePending&&guideReadable(strip(p.extract)):strip(p.extract).length>=80);
   return selectCandidates(readable,lang,mode,depth).map(p=>article(p,lang,mode));
 }
 
@@ -121,7 +122,7 @@ function startBatch(key,lang,mode,depth,cache,ctx,work) {
     // Candidates first, text second: the random call carries no extracts, so
     // it returns in a fraction of a second; introductions are then fetched in
     // parallel chunks for the readable candidates only (extracts.js).
-    const params={generator:'random',grnnamespace:'0',grnlimit:mode==='wiki'?'50':'20',prop:'pageimages|info|description'+(mode==='wiki'?'|pageviews':'|categories'),pvipdays:'14',piprop:'thumbnail',pilicense:'any',pithumbsize:'960',pilimit:'max',inprop:mode==='wiki'?'url|talkid':'url',...(mode==='how'?phrasebookParams(lang):{})};
+    const params={generator:'random',grnnamespace:'0',grnlimit:mode==='wiki'?'50':'20',prop:'pageimages|info|description'+(mode==='wiki'?'|pageviews':'|categories|pageprops|images'),ppprop:'disambiguation',...(mode==='how'?voyageImageParams:{}),pvipdays:'14',piprop:'thumbnail',pilicense:'any',pithumbsize:'960',pilimit:'max',inprop:mode==='wiki'?'url|talkid':'url',...(mode==='how'?phrasebookParams(lang):{})};
     // Two concurrent Wikipedia samples examine up to 100 candidates. Wikivoyage
     // needs one: its guides need no photo, so most of the 20 are usable.
     // Publish the first usable response immediately; cache the merged result
@@ -146,6 +147,7 @@ function startBatch(key,lang,mode,depth,cache,ctx,work) {
       if(mode==='wiki')await completePageviews(fresh,ids=>upstream(apiURL(lang,mode,{prop:'pageviews',pvipdays:'14',pageids:ids})));
       const chosen=selectCandidates(fresh,lang,mode,depth);
       await Promise.all([
+        mode==='how'?completeVoyageImages(chosen,upstream):null,
         completeExtracts(chosen,ids=>upstream(apiURL(lang,mode,extractParams(ids)))).then(()=>mode==='how'?completeLeadFallback(chosen,id=>upstream(apiURL(lang,mode,fullTextParams(id)))):null),
         mode==='wiki'&&HELP_LANGS.has(lang)?completeNeeds(lang,chosen,params=>upstream(apiURL(lang,mode,params))):null,
       ]);
@@ -178,7 +180,7 @@ async function articles(request,url,ctx,env,work) {
   const lang=mode==='how'?voyageLang(requested):requested;
   // n only slices a shared batch; arbitrary request sizes cannot multiply cache
   // keys. Versioning excludes earlier unfiltered batches after depth changes.
-  const key=new Request(`${url.origin}/api/articles?version=8&mode=${mode}&lang=${lang}&depth=${mode==='how'?3:depth}&batch=${batch}${draw?'&draw='+draw:''}`);
+  const key=new Request(`${url.origin}/api/articles?version=8&mode=${mode}${mode==='how'?'&images=1':''}&lang=${lang}&depth=${mode==='how'?3:depth}&batch=${batch}${draw?'&draw='+draw:''}`);
   if(cached){const recovered=await cachedWindow(work.cache,key,batch);return json({...recovered,articles:recovered.articles.slice(0,n)},200,{'X-Cache':'RECOVERY'});}
   expireJobs(inFlight);
   const cache=draw?openingCache:work.cache;
@@ -256,7 +258,7 @@ async function handle(request,env,ctx,work) {
         const lang=voyageLang(requested);
         // Many readers ask for the same destination and style: complete result
         // pages are shared from the edge cache for an hour, before any upstream work.
-        const key=new Request(`${url.origin}/api/travel?v=10&lang=${lang}&place=${encodeURIComponent(places.map(fold).join('|'))}&style=${style}&offset=${cursor.map(c=>c??'-').join('.')}`),cache=work.cache;
+        const key=new Request(`${url.origin}/api/travel?v=11&lang=${lang}&place=${encodeURIComponent(places.map(fold).join('|'))}&style=${style}&offset=${cursor.map(c=>c??'-').join('.')}`),cache=work.cache;
         expireJobs(travelPending);
         try{const hit=await cache?.match(key);if(hit)return json(await hit.json(),200,{'X-Cache':'HIT'});}catch{}
         if(travelPending.has(key.url))return (await travelPending.get(key.url)).clone();
@@ -266,7 +268,7 @@ async function handle(request,env,ctx,work) {
         const searches=await Promise.all((places.length?places:[null]).map(async(place,i)=>{
           if(cursor[i]===null)return {place,pages:[],next:null};
           const query=[place?JSON.stringify(place):'',style?'('+travelTerms(lang,style)+')':''].filter(Boolean).join(' ');
-          const data=await upstream(apiURL(lang,'how',{generator:'search',gsrsearch:query,gsrnamespace:'0',gsrlimit:limit,gsroffset:String(cursor[i]),prop:'pageimages|info|description|categories|pageprops',ppprop:'geocrumb-is-in|disambiguation',piprop:'thumbnail',pilicense:'any',pithumbsize:'960',pilimit:'max',inprop:'url',...phrasebookParams(lang)}));
+          const data=await upstream(apiURL(lang,'how',{generator:'search',gsrsearch:query,gsrnamespace:'0',gsrlimit:limit,gsroffset:String(cursor[i]),prop:'pageimages|info|description|categories|pageprops|images',...voyageImageParams,ppprop:'geocrumb-is-in|disambiguation',piprop:'thumbnail',pilicense:'any',pithumbsize:'960',pilimit:'max',inprop:'url',...phrasebookParams(lang)}));
           if(!data||data.error)return null;
           // Search relevance order (the generator's index), not page-ID order.
           const pages=Object.values(data.query?.pages||{}).filter(p=>p.pageid>0&&!isDisambiguation(p)&&!isPhrasebook(p)).sort((a,b)=>(a.index??0)-(b.index??0));
@@ -289,12 +291,13 @@ async function handle(request,env,ctx,work) {
         supply.hydrate(found,lang,'how');
         const texts=completeExtracts(found,ids=>upstream(apiURL(lang,'how',extractParams(ids)))).then(()=>completeLeadFallback(found,id=>upstream(apiURL(lang,'how',fullTextParams(id))),FALLBACK_MAX,leadStore(lang,ctx,work))).then(()=>supply.remember(found,lang,'how'));
         work.keep(texts);
-        const preparation=Promise.all([texts,identityTask]);work.keep(preparation);
+        const pictures=completeVoyageImages(found,upstream);work.keep(pictures);
+        const preparation=Promise.all([texts,identityTask,pictures]);work.keep(preparation);
         await within(preparation,Math.max(0,TRAVEL_BUDGET_MS-(Date.now()-started)));
         const identities=await within(identityTask,0)||new Map();
         // Keep guides that are about the place: named in the title or introduction.
         const ready=searches.map(s=>s.pages.filter(p=>{
-          if(!guideReadable(strip(p.extract)))return false;
+          if(p.voyageImagePending||!guideReadable(strip(p.extract)))return false;
           if(!s.place)return true;
           const belongs=placesResolver.belongs(lang,p,identities.get(s.place));
           if(belongs==='pending'||!identities.has(s.place)){p.locationMissing=true;return false;}
@@ -302,7 +305,7 @@ async function handle(request,env,ctx,work) {
           return belongs===null?namesPlace(p,s.place):belongs;
         }));
         const body={articles:interleave(ready).map(p=>article(p,lang,'how')),next:formatCursor(searches.map(s=>s.next))};
-        const unfinished=s=>s.pages.some(p=>typeof p.extract!=='string'||p.extractMissing||p.locationMissing);
+        const unfinished=s=>s.pages.some(p=>typeof p.extract!=='string'||p.extractMissing||p.locationMissing||p.voyageImagePending);
         let complete=!searches.some(unfinished);
         // Some guides' text did not arrive in time: moving on would skip them for
         // good (and could end the feed early). "retry" keeps each unfinished

@@ -1,3 +1,4 @@
+import {completeVoyageImages,voyageImageParams} from './voyage-images.js';
 import {createWork,expireJobs} from './runtime.js';
 import {fullTextParams,leadFromText,guideReadable} from './extracts.js';
 import {imageURL} from './supply.js';
@@ -9,7 +10,7 @@ const valid=(p,id)=>p&&p.missing===undefined&&p.ns===0&&p.pageid===Number(id.sli
 function value(p,id,lang){
  return valid(p,id)?{id,lang,title:clean(p.title).slice(0,160),body:clean(p.extract).slice(0,600),img:imageURL(p.thumbnail?.source),src:id[0]==='v'?'how':'wiki',url:`https://${host(id,lang)}/?curid=${id.slice(1)}`} : null;
 }
-const params=ids=>({pageids:ids.join('|'),prop:'extracts|pageimages',exintro:'1',explaintext:'1',exchars:'600',exlimit:'max',piprop:'thumbnail',pilicense:'any',pithumbsize:'960',pilimit:'max'});
+const params=(ids,voyage=false)=>({pageids:ids.join('|'),prop:'extracts|pageimages'+(voyage?'|images':''),...(voyage?voyageImageParams:{}),exintro:'1',explaintext:'1',exchars:'600',exlimit:'max',piprop:'thumbnail',pilicense:'any',pithumbsize:'960',pilimit:'max'});
 async function opening(p,id,lang,work){
  if(id[0]!=='v'||guideReadable(clean(p.extract)))return true;
  const data=await work.upstream(api(id,lang,fullTextParams(id.slice(1))));
@@ -18,13 +19,14 @@ async function opening(p,id,lang,work){
 }
 export async function verifiedArticle(id,lang,env,ctx,work=createWork(env,ctx)) {
  expireJobs(pending);
- const key=new Request(`https://wikiscroll.com/__verified/v5/${lang}/${id}`),cache=work.cache;
+ const key=new Request(`https://wikiscroll.com/__verified/v6/${lang}/${id}`),cache=work.cache;
  try {const hit=await cache?.match(key);if(hit)return await hit.json();}catch{}
  if(pending.has(key.url))return pending.get(key.url);
  const job=(async()=>{
-  const data=await work.upstream(api(id,lang,params([id.slice(1)])));
+  const data=await work.upstream(api(id,lang,params([id.slice(1)],id[0]==='v')));
   if(!data?.query?.pages)throw Error(work.reason||'Source unavailable');
   const p=data.query.pages[id.slice(1)];
+  if(valid(p,id)&&id[0]==='v')await completeVoyageImages([p],work.upstream);
   if(valid(p,id)&&!await opening(p,id,lang,work))throw Error(work.reason||'Opening text unavailable');
   const result=value(p,id,lang);
   if(cache)work.keep(cache.put(key,Response.json(result,{headers:{'Cache-Control':`public,max-age=${result?86400:300}`}})));
@@ -41,7 +43,7 @@ export async function verifyCollection(c,env,ctx,work=createWork(env,ctx)){
  const selection=c.items.map(a=>a.lang+'|'+a.id).sort().join(',');
  const digest=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(selection))),b=>b.toString(16).padStart(2,'0')).join('');
  expireJobs(pending);
- const key=new Request('https://wikiscroll.com/__verified-collection/v2/'+digest),cache=work.cache;
+ const key=new Request('https://wikiscroll.com/__verified-collection/v3/'+digest),cache=work.cache;
  let stored;try{const hit=await cache?.match(key);if(hit)stored=await hit.json();}catch{}
  const lookup=new Map((stored?.items||[]).map(a=>[a.lang+'|'+a.id,a]));
  const finish=items=>({v:1,name:c.name,items:c.items.map(a=>{const item=items.get(a.lang+'|'+a.id);if(!item)throw Error('Article unavailable');return {id:a.id,lang:a.lang,title:item.title,body:item.body.slice(0,240),img:item.img};})});
@@ -55,9 +57,10 @@ export async function verifyCollection(c,env,ctx,work=createWork(env,ctx)){
   }
   const chunks=[];for(const list of groups.values())for(let i=0;i<list.length;i+=5)chunks.push(list.slice(i,i+5));
   await Promise.all(chunks.map(async list=>{
-   const data=await work.upstream(api(list[0].id,list[0].lang,params(list.map(a=>a.id.slice(1)))));
+   const data=await work.upstream(api(list[0].id,list[0].lang,params(list.map(a=>a.id.slice(1)),list[0].id[0]==='v')));
    for(const a of list){const p=data?.query?.pages?.[a.id.slice(1)];if(valid(p,a.id))rows.set(a.lang+'|'+a.id,{id:a.id,lang:a.lang,page:p});}
   }));
+  await completeVoyageImages([...rows.values()].filter(r=>r.id[0]==='v').map(r=>r.page),work.upstream);
   await Promise.all([...rows.values()].map(async({id,lang,page})=>{
    if(!await opening(page,id,lang,work))return;
    const item=value(page,id,lang);if(item){lookup.set(lang+'|'+id,item);rows.delete(lang+'|'+id);}

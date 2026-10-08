@@ -493,7 +493,7 @@ function selectDepthPages(pages,depth,lang='en') {
 }
 async function fetchWikiRandom() {
   const requestGen=fillGeneration,lang=curLang,api=`https://${lang}.wikipedia.org/w/api.php?action=query&format=json&origin=*`;
-  const data=await fetchOne(api+'&generator=random&grnnamespace=0&grnlimit=20&prop=pageviews%7Cextracts%7Cpageimages%7Cdescription&pvipdays=14&exintro=1&exchars=800&explaintext=1&exlimit=max&piprop=thumbnail&pithumbsize=640&pilimit=max');
+  const data=await fetchOne(api+'&generator=random&grnnamespace=0&grnlimit=20&prop=pageviews%7Cextracts%7Cpageimages%7Cdescription&pvipdays=14&exintro=1&exchars=800&explaintext=1&exlimit=max&pilicense=any&piprop=thumbnail&pithumbsize=640&pilimit=max');
   if(requestGen!==fillGeneration||!data?.query?.pages)return [];
   const renderable=Object.values(data.query.pages).filter(p=>p?.thumbnail?.source&&isValidTitle(p.title)&&stripHtml(p.extract||'').length>=MIN_EXTRACT&&!/^topics referred to by the same term$/i.test(p.description||''));
   // Views arrive for only five pages per request; complete up to ten more.
@@ -565,7 +565,7 @@ async function fetchVoyage() {
     // Random fallback — ONE Action API call for 20 candidates. The previous
     // REST approach fired 16 parallel requests per call (up to 80 per fill),
     // which tripped Wikimedia's per-IP rate limiting and killed the feed.
-    const url = [`https://${lang}.wikivoyage.org/w/api.php`,'?action=query','&generator=random','&grnnamespace=0','&grnlimit=20','&prop=extracts%7Cpageimages','&exintro=1','&exchars=600','&explaintext=1','&exlimit=max','&piprop=thumbnail','&pithumbsize=640','&pilimit=max','&format=json','&origin=*'].join('');
+    const url = [`https://${lang}.wikivoyage.org/w/api.php`,'?action=query','&generator=random','&grnnamespace=0','&grnlimit=20','&prop=extracts%7Cpageimages','&exintro=1','&exchars=600','&explaintext=1','&exlimit=max','&pilicense=any&piprop=thumbnail','&pithumbsize=640','&pilimit=max','&format=json','&origin=*'].join('');
     const data = await fetchOne(url);
     if(requestGen!==fillGeneration)return [];
     if (data?.query?.pages) {
@@ -838,7 +838,10 @@ function scheduleRefill() {
   if(curMode==='how'&&(travelFilters.place||travelFilters.style)&&travelExhausted)return;
   if(refillTimer||!navigator.onLine||document.hidden)return;
   const gen=fillGeneration;
-  const delay=Math.max(350,Math.min(10000,700*Math.pow(1.6,refillAttempts++)));
+  const pause=workerCooldownUntil-Date.now();
+  const recoverable=pendingWorkerBatch?.cacheRecovery&&articles.length&&(pendingWorkerBatch.cachedScan||0)<8;
+  // Retry at the server's deadline, not a backoff tick up to ten seconds later.
+  const delay=pause>0&&!recoverable?pause+50:Math.max(350,Math.min(10000,700*Math.pow(1.6,refillAttempts++)));
   refillTimer=setTimeout(async()=>{
     refillTimer=null;if(gen!==fillGeneration)return;
     await fillQueue();if(gen!==fillGeneration)return;
@@ -984,7 +987,7 @@ async function resolveDeepLink() {
   const domain = `${lang}.${prefix === 'w' ? 'wikipedia' : 'wikivoyage'}.org`;
   try {
     // Direct request: a shared article must not spend the feed's request budget.
-    const response = await fetch(`https://${domain}/w/api.php?action=query&format=json&origin=*&pageids=${pageid}&prop=extracts%7Cpageimages%7Cinfo%7Cdescription&exintro=1&explaintext=1&piprop=thumbnail&pithumbsize=800&inprop=url`, {signal: AbortSignal.timeout(8000)});
+    const response = await fetch(`https://${domain}/w/api.php?action=query&format=json&origin=*&pageids=${pageid}&prop=extracts%7Cpageimages%7Cinfo%7Cdescription&exintro=1&explaintext=1&pilicense=any&piprop=thumbnail&pithumbsize=960&inprop=url`, {signal: AbortSignal.timeout(8000)});
     if (!response.ok) return null;
     const p = (await response.json())?.query?.pages?.[pageid];
     // Only real articles: never a talk, user or project page with the same id.
@@ -1529,7 +1532,7 @@ function syncAllToggles() {
   if (ds2) ds2.value = depthLevel;
   syncDepthSteps();
 }
-function setAmbient(val) { ambientEnabled=val; if(!val)closeAmbient(); saveSettings(); syncAllToggles(); }
+function setAmbient(val) { ambientEnabled=val; if(!val)closeAmbient(); window.dispatchEvent(new Event('ambient-preference-change')); saveSettings(); syncAllToggles(); }
 function setSwipe(val) { swipeEnabled=val; saveSettings(); syncAllToggles(); }
 
 function setKbBar(val) { kbBarEnabled=val; saveSettings(); syncAllToggles(); }
@@ -2011,7 +2014,7 @@ document.getElementById('ambientClose').addEventListener('click', closeAmbient);
     startX=ev.touches[0].clientX; startY=ev.touches[0].clientY;
     swiping=false; touchCard=card;
     velReset(startX);
-    if(ambientEnabled)lpTimer = setTimeout(()=>{ if(!swiping){ openAmbient(card); touchCard=null; } lpTimer=null; },620);
+    if(ambientEnabled)lpTimer = setTimeout(()=>{ if(ambientEnabled&&!swiping){ openAmbient(card); touchCard=null; } lpTimer=null; },620);
   },{passive:true});
 
   document.addEventListener('touchmove', ev => {
@@ -2057,7 +2060,7 @@ document.getElementById('ambientClose').addEventListener('click', closeAmbient);
     let mCard = null, mDragging = false, mStartX = 0, mStartY = 0;
 
     document.addEventListener('mousedown', ev => {
-      if (ev.button !== 0 || flyLock || !swipeEnabled || feedInputBlocked()) return;
+      if (ev.button !== 0 || !ambientEnabled || flyLock || !swipeEnabled || feedInputBlocked()) return;
       const card = ev.target.closest('.card');
       if (!card || !feed.contains(card) || ev.target.closest('button,.acts,a')) return;
       mCard = card; mDragging = false;
@@ -2096,7 +2099,18 @@ document.getElementById('ambientClose').addEventListener('click', closeAmbient);
       if (shouldFly(dx, vel)) flyOff(card, dx > 0 ? 1 : -1, vel, dx);
       else springBack(card);
     };
-    window.addEventListener('feed-reset', () => { mCard = null; mDragging = false; });
+    const cancelMouseDrag = () => {
+      if(mCard)restoreCard(mCard);
+      mCard=null;mDragging=false;
+      if(d)dragEndInternal();
+      document.body.classList.remove('dragging');
+    };
+    // A lost release must not keep blocking independent trackpad gestures.
+    window.addEventListener('blur', cancelMouseDrag);
+    window.addEventListener('feed-reset', cancelMouseDrag);
+    window.addEventListener('ambient-preference-change',()=>{if(!ambientEnabled)cancelMouseDrag();});
+    document.addEventListener('visibilitychange',()=>{if(document.hidden)cancelMouseDrag();});
+    document.addEventListener('dragstart',ev=>{if(ambientEnabled&&swipeEnabled&&mCard)ev.preventDefault();});
     document.addEventListener('mouseup', endMouseDrag);
     document.addEventListener('mouseleave', endMouseDrag);
   }

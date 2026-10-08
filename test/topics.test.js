@@ -36,7 +36,7 @@ test('invalid topic inputs do not trigger upstream work',async()=>{
 let topicModule=0;
 const freshTopics=()=>import('../worker/topics.js?test='+topicModule++);
 const topicUrl=()=>new URL('https://wikiscroll.com/api/topics?topic=tech&lang=en&depth=3&batch=8');
-const topicKey=()=>new Request('https://wikiscroll.com/api/topics?v=7&topic=tech&lang=en&depth=3&batch=8');
+const topicKey=()=>new Request('https://wikiscroll.com/api/topics?v=8&topic=tech&lang=en&depth=3&batch=8');
 function edgeCache(){
  const entries=new Map();
  return {entries,async match(key){return entries.get(key.url)?.clone();},async put(key,response){entries.set(key.url,response.clone());}};
@@ -321,4 +321,15 @@ test('topic introductions start while optional maintenance enrichment is still p
  const cards=await run;clearTimeout(timer);
  assert.equal(extractStarted,true);assert.equal(cards.length,1);
  assert.equal(serialFallback,false);assert.ok(!state.chosen[0].needsMissing);
+});
+
+test('topic thumbnails include the selected article photo when the free-only default omits it',async()=>{
+ const state={candidates:[[{pageid:36687454,ns:0,title:'Ralph Patt'}]]};
+ const cards=await topicPages('music','en',3,async address=>{
+  const p=new URL(address).searchParams;
+  const page={pageid:36687454,ns:0,title:'Ralph Patt',pageviews:{a:20},categories:[],extract:'Ralph Oliver Patt was an American jazz guitarist who developed major-thirds tuning. '.repeat(2)};
+  if(p.get('prop')?.includes('pageimages')){assert.equal(p.get('pilicense'),'any');page.thumbnail={source:'https://upload.wikimedia.org/wikipedia/en/9/96/Ralph_Patt.jpg'};}
+  return {query:{pages:{36687454:page}}};
+ },{state});
+ assert.equal(cards.length,1);assert.match(cards[0].img,/Ralph_Patt\.jpg/);
 });

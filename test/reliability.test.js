@@ -238,7 +238,7 @@ test('independent invocation queues still share Wikimedia Retry-After cooldowns'
 });
 
 test('cooldown recovery reads eight cache slots, deduplicates, excludes expired/partial cards and never fetches',async()=>{
- const store=cache(),base=new Request('https://wikiscroll.com/api/topics?v=7&topic=help&lang=en&depth=3&batch=60');
+ const store=cache(),base=new Request('https://wikiscroll.com/api/topics?v=8&topic=help&lang=en&depth=3&batch=60');
  let reads=0;const original=globalThis.fetch;globalThis.fetch=()=>{throw Error('cache recovery must not fetch upstream');};
  try{
   for(const [slot,body] of [[60,{articles:[{id:'w1'},{id:'w2'}]}],[61,{articles:[{id:'w1'},{id:'w3'}]}],[62,{articles:[{id:'w4'}],partial:true}],[63,{articles:[{id:'w5'}],cached_at:new Date(Date.now()-86400001).toISOString()}],[0,{articles:[{id:'w6'}]}]]){
@@ -247,4 +247,13 @@ test('cooldown recovery reads eight cache slots, deduplicates, excludes expired/
   const result=await cachedWindow({match:async k=>{reads++;return store.match(k);}},base,60);
   assert.equal(reads,8);assert.equal(result.cached_only,true);assert.deepEqual(result.articles.map(a=>a.id),['w1','w2','w3','w6']);
  }finally{globalThis.fetch=original;}
+});
+
+test('image-policy rollout retains matching older reserves only when the new recovery cache is empty',async()=>{
+ const store=cache(),key=new Request('https://wikiscroll.com/api/topics?v=8&topic=music&lang=en&depth=3&batch=5'),backup=new Request(key.url.replace('v=8','v=7'));let reads=0;
+ await store.put(backup,Response.json({articles:[{id:'w1',topic:'music'}],cached_at:new Date().toISOString()}));
+ const measured={match:async k=>{reads++;assert.match(k.url,/topic=music&lang=en&depth=3/);return store.match(k);}};
+ assert.equal((await cachedWindow(measured,key,5,86400000,backup)).articles[0].id,'w1');assert.equal(reads,16);
+ await store.put(key,Response.json({articles:[{id:'w2',topic:'music'}],cached_at:new Date().toISOString()}));reads=0;
+ assert.equal((await cachedWindow(measured,key,5,86400000,backup)).articles[0].id,'w2');assert.equal(reads,8);
 });

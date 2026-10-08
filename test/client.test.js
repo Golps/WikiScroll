@@ -136,3 +136,14 @@ test('repeated partial topic supply releases the foreground after bounded retrie
  for(let i=0;i<4;i++)await c.fetchWorkerBatch(0);
  assert.equal(urls[0],urls[1]);assert.equal(urls[1],urls[2]);assert.notEqual(urls[2],urls[3]);
 });
+
+test('cold startup retries at the server pause deadline rather than another exponential backoff tick',()=>{
+ const start=source.indexOf('let refillTimer=null'),end=source.indexOf("window.addEventListener('online'",start);
+ let delay;const c=vm.createContext({Date:{now:()=>100000},setTimeout:(_,d)=>{delay=d;return 1;},navigator:{onLine:true},document:{hidden:false},curMode:'wiki',fillGeneration:0,workerCooldownUntil:134000,pendingWorkerBatch:{cacheRecovery:true,cachedScan:0},articles:[],queue:[],QUEUE_MIN:72});
+ vm.runInContext(source.slice(start,end)+'\nrefillAttempts=50;scheduleRefill();',c);assert.equal(delay,34050);
+});
+test('an existing feed may still scan cache-only reserves before the upstream pause ends',()=>{
+ const start=source.indexOf('let refillTimer=null'),end=source.indexOf("window.addEventListener('online'",start);
+ let delay;const c=vm.createContext({Date:{now:()=>100000},setTimeout:(_,d)=>{delay=d;return 1;},navigator:{onLine:true},document:{hidden:false},curMode:'wiki',fillGeneration:0,workerCooldownUntil:134000,pendingWorkerBatch:{cacheRecovery:true,cachedScan:0},articles:[{id:'w1'}],queue:[],QUEUE_MIN:72});
+ vm.runInContext(source.slice(start,end)+'\nscheduleRefill();',c);assert.equal(delay,700);
+});

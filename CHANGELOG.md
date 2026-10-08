@@ -4,6 +4,11 @@ Releases of this repository. Each entry describes what changed in the code; [doc
 
 ## Unreleased
 
+- Request the article's selected thumbnail explicitly, including images omitted by Wikipedia's free-only API default. Apply the same policy to topic, random, vital, travel, shared-article and collection metadata. Refresh affected caches without discarding compatible cache-only outage reserves.
+- Resume loading at the server's Retry-After deadline rather than adding up to ten seconds of client backoff.
+
+- When Ambient Mode is off, desktop clicks retain native text selection and image dragging; two-finger trackpad swipes still save or skip. Lost mouse releases and preference changes cancel unfinished card drags safely.
+
 - Surface upstream cooldowns in successful partial responses, preserving ready cards while allowing bounded cache recovery. Repeated partial topic batches no longer pin the foreground indefinitely.
 - Prepare topic introductions and optional maintenance tags concurrently within the existing upstream budget.
 - Label right swipes as Save, and add a persistent Ambient Mode switch, enabled by default, to desktop and mobile Settings.

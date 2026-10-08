@@ -59,7 +59,7 @@ export function imageURL(source) {
 
 // During a Wikimedia cooldown, edge-cache reads remain safe: no refresh,
 // fresh job or upstream request is allowed in this bounded recovery window.
-export async function cachedWindow(cache,key,batch,maxAge=86400000){
+export async function cachedWindow(cache,key,batch,maxAge=86400000,backupKey=null){
  const articles=[],seen=new Set();
  for(let offset=0;offset<8;offset++){
   const url=new URL(key.url);url.searchParams.set('batch',String((batch+offset)%64));
@@ -70,5 +70,8 @@ export async function cachedWindow(cache,key,batch,maxAge=86400000){
    for(const a of data.articles)if(!seen.has(a.id)){seen.add(a.id);articles.push(a);}
   }catch{}
  }
+ // Preserve verified reserves through a metadata-policy rollout, only when
+ // the new cache is empty and only on this upstream-free recovery path.
+ if(!articles.length&&backupKey)return cachedWindow(cache,backupKey,batch,maxAge);
  return {articles:articles.slice(0,40),cached_only:true};
 }

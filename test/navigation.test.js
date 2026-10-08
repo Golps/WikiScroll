@@ -78,7 +78,7 @@ function harness(count, height = 700) {
     closeAmbient() { namedElement('ambientOverlay').classList.remove('open'); },
     articles: cards.map(card => ({id: card.dataset.id, extract: 'An article payload'})),
     liked: new Map(), feedSeen: new Set(cards.map(card => card.dataset.id)),
-    fillGeneration: 0, swipeEnabled: true,
+    fillGeneration: 0, swipeEnabled: true, ambientEnabled: true,
   });
   vm.runInContext(savedKeys + geometry + navigation, context);
   function dispatch(scope, type, event = {}) {
@@ -287,4 +287,28 @@ test('swiping right on an already saved article never removes it',()=>{
   assert.equal(h.current(),'w2');assert.deepEqual(h.likes,[]);
   h.key('ArrowRight');h.step();h.step();
   assert.deepEqual(h.likes,['w2']);
+});
+
+
+test('Ambient off preserves desktop selection and native image dragging while wheel swipes still save',()=>{
+ const h=harness(4);h.context.ambientEnabled=false;
+ const card=h.cards[0],target={closest:selector=>selector==='.card'?card:null};
+ h.dispatch('document','mousedown',{button:0,clientX:50,clientY:50,target});
+ const move=h.dispatch('document','mousemove',{clientX:220,clientY:50,target});
+ assert.equal(move.prevented,false);assert.equal(h.pendingFrames,0);assert.equal(vm.runInContext('feedMotionLocked',h.context),false);
+ assert.equal(h.dispatch('document','dragstart',{target}).prevented,false);
+ h.dispatch('document','mouseup',{target});assert.equal(h.current(),'w1');assert.deepEqual(h.likes,[]);
+ h.dispatch('feed','wheel',{deltaX:-120,deltaY:0});h.step();h.step();assert.equal(h.current(),'w2');assert.deepEqual(h.likes,['w1']);
+});
+test('lost mouse release and disabling Ambient cancel the drag without saving or pinning wheel input',()=>{
+ for(const event of ['blur','ambient-preference-change']){
+  const h=harness(4),card=h.cards[0],target={closest:selector=>selector==='.card'?card:null};
+  h.dispatch('document','mousedown',{button:0,clientX:50,clientY:50,target});
+  h.dispatch('document','mousemove',{clientX:170,clientY:50,target});h.step(20);
+  assert.equal(vm.runInContext('feedMotionLocked',h.context),true);
+  if(event==='ambient-preference-change')h.context.ambientEnabled=false;
+  h.dispatch('window',event);
+  assert.equal(vm.runInContext('feedMotionLocked',h.context),false);assert.equal(card.style.transform,'');assert.deepEqual(h.likes,[]);
+  h.dispatch('feed','wheel',{deltaX:120,deltaY:0});h.step();h.step();assert.equal(h.current(),'w2');assert.deepEqual(h.likes,[]);
+ }
 });

@@ -97,7 +97,7 @@ export async function vitalArticles(lang, depth, upstream, ctx, toArticle, info 
     titles = Object.values(data?.query?.pages || {}).map(p => p.langlinks?.[0]?.['*']).filter(Boolean);
     if (!titles.length) return [];
   }
-  const data = await upstream(api(lang, {titles: titles.join('|'), redirects: '1', prop: 'pageimages|info|description', piprop: 'thumbnail', pithumbsize: '960', pilimit: 'max', inprop: 'url|talkid'}));
+  const data = await upstream(api(lang, {titles: titles.join('|'), redirects: '1', prop: 'pageimages|info|description', piprop: 'thumbnail', pilicense: 'any', pithumbsize: '960', pilimit: 'max', inprop: 'url|talkid'}));
   const pages = shuffle(Object.values(data?.query?.pages || {}).filter(p => Number.isSafeInteger(p.pageid) && p.pageid > 0 && p.ns === 0 && p.thumbnail?.source));
   // Cards whose introduction has already arrived. If the answer budget runs
   // out while a slower chunk is pending, the caller answers with these.

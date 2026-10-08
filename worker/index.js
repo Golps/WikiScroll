@@ -121,7 +121,7 @@ function startBatch(key,lang,mode,depth,cache,ctx,work) {
     // Candidates first, text second: the random call carries no extracts, so
     // it returns in a fraction of a second; introductions are then fetched in
     // parallel chunks for the readable candidates only (extracts.js).
-    const params={generator:'random',grnnamespace:'0',grnlimit:mode==='wiki'?'50':'20',prop:'pageimages|info|description'+(mode==='wiki'?'|pageviews':'|categories'),pvipdays:'14',piprop:'thumbnail',pithumbsize:'960',pilimit:'max',inprop:mode==='wiki'?'url|talkid':'url',...(mode==='how'?phrasebookParams(lang):{})};
+    const params={generator:'random',grnnamespace:'0',grnlimit:mode==='wiki'?'50':'20',prop:'pageimages|info|description'+(mode==='wiki'?'|pageviews':'|categories'),pvipdays:'14',piprop:'thumbnail',pilicense:'any',pithumbsize:'960',pilimit:'max',inprop:mode==='wiki'?'url|talkid':'url',...(mode==='how'?phrasebookParams(lang):{})};
     // Two concurrent Wikipedia samples examine up to 100 candidates. Wikivoyage
     // needs one: its guides need no photo, so most of the 20 are usable.
     // Publish the first usable response immediately; cache the merged result
@@ -256,7 +256,7 @@ async function handle(request,env,ctx,work) {
         const lang=voyageLang(requested);
         // Many readers ask for the same destination and style: complete result
         // pages are shared from the edge cache for an hour, before any upstream work.
-        const key=new Request(`${url.origin}/api/travel?v=9&lang=${lang}&place=${encodeURIComponent(places.map(fold).join('|'))}&style=${style}&offset=${cursor.map(c=>c??'-').join('.')}`),cache=work.cache;
+        const key=new Request(`${url.origin}/api/travel?v=10&lang=${lang}&place=${encodeURIComponent(places.map(fold).join('|'))}&style=${style}&offset=${cursor.map(c=>c??'-').join('.')}`),cache=work.cache;
         expireJobs(travelPending);
         try{const hit=await cache?.match(key);if(hit)return json(await hit.json(),200,{'X-Cache':'HIT'});}catch{}
         if(travelPending.has(key.url))return (await travelPending.get(key.url)).clone();
@@ -266,7 +266,7 @@ async function handle(request,env,ctx,work) {
         const searches=await Promise.all((places.length?places:[null]).map(async(place,i)=>{
           if(cursor[i]===null)return {place,pages:[],next:null};
           const query=[place?JSON.stringify(place):'',style?'('+travelTerms(lang,style)+')':''].filter(Boolean).join(' ');
-          const data=await upstream(apiURL(lang,'how',{generator:'search',gsrsearch:query,gsrnamespace:'0',gsrlimit:limit,gsroffset:String(cursor[i]),prop:'pageimages|info|description|categories|pageprops',ppprop:'geocrumb-is-in|disambiguation',piprop:'thumbnail',pithumbsize:'960',pilimit:'max',inprop:'url',...phrasebookParams(lang)}));
+          const data=await upstream(apiURL(lang,'how',{generator:'search',gsrsearch:query,gsrnamespace:'0',gsrlimit:limit,gsroffset:String(cursor[i]),prop:'pageimages|info|description|categories|pageprops',ppprop:'geocrumb-is-in|disambiguation',piprop:'thumbnail',pilicense:'any',pithumbsize:'960',pilimit:'max',inprop:'url',...phrasebookParams(lang)}));
           if(!data||data.error)return null;
           // Search relevance order (the generator's index), not page-ID order.
           const pages=Object.values(data.query?.pages||{}).filter(p=>p.pageid>0&&!isDisambiguation(p)&&!isPhrasebook(p)).sort((a,b)=>(a.index??0)-(b.index??0));

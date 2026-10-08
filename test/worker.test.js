@@ -525,7 +525,7 @@ test('a travel guide without an introduction is found through its opening text',
     assert.match(body.articles[0].body,/^Japón está formado por cuatro islas/);
     assert.deepEqual(asked,['2577'],'only the guide without an introduction reads its full text');
   },cache);
-  assert.ok([...cache.entries.keys()].some(k=>k.includes('/api/travel?v=9')),'a complete page is cached');
+  assert.ok([...cache.entries.keys()].some(k=>k.includes('/api/travel?v=10')),'a complete page is cached');
 });
 test('random and searched Wikivoyage feeds leave out phrasebooks in any language',async()=>{
   const seen=[];
@@ -625,7 +625,7 @@ test('a cancelled background batch cannot pin the same key after its work deadli
 
 test('cache-only recovery serves the exact source and depth without starting upstream work',async()=>{
  const store=edgeCache();
- for(const [path,id] of [['/api/articles?version=8&mode=wiki&lang=en&depth=5&batch=8','w1'],['/api/topics?v=7&topic=help&lang=en&depth=3&batch=8','w2']])
+ for(const [path,id] of [['/api/articles?version=8&mode=wiki&lang=en&depth=5&batch=8','w1'],['/api/topics?v=8&topic=help&lang=en&depth=3&batch=8','w2']])
   await store.put(new Request('https://wikiscroll.com'+path),Response.json({articles:[{id}],cached_at:new Date().toISOString()}));
  await mocked(()=>{throw Error('upstream must remain paused');},async api=>{
   for(const [path,id] of [['/api/articles?cached=1&depth=5&batch=8','w1'],['/api/topics?cached=1&topic=help&batch=8','w2']]){
@@ -635,4 +635,12 @@ test('cache-only recovery serves the exact source and depth without starting ups
   assert.equal((await api.fetch(request('cached=1&draw='+'a'.repeat(32)),env,ctx)).status,400);
   assert.equal((await api.fetch(request('cached=bad'),env,ctx)).status,400);
  },store);
+});
+
+test('verified previews use the selected article image rather than the free-only default',async()=>{
+ const {verifiedArticle}=await import('../worker/verified.js?selected-photo');
+ await mocked(async address=>{
+  const p=new URL(address).searchParams;assert.equal(p.get('pilicense'),'any');
+  return data([page(36687454,{title:'Ralph Patt',thumbnail:{source:'https://upload.wikimedia.org/wikipedia/en/9/96/Ralph_Patt.jpg'}})]);
+ },async()=>{const article=await verifiedArticle('w36687454','en',env,{waitUntil(){}});assert.match(article.img,/Ralph_Patt\.jpg/);});
 });

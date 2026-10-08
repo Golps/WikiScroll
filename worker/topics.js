@@ -102,7 +102,7 @@ export async function topicPages(topic,lang,depth,upstream,{help=false,supply=nu
  const missing=ids.filter(id=>!state.pages.has(id));
  await Promise.all(Array.from({length:Math.ceil(missing.length/20)},async(_,i)=>{
   // No introductions yet: they are the slow part, so only chosen pages get them.
-  const d=await query(lang,{pageids:missing.slice(i*20,i*20+20).join('|'),prop:'pageviews|pageimages|info|description',pvipdays:'14',piprop:'thumbnail',pithumbsize:'960',pilimit:'max',inprop:'url|talkid'});
+  const d=await query(lang,{pageids:missing.slice(i*20,i*20+20).join('|'),prop:'pageviews|pageimages|info|description',pvipdays:'14',piprop:'thumbnail',pilicense:'any',pithumbsize:'960',pilimit:'max',inprop:'url|talkid'});
   for(const p of Object.values(d?.query?.pages||{}))if(map.has(p.pageid)&&p.pageid>0&&p.title&&(p.ns===undefined||p.ns===0)&&!/^(Lists? of|Index of|Outline of|Comparison of|Category:)/i.test(p.title)&&!/^topics referred to by the same term$/i.test(p.description||'')){const page={...p,branch:map.get(p.pageid)?.branch};state.pages.set(p.pageid,page);}
  }));
  await Promise.all(Array.from({length:Math.ceil(ids.length/20)},async(_,i)=>{
@@ -147,8 +147,8 @@ export async function topicResponse(url,env,ctx,{langs,permit,limited,upstream,w
  const draw=url.searchParams.get('draw'),cached=url.searchParams.get('cached');
  if(!(Object.hasOwn(roots,topic)||topic==='help')||!langs.has(lang)||!Number.isInteger(depth)||!bands[depth]||!Number.isInteger(batch)||batch<0||batch>63||(helpParam!==null&&!help)||!validOpeningDraw(draw)||(cached!==null&&cached!=='1')||(cached&&draw))return Response.json({error:'Invalid topic parameters'},{status:400});
  if((topic==='help'||help)&&!HELP_LANGS.has(lang))return Response.json({error:'Help Wikipedia is not available in this language'},{status:400});
- const key=new Request(`${url.origin}/api/topics?v=7&topic=${topic}&lang=${lang}&depth=${depth}&batch=${batch}${help&&topic!=='help'?'&help=1':''}${draw?'&draw='+draw:''}`),cache=draw?openingCache:work.cache;
- if(cached)return Response.json(await cachedWindow(work.cache,key,batch),{headers:{'Cache-Control':'no-store','X-Cache':'RECOVERY'}});
+ const key=new Request(`${url.origin}/api/topics?v=8&topic=${topic}&lang=${lang}&depth=${depth}&batch=${batch}${help&&topic!=='help'?'&help=1':''}${draw?'&draw='+draw:''}`),cache=draw?openingCache:work.cache;
+ if(cached)return Response.json(await cachedWindow(work.cache,key,batch,86400000,new Request(key.url.replace('/api/topics?v=8','/api/topics?v=7'))),{headers:{'Cache-Control':'no-store','X-Cache':'RECOVERY'}});
  expireJobs(pending);
  const respond=(payload,cacheState)=>{
   const paused=payload.partial&&['upstream_rate_limited','work_rate_limited'].includes(work.reason);

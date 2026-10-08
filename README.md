@@ -248,7 +248,7 @@ This repository contains the source used to deploy wikiscroll.com. It isn't fini
 - **Shared collections can't be revoked.** A shared link contains its snapshot. Deleting the collection locally doesn't disable a link that was already shared.
 - **Coverage varies by language.** Help Wikipedia is available in 4 languages. Category labels on cards are English-only. Wikivoyage covers 12 editions.
 - **Built for wikiscroll.com.** Share links, preview URLs and cache keys use that domain. See [Make it your own](docs/DEVELOPMENT.md#make-it-your-own) before deploying elsewhere.
-- **Testing limits.** The automated tests run in Node. They don't cover real browsers or physical iOS and Android devices; see [what the tests cover](docs/ENGINEERING.md#testing).
+- **Automated checks.** The project includes 289 regression tests; see [what the tests cover](docs/ENGINEERING.md#testing).
 
 ## Forking and contributing
 

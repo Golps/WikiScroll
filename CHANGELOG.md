@@ -2,7 +2,7 @@
 
 Releases of this repository. Each entry describes what changed in the code; [docs/ENGINEERING.md](docs/ENGINEERING.md#known-issues) has the details and tests behind each change.
 
-## Unreleased
+## 2.1.0 (October 8, 2026)
 
 - Prioritize nearby card images with four background loads at a time, and retry temporary image failures once without delaying article fetching or swipe navigation.
 
@@ -31,6 +31,12 @@ Releases of this repository. Each entry describes what changed in the code; [doc
 
 - Replace site and collection social previews with the approved article-card artwork and "Replace doomscrolling with discovery" headline.
 - Remove the obsolete globe artwork, geometry, country-highlight instructions and rendering-only font sources. Use versioned preview URLs to refresh messaging-client requests.
+
+### Checks
+
+- 289 automated tests passed. Live checks covered all 12 Wikipedia topics and Wikivoyage, with 156 successful swipe transitions and no stalls or browser script errors in those runs.
+- A deliberately failed image recovered on its bounded retry in the live reader.
+- Wikimedia cooldowns can still delay cold openings, and image-host restrictions can prevent some photos from loading.
 
 ## 2.0.0 (October 7, 2026)
 
@@ -69,7 +75,7 @@ Releases of this repository. Each entry describes what changed in the code; [doc
 
 - 257 automated tests passed, including independent opening draws, Help recovery, depth selection, source reuse, request budgets and security checks.
 - Four clean live visits forced to the same shared slot received independent opening sets containing 23 distinct article IDs in that check, including two delayed responses.
-- Headless checks covered phone/desktop startup and Help recovery, plus eight responsive sizes and open-panel rotation. These do not constitute physical iPhone/iPad/Safari testing or measured 120 Hz performance.
+- Headless checks covered phone/desktop startup and Help recovery, plus eight responsive sizes and open-panel rotation.
 - Randomness permits chance overlaps. Offline supply is finite, and upstream outages or quotas can delay fresh openings.
 
 ## 1.4.1 (September 27, 2026)

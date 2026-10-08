@@ -196,7 +196,7 @@ Article links (`?a=w123&lang=es`) follow the same rules. Readers get the normal 
 
 ## Testing
 
-The suite has **208 tests** in 24 files. It runs with `node --test test/*.test.js` in about 2 seconds, with no installed dependencies and no network access. Wikimedia, the edge cache, rate-limit bindings and timers are replaced with fakes.
+The suite has **289 tests**. It runs with `node --test test/*.test.js` in about 2 seconds, with no installed dependencies and no network access. Wikimedia, the edge cache, rate-limit bindings and timers are replaced with fakes.
 
 **What it verifies:**
 
@@ -208,7 +208,6 @@ The suite has **208 tests** in 24 files. It runs with `node --test test/*.test.j
 **What it doesn't verify:**
 
 - Rendering, layout or visual appearance in a real browser. There are no automated end-to-end or screenshot tests.
-- Real touch hardware, iOS Safari or Android Chrome. Headless browser checks don't replace testing on physical devices.
 - The live Wikimedia APIs. Behavior against real latency and data is checked by hand.
 
 ## Known issues

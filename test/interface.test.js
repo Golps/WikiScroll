@@ -30,7 +30,7 @@ test('a stored depth outside 1 to 5 falls back to Balanced', () => {
     const c = vm.createContext({
       lsGet: k => values[k] ?? null, lsSet() {}, liked: new Map(), updateBadge() {}, IDB: {getAll: async () => []},
       TOPIC_MAP: {}, curTopics: new Set(), syncTopicUI() {}, LANGS: [{c: 'en'}], window: {location: {search: ''}}, applyLangUI() {},
-      localStorage: {}, applyTheme() {}, syncAllToggles() {}, curLang: 'en', URLSearchParams, saveTopics() {}, saveSettings() {},
+      READING_TEXT_SIZES: ['standard','large','larger'], applyReadingPreferences() {}, localStorage: {}, applyTheme() {}, syncAllToggles() {}, curLang: 'en', URLSearchParams, saveTopics() {}, saveSettings() {},
     });
     vm.runInContext(slice(app, 'const HELP_MODES', '\n') + slice(app, '// Page IDs repeat across editions', 'function saveHistory('), c);
     vm.runInContext('loadPersistedState()', c);
@@ -76,7 +76,7 @@ test('external article pages open without access back to WikiScroll', () => {
 });
 
 test('only the card on screen is in the keyboard Tab order', () => {
-  const control = () => ({tabIndex: 0, removed: false, removeAttribute(name) { if (name === 'tabindex') { this.removed = true; this.tabIndex = 0; } }});
+  const control = () => ({tabIndex: 0, removed: false, matches: () => false, removeAttribute(name) { if (name === 'tabindex') { this.removed = true; this.tabIndex = 0; } }});
   const cards = [0, 1, 2].map(() => { const controls = [control(), control(), control()]; return {controls, querySelectorAll: () => controls}; });
   const feed = {querySelectorAll: () => cards};
   const c = vm.createContext({document: {getElementById: () => feed}, getCurrentFeedCard: () => cards[1]});

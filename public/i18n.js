@@ -4,7 +4,7 @@
   const dictionaries = window.WS_TRANSLATIONS ||= {};
   let language = 'en';
   const originals = new WeakMap(), attributes = new WeakMap();
-  const excluded = 'script,style,noscript,svg,textarea,.art-title,.art-body,.li-ttl,.li-body,.hi-ttl,.hi-body,.coll-tab:not([data-cid="null"]),#ambientTitle,#ambientExcerpt,.travel-end-place,#mapTitle,#mapBadgeText,#privacyDialog,#aboutDialog,.sp-about-logo,.logo,.lopt,.blopt,#langTxt,#burgerLangTxt,.kb-key';
+  const excluded = 'script,style,noscript,svg,textarea,.art-title,.art-body,.li-ttl,.li-body,.hi-ttl,.hi-body,.coll-tab:not([data-cid="null"]),#ambientTitle,#ambientExcerpt,#imageTitle,#inspectedImage,.travel-end-place,#mapTitle,#mapBadgeText,#privacyDialog,#aboutDialog,.sp-about-logo,.logo,.lopt,.blopt,#langTxt,#burgerLangTxt,.kb-key';
   // Messages that embed a collection name or a count. The dictionaries hold
   // one template per message ("Added to \"{name}\""); the value is kept as typed.
   const templates = [

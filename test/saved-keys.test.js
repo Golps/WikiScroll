@@ -17,7 +17,7 @@ function harness(stored = {}, idb = []) {
     lsGet: k => values[k] ?? null, lsSet: (k, v) => { values[k] = JSON.parse(JSON.stringify(v)); }, liked: new Map(), updateBadge() {},
     IDB: {getAll: async () => [...db.values()], put: a => db.set(a.id, a), delete: id => db.delete(id)},
     TOPIC_MAP: {}, curTopics: new Set(), syncTopicUI() {}, LANGS: [{c: 'en'}, {c: 'es'}], window: {location: {search: ''}}, applyLangUI() {},
-    localStorage: {}, applyTheme() {}, syncAllToggles() {}, curLang: 'en', URLSearchParams, URL, saveTopics() {}, saveSettings() {},
+    READING_TEXT_SIZES: ['standard','large','larger'], applyReadingPreferences() {}, localStorage: {}, applyTheme() {}, syncAllToggles() {}, curLang: 'en', URLSearchParams, URL, saveTopics() {}, saveSettings() {},
     renderLikedList() {}, atlasIcon: {bookmark: ''}, requestAnimationFrame: fn => fn(), history: [], collections: [], articles: [],
     document: {getElementById: id => { if (!buttons.has(id)) buttons.set(id, {className: 'act', innerHTML: ''}); return buttons.get(id); }},
   });

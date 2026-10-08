@@ -65,8 +65,10 @@ for (const [buttonId, panelId] of [['langBtn','langDd'],['burgerBtn','burgerMenu
 function syncCardFocus(feed = document.getElementById('feed')) {
   const current = getCurrentFeedCard();
   for (const card of feed.querySelectorAll('.card[data-id]'))
-    for (const control of card.querySelectorAll('button, a[href]'))
-      if (card === current) control.removeAttribute('tabindex'); else control.tabIndex = -1;
+    for (const control of card.querySelectorAll('button, a[href], [role="button"]'))
+      if (card !== current) control.tabIndex = -1;
+      else if (control.matches('[data-image-inspect]')) control.tabIndex = 0;
+      else control.removeAttribute('tabindex');
 }
 {
   const feed = document.getElementById('feed');
@@ -78,15 +80,14 @@ function syncCardFocus(feed = document.getElementById('feed')) {
 }
 
 // Match excerpt length to whole lines of the available space, without inner scrolling.
+function fitExcerptBody(target) {
+  const lines = Math.max(0, Math.min(innerWidth <= 767 ? 10 : 12, Math.floor(target.clientHeight / parseFloat(getComputedStyle(target).lineHeight))));
+  target.style.setProperty('--excerpt-lines', Math.max(1, lines));
+  if (target.firstElementChild) target.firstElementChild.style.visibility = lines ? 'visible' : 'hidden';
+  chooseExcerpt(target, lines);
+}
 const excerptObserver = new ResizeObserver(entries => {
-  for (const {target} of entries) {
-    // Use the whole space the card gives the excerpt; the old 4/6-line cap left
-    // a third of many phone cards empty. The ceiling only guards very tall windows.
-    const lines = Math.max(0, Math.min(innerWidth <= 767 ? 10 : 12, Math.floor(target.clientHeight / parseFloat(getComputedStyle(target).lineHeight))));
-    target.style.setProperty('--excerpt-lines', Math.max(1, lines));
-    target.firstElementChild.style.visibility = lines ? 'visible' : 'hidden';
-    chooseExcerpt(target, lines);
-  }
+  for (const {target} of entries) fitExcerptBody(target);
 });
 const observedExcerpts = new WeakSet();
 function fitExcerpts() {
@@ -174,6 +175,12 @@ new MutationObserver(() => {
   if (!ambientFull) { ambientFull = ambientExcerpt.textContent; fitAmbient(); }
 }).observe(ambientOverlay, {attributes: true, attributeFilter: ['class']});
 addEventListener('resize', fitAmbient);
+addEventListener('reading-preference-change', () => {
+  requestAnimationFrame(() => {
+    document.querySelectorAll('#feed .art-body').forEach(fitExcerptBody);
+    fitAmbient();
+  });
+});
 
 // Dismiss only genuine backdrop clicks, preserving interaction inside the dialog.
 const sourceDialog = document.getElementById('sourceDialog');

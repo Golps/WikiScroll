@@ -118,6 +118,10 @@ Press <kbd>Space</kbd> on desktop, or long-press a card on a phone, and everythi
   <img src="docs/images/ambient-desktop.jpg" alt="Ambient mode on desktop: the title Mandarin duck and its full introduction in large serif type over a dark, softened photo of the two ducks." width="860">
 </p>
 
+## Reading preferences
+
+Settings offers Standard, Large and Larger excerpt text. The introduction refits to the card without scrolling inside it, and the preference also applies to Ambient Mode. Optional image dimming works in dark mode and is off by default. Tap a card image, or focus it and press Enter, to inspect it in a separate viewer; the original article links to its image credits.
+
 ## Collections you can share
 
 Group saved articles into named collections, and share one as a link. The link opens a page on wikiscroll.com where every title, excerpt and image has been checked again against Wikimedia. Recipients can save their own copy, and messaging apps show a generated preview card.

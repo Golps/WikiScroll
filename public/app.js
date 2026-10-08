@@ -89,6 +89,8 @@ let curTopics = new Set();
 let travelFilters = lsGet('ws_travel_filters') || {place:'',style:''};
 let travelOffset=0, travelExhausted=false, travelSuggestion='', travelContinuing=false, travelRetries=0;
 let ambientEnabled = true;
+let readingTextSize = 'standard', dimImages = false;
+const READING_TEXT_SIZES = ['standard', 'large', 'larger'];
 let swipeEnabled = true, kbBarEnabled = true, helpMode = 'off';
 let lightMode = false, depthLevel = 3;
 let history = [];
@@ -167,6 +169,8 @@ function loadPersistedState() {
   const settings = lsGet('ws_settings') || {};
   swipeEnabled = settings.swipe !== false;
   ambientEnabled = settings.ambient !== false;
+  readingTextSize = READING_TEXT_SIZES.includes(settings.readingTextSize) ? settings.readingTextSize : 'standard';
+  dimImages = settings.dimImages === true;
   kbBarEnabled = settings.kbBar !== false;
   helpMode = helpTopic ? 'only' : HELP_MODES.includes(settings.helpMode) ? settings.helpMode : settings.help === true ? 'tags' : 'off';
   lightMode = settings.lightMode === true;
@@ -181,11 +185,12 @@ function loadPersistedState() {
   try { Object.keys(localStorage).filter(k => k.startsWith('ws_topchart_')).forEach(k => localStorage.removeItem(k)); } catch {}
   if (helpTopic || typeof settings.help === 'boolean') { saveTopics(); saveSettings(); }
   applyTheme();
+  applyReadingPreferences();
   syncAllToggles();
 }
 function saveLiked()    { lsSet('ws_liked',    [...liked.values()]); }
 function saveTopics()   { lsSet('ws_topics',   [...curTopics]); }
-function saveSettings() { lsSet('ws_settings', { ambient: ambientEnabled, swipe: swipeEnabled, kbBar: kbBarEnabled, helpMode: helpMode, lightMode: lightMode, depth: depthLevel, lang: curLang }); }
+function saveSettings() { lsSet('ws_settings', { readingTextSize, dimImages, ambient: ambientEnabled, swipe: swipeEnabled, kbBar: kbBarEnabled, helpMode: helpMode, lightMode: lightMode, depth: depthLevel, lang: curLang }); }
 function saveHistory()     { lsSet('ws_history', history.slice(0, 50)); }
 function saveCollections() { lsSet('ws_collections', collections); }
 
@@ -1198,6 +1203,7 @@ function renderCard(a) {
   likeBtn.addEventListener('click',  () => toggleLike(a.id));
   shareBtn.addEventListener('click', () => doShare(a));
   readBtn.addEventListener('click',  () => window.open(a.url,'_blank','noopener'));
+  setupImageInspection(card, a);
   // Keep the map action attached to the image, with a text-only card fallback.
   if (isHow) {
     const mapBtn = document.createElement('button');
@@ -1211,6 +1217,63 @@ function renderCard(a) {
   document.getElementById('feed').appendChild(card);
   decorateToday(card);
 }
+
+// Native dialog keeps inspection out of feed gestures and restores keyboard focus.
+const imageDialog = document.getElementById('imageDialog');
+function openImageInspection(article, image) {
+  if (imageDialog.open || !image.complete || !image.naturalWidth ||
+      document.querySelector('dialog[open], #ambientOverlay.open, #spBackdrop.open, #burgerMenu.open') ||
+      document.body.classList.contains('dragging')) return;
+  const viewer = document.getElementById('inspectedImage');
+  document.getElementById('imageTitle').textContent = article.title;
+  document.getElementById('imageSourceLink').href = article.url;
+  document.getElementById('imageLoadError').hidden = true;
+  viewer.hidden = false;
+  viewer.alt = article.title;
+  viewer.src = image.currentSrc || image.src;
+  imageDialog.showModal();
+}
+function setupImageInspection(card, article) {
+  const image = card.querySelector('.art-img');
+  if (!image) return;
+  image.dataset.imageInspect = 'true';
+  image.setAttribute('role', 'button');
+  image.setAttribute('aria-label', 'View image');
+  image.setAttribute('aria-haspopup', 'dialog');
+  image.tabIndex = -1; // syncCardFocus enables only the visible card.
+  let gesture = null;
+  image.addEventListener('pointerdown', event => {
+    if (!event.isPrimary) { if (gesture) gesture.moved = true; return; }
+    gesture = {id: event.pointerId, x: event.clientX, y: event.clientY, at: performance.now(), moved: false};
+  });
+  image.addEventListener('pointermove', event => {
+    if (gesture && event.pointerId === gesture.id && Math.hypot(event.clientX - gesture.x, event.clientY - gesture.y) > 8) gesture.moved = true;
+  });
+  image.addEventListener('pointercancel', () => { if (gesture) gesture.moved = true; });
+  image.addEventListener('click', () => {
+    if (gesture && (gesture.moved || performance.now() - gesture.at > 550)) return;
+    openImageInspection(article, image);
+  });
+  image.addEventListener('keydown', event => {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    event.preventDefault(); openImageInspection(article, image);
+  });
+}
+document.getElementById('imageClose').addEventListener('click', () => imageDialog.close());
+imageDialog.addEventListener('click', event => {
+  if (event.target !== imageDialog) return;
+  const r = imageDialog.getBoundingClientRect();
+  if (event.clientX < r.left || event.clientX > r.right || event.clientY < r.top || event.clientY > r.bottom) imageDialog.close();
+});
+imageDialog.addEventListener('close', () => {
+  // Leave the image in place until the existing dialog exit transition finishes.
+  setTimeout(() => { if (!imageDialog.open) document.getElementById('inspectedImage').removeAttribute('src'); }, 300);
+});
+document.getElementById('inspectedImage').addEventListener('error', () => {
+  if (!imageDialog.open) return;
+  document.getElementById('inspectedImage').hidden = true;
+  document.getElementById('imageLoadError').hidden = false;
+});
 
 function showError() {
   const isHow = curMode==='how';
@@ -1575,6 +1638,14 @@ function syncAllToggles() {
   setSw('dkSwipeToggle', swipeEnabled);
   setSw('ambientToggle', ambientEnabled);
   setSw('dkAmbientToggle', ambientEnabled);
+  setSw('dimImagesToggle', dimImages);
+  setSw('dkDimImagesToggle', dimImages);
+  document.querySelectorAll('[data-reading-size]').forEach(button => {
+    const selected = button.dataset.readingSize === readingTextSize;
+    button.classList.toggle('on', selected);
+    button.setAttribute('aria-checked', String(selected));
+    button.tabIndex = selected ? 0 : -1;
+  });
   // KB bar — desktop only
   setSw('dkKbToggle', kbBarEnabled);
   syncHelpUI();
@@ -1584,6 +1655,18 @@ function syncAllToggles() {
   if (ds1) ds1.value = depthLevel;
   if (ds2) ds2.value = depthLevel;
   syncDepthSteps();
+}
+function applyReadingPreferences() {
+  document.body.dataset.readingSize = readingTextSize;
+  document.body.classList.toggle('dim-images', dimImages);
+  window.dispatchEvent(new Event('reading-preference-change'));
+}
+function setReadingTextSize(size) {
+  if (!READING_TEXT_SIZES.includes(size) || size === readingTextSize) return;
+  readingTextSize = size; saveSettings(); syncAllToggles(); applyReadingPreferences();
+}
+function setDimImages(value) {
+  dimImages = value === true; saveSettings(); syncAllToggles(); applyReadingPreferences();
 }
 function setAmbient(val) { ambientEnabled=val; if(!val)closeAmbient(); window.dispatchEvent(new Event('ambient-preference-change')); saveSettings(); syncAllToggles(); }
 function setSwipe(val) { swipeEnabled=val; saveSettings(); syncAllToggles(); }
@@ -1604,6 +1687,21 @@ function setTheme(val) {
   syncAllToggles();
 }
 function setDepth(val) { depthLevel=parseInt(val)||3; saveSettings(); syncAllToggles(); toast(`🔭 Depth: ${DEPTH_LABELS[depthLevel]}`); resetFeed(); }
+
+document.querySelectorAll('[data-reading-size]').forEach(button => {
+  button.addEventListener('click', () => setReadingTextSize(button.dataset.readingSize));
+  button.addEventListener('keydown', event => {
+    if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(event.key)) return;
+    event.preventDefault();
+    const backwards = ['ArrowLeft', 'ArrowUp'].includes(event.key);
+    const rtl = document.body.classList.contains('rtl-ui') && ['ArrowLeft', 'ArrowRight'].includes(event.key);
+    const step = backwards !== rtl ? -1 : 1;
+    const index = event.key === 'Home' ? 0 : event.key === 'End' ? 2 : (READING_TEXT_SIZES.indexOf(readingTextSize) + step + 3) % 3;
+    setReadingTextSize(READING_TEXT_SIZES[index]);
+    button.closest('.reading-size-choices').querySelector('[data-reading-size="' + readingTextSize + '"]').focus();
+  });
+});
+['dimImagesToggle','dkDimImagesToggle'].forEach(id => document.getElementById(id).addEventListener('click', () => setDimImages(!dimImages)));
 
 ['ambientToggle','dkAmbientToggle'].forEach(id=>document.getElementById(id).addEventListener('click',()=>setAmbient(!ambientEnabled)));
 
@@ -2246,7 +2344,7 @@ document.getElementById('ambientClose').addEventListener('click', closeAmbient);
     if(ev.touches.length>1){zoomed=true;lt=0;unzoom();return;}
     if(zoomed){lt=0;return;}
     const card=ev.target.closest('.card');
-    if(!card||ev.target.closest('button,.acts,.cbg')){lt=0;return;}
+    if(!card||ev.target.closest('button,.acts,.cbg,[data-image-inspect]')){lt=0;return;}
     const now=Date.now(),x=ev.touches[0].clientX,y=ev.touches[0].clientY;
     if(now-lt<340&&Math.hypot(x-lx,y-ly)<40){
       ev.preventDefault();

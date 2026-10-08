@@ -2,6 +2,12 @@
 
 Releases of this repository. Each entry describes what changed in the code; [docs/ENGINEERING.md](docs/ENGINEERING.md#known-issues) has the details and tests behind each change.
 
+## Unreleased
+
+- Add persistent Standard, Large and Larger reading text preferences to mobile and desktop Settings. Refit card and Ambient excerpts without changing discovery filters or requesting new articles.
+- Add optional dark-mode image dimming, off by default, while keeping inspected images at their original brightness.
+- Open card images in an accessible viewer on tap or keyboard activation, preserving swipe and long-press gestures and linking to the original article for image credits. Reuse the existing image URL without additional article/API lookups.
+
 ## 2.1.0 (October 8, 2026)
 
 - Prioritize nearby card images with four background loads at a time, and retry temporary image failures once without delaying article fetching or swipe navigation.

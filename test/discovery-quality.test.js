@@ -139,7 +139,7 @@ test('earlier Help Wikipedia choices migrate to the three-choice setting', () =>
     const c = vm.createContext({
       lsGet: k => store[k] ?? null, lsSet: (k, v) => { store[k] = v; }, liked: new Map(), updateBadge() {}, IDB: {getAll: async () => []},
       TOPIC_MAP: {science: {}}, curTopics: new Set(), syncTopicUI() {}, LANGS: [{c: 'en'}], window: {location: {search: ''}}, applyLangUI() {},
-      localStorage: {}, applyTheme() {}, syncAllToggles() {}, curLang: 'en', URLSearchParams,
+      READING_TEXT_SIZES: ['standard','large','larger'], applyReadingPreferences() {}, localStorage: {}, applyTheme() {}, syncAllToggles() {}, curLang: 'en', URLSearchParams,
     });
     vm.runInContext(slice('const HELP_MODES', '\n') + slice('// Page IDs repeat across editions', 'function saveHistory('), c);
     vm.runInContext('loadPersistedState()', c);

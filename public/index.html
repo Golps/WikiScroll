@@ -81,8 +81,8 @@
 
 <link rel="preconnect" href="https://thumb.wikimedia.org">
 <link rel="preconnect" href="https://upload.wikimedia.org">
-<link rel="stylesheet" href="/styles.css?v=73">
-<script src="/lang.js?v=7"></script>
+<link rel="stylesheet" href="/styles.css?v=74">
+<script src="/lang.js?v=8"></script>
 <link rel="stylesheet" href="/about.css?v=51">
 <link rel="describedby" href="/llms.txt" type="text/plain">
 </head>
@@ -170,6 +170,17 @@
     <div class="burger-row">
       <div class="burger-row-label"><span class="ico">◐</span><div><div>Ambient Mode</div><div class="burger-row-sub">Long-press for distraction-free reading.</div></div></div>
       <button class="toggle-sw on" id="ambientToggle" role="switch" aria-label="Ambient Mode" aria-checked="true"></button>
+    </div>
+
+    <div class="burger-row reading-size-row">
+      <div class="burger-row-label"><span class="ico" aria-hidden="true">Aa</span><div><div id="mReadingLabel">Reading text</div><div class="burger-row-sub">Larger text, shorter excerpts. Your feed stays the same.</div></div></div>
+      <div class="reading-size-choices" role="radiogroup" aria-labelledby="mReadingLabel">
+        <button type="button" role="radio" data-reading-size="standard" aria-checked="true" class="on">Standard</button><button type="button" role="radio" data-reading-size="large" aria-checked="false" tabindex="-1">Large</button><button type="button" role="radio" data-reading-size="larger" aria-checked="false" tabindex="-1">Larger</button>
+      </div>
+    </div>
+    <div class="burger-row">
+      <div class="burger-row-label"><span class="ico" aria-hidden="true">◑</span><div><div>Dim images in dark mode</div><div class="burger-row-sub">Soften bright photos while reading at night.</div></div></div>
+      <button type="button" class="toggle-sw" id="dimImagesToggle" role="switch" aria-label="Dim images in dark mode" aria-checked="false"></button>
     </div>
 
     <div class="burger-row wikipedia-only">
@@ -394,6 +405,20 @@
     </div>
   </div>
 
+  <div class="sp-section">
+    <div class="sp-section-title">Reading</div>
+    <div class="sp-row reading-size-row">
+      <div class="sp-row-label"><span class="ico" aria-hidden="true">Aa</span><div><div id="dkReadingLabel">Reading text</div><div class="sp-row-sub">Larger text, shorter excerpts. Your feed stays the same.</div></div></div>
+      <div class="reading-size-choices" role="radiogroup" aria-labelledby="dkReadingLabel">
+        <button type="button" role="radio" data-reading-size="standard" aria-checked="true" class="on">Standard</button><button type="button" role="radio" data-reading-size="large" aria-checked="false" tabindex="-1">Large</button><button type="button" role="radio" data-reading-size="larger" aria-checked="false" tabindex="-1">Larger</button>
+      </div>
+    </div>
+    <div class="sp-row">
+      <div class="sp-row-label"><span class="ico" aria-hidden="true">◑</span><div><div>Dim images in dark mode</div><div class="sp-row-sub">Soften bright photos while reading at night.</div></div></div>
+      <button type="button" class="toggle-sw" id="dkDimImagesToggle" role="switch" aria-label="Dim images in dark mode" aria-checked="false"></button>
+    </div>
+  </div>
+
   <div class="sp-section wikipedia-only">
     <div class="sp-section-title">Discovery</div>
 
@@ -498,6 +523,13 @@
   <div class="kb-hint"><span class="kb-key">Esc</span> Close</div>
 </div>
 
+<dialog id="imageDialog" class="source-dialog image-dialog" aria-labelledby="imageTitle">
+  <button type="button" class="modal-close" id="imageClose" aria-label="Close image">✕</button>
+  <h2 id="imageTitle" dir="auto"></h2>
+  <figure class="image-inspection"><img id="inspectedImage" alt="" decoding="async"><p id="imageLoadError" role="status" hidden>Image could not load. Open the original article to view it.</p></figure>
+  <a id="imageSourceLink" target="_blank" rel="noopener">View image and credits on the original article</a>
+</dialog>
+
 <dialog id="sourceDialog" class="source-dialog" aria-labelledby="sourceTitle">
 <form method="dialog"><button class="modal-close" aria-label="Close source guide">✕</button></form>
 <p class="source-eyebrow">Two ways to explore</p><h2 id="sourceTitle">Where will curiosity take you?</h2>
@@ -505,10 +537,10 @@
 <section><h3>Wikivoyage <span>Explore places</span></h3><p>Community-written travel guides to places around the world.</p></section>
 <p class="source-footnote">Free knowledge. Switch sources anytime; your saved articles stay together.</p>
 </dialog>
-<script src="/i18n.js?v=53"></script>
+<script src="/i18n.js?v=54"></script>
 <script src="/discovery.js?v=49"></script>
-<script src="/app.js?v=91"></script>
-<script src="/atlas.js?v=56"></script>
+<script src="/app.js?v=92"></script>
+<script src="/atlas.js?v=57"></script>
 <noscript><p>WikiScroll is a free Wikipedia and Wikivoyage discovery reader. Enable JavaScript to browse articles, save favorites, and explore topics in 15 languages.</p></noscript>
 <script src="/features.js?v=68"></script>
 <script src="/webmcp.js?v=1"></script>

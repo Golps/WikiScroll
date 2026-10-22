@@ -1,0 +1,21 @@
+---
+import Icon from '../Icon.astro';
+import HelpTypes from './HelpTypes.astro';
+const { desktop = false } = Astro.props;
+const row = desktop ? 'sp-row' : 'burger-row wikipedia-only', label = desktop ? 'sp-row-label' : 'burger-row-label', sub = desktop ? 'sp-row-sub' : 'burger-row-sub';
+const prefix = desktop ? 'dk' : 'm', helpLabel = `${prefix}HelpLabel`;
+const depths = ['Popular','Known','Balanced','Niche','Obscure'];
+---
+<div class={row}>
+  <div class={label}><span class="ico"><Icon name="depth" /></span><div><div>Article Depth</div><div class={sub}>Popular to obscure, based on readership.</div></div></div>
+</div>
+<div class={row} style="padding-top:0;border:none;">
+  <div class="depth-wrap"><div class="depth-track"><input type="range" class="depth-slider" aria-label="Article depth" id={desktop ? 'dkDepthSlider' : 'depthSlider'} min="1" max="5" value="3" step="1"></div>
+    <div class="depth-steps" id={desktop ? 'dkDepthSteps' : 'depthSteps'}>{depths.map((name,i)=><div class={`depth-step${i===2?' active':''}`} data-d={i+1}><div class="ds-dot"></div><span>{name}</span></div>)}</div>
+  </div>
+</div>
+<div class={`${row} help-only help-row`}>
+  <div class={label}><span class="ico"><Icon name="sources" /></span><div><div id={helpLabel}>Help Wikipedia</div><div class={`${sub} help-sub`}><span data-for="off">Discover articles you can help improve.</span><span data-for="tags">Labels articles that need improvement.</span><span data-for="only">Shows only articles that need improvement.</span></div></div></div>
+  <div class="help-seg" role="radiogroup" aria-labelledby={helpLabel}><button type="button" role="radio" data-help-choice="off" aria-checked="true" class="on">Off</button><button type="button" role="radio" data-help-choice="tags" aria-checked="false" tabindex="-1">Show tags</button><button type="button" role="radio" data-help-choice="only" aria-checked="false" tabindex="-1">Only these articles</button></div>
+</div>
+<HelpTypes prefix={prefix} />

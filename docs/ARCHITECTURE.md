@@ -1,0 +1,122 @@
+# Architecture
+
+This page describes how WikiScroll is organized: where things live and which rules hold across the codebase. For the reasoning behind the reliability work, see [ENGINEERING.md](ENGINEERING.md). For setup and deployment, see [DEVELOPMENT.md](DEVELOPMENT.md).
+
+## Bird's-eye view
+
+WikiScroll has two parts, deployed together as a single Cloudflare Worker with static assets:
+
+1. **An Astro-built static front end** (`src/` + `public/` → `dist/`). Astro components generate HTML at build time; ordered CSS modules are bundled into one content-hashed stylesheet and classic browser scripts are copied as static files. No Astro client router, hydration runtime or server adapter is added. The existing Worker continues to own APIs and request handling. The browser holds all user data (saved articles, collections, history, settings) in `localStorage`, with IndexedDB as a second copy of saved articles.
+2. **A Worker** (`worker/`). It answers a few JSON endpoints that turn Wikimedia's APIs into ready-to-read cards. It verifies metadata for shared links and collections, and serves prebuilt preview artwork. It has no database: its only state is Cloudflare's edge cache, in-memory maps for coalescing requests, and rate-limit bindings.
+
+The diagram below shows ordinary preloading. Online Wikipedia and unfiltered Wikivoyage openings include a per-draw random key and bypass completed shared batches; they reuse source metadata and coalesce retries of that exact draw. Topic and Help openings follow the same rule. Offline openings use an exact-settings local reserve or eligible starter content.
+
+```mermaid
+sequenceDiagram
+  participant R as Reader (browser)
+  participant W as Worker
+  participant C as Edge cache
+  participant M as Wikimedia APIs
+  R->>W: GET /api/articles?mode=wiki&lang=en&depth=3&batch=17
+  W->>C: look up batch slot
+  alt fresh or stale hit
+    C-->>W: cached cards
+    W-->>R: cards (stale ones trigger a background refresh)
+  else miss
+    W->>M: random candidates (no introductions yet)
+    W->>M: complete candidate pageviews, chunks of 5
+    W->>W: select candidates by requested depth
+    W->>M: introductions for selected candidates, chunks of 5
+    W-->>R: cards that are ready within the answer budget
+    W->>C: store the completed batch
+  end
+```
+
+The browser asks the Worker for batches and keeps a reserve queued ahead of the card on screen. If the Worker can't be reached, the browser calls the Wikimedia API directly, with its own deadlines and request budget.
+
+## Code map
+
+### Frontend templates and styles
+
+`src/pages/index.astro` composes the reader shell. Shared reading preferences, discovery controls and travel forms live in `src/components/settings/`; `collections/CollectionDialogs.astro` renders inert dialog templates that browser code clones with instance-specific IDs. AboutContent.astro is shared by the public About page and its dialog.
+
+`src/styles/reader.css` imports the existing cascade in order. Vite emits one stylesheet; `scripts/astro-offline.mjs` adds its generated URL to the service-worker precache and hashes the generated HTML/CSS into the shell cache identity. `scripts/build.mjs` serializes builds sharing `dist/`.
+
+### `public/`: the browser app
+
+| File | Responsibility |
+|---|---|
+| `app.js` | The core: constants, state and persistence, the supply queue, card rendering, likes and collections, settings, gestures (touch, mouse, trackpad, keyboard), maps and "On this day". |
+| `atlas.js` | Presentation only: fitting excerpts to the space available, making closed drawers `inert`, keeping the current card in place across resizes, dialog dismissal, theme metadata. |
+| `features.js` | Wikivoyage travel filters (including the end-of-results card), and sharing and importing collection snapshots. |
+| `discovery.js` | The dismissible "follow your curiosity" hint for first-time readers. |
+| `lang.js`, `i18n.js` + `translations/<lang>.js` | Interface localization. `lang.js` loads the reader's dictionary (one small file per language) as early as possible; `i18n.js` applies it through a `MutationObserver`. Article text is excluded. |
+| `sw.js` | Service worker: offline app shell, network-first page loads with a 2.5-second fallback to cache, and a cache of up to 80 Wikimedia images. |
+| `data/starter-en.json` | A small bundled set of English articles for eligible offline openings when there is no matching local reserve. Online openings wait for an independent live draw. See [STARTER-SOURCES.md](STARTER-SOURCES.md). |
+
+### `worker/`: the Cloudflare Worker
+
+| File | Responsibility |
+|---|---|
+| `index.js` | Entry point and routing. Builds `/api/articles` and `/api/travel` batches, bounds upstream calls (`upstream`), serves link-preview HTML to bots, serves static assets, and optionally injects the analytics beacon. |
+| `topics.js` | `/api/topics`: samples articles for a topic by walking random branches of Wikipedia's category tree, then filters them by depth. |
+| `vital.js` | *Popular* and *Known* depths: builds and caches Wikipedia's Level 3 and Level 4 vital-article lists, and maps them to other languages through interlanguage links. |
+| `pageviews.js` | Completes pageview data 5 pages at a time, averages views while ignoring publication lag, and scales depth ranges per language. |
+| `extracts.js` | Fetches introductions separately, in parallel chunks of 5. |
+| `needs.js` | Help Wikipedia: finds maintenance needs through hidden tracking categories, and samples articles that need work. |
+| `today.js` | `/api/today`: parses Wikipedia's "On this day" feed into exact page-ID matches and occasional surprise cards. |
+| `collections.js` | Decodes and validates shared collections, renders the verified collection page, and serves prebuilt PNG preview artwork. |
+| `verified.js` | Fetches article metadata again from Wikimedia by page ID, for shared links and collections. |
+| `runtime.js` | One invocation budget for fetch and cache operations, a shared upstream scheduler, deadlines and cooldowns. |
+| `supply.js` | Bounded reusable source records for readership, introductions and maintenance tags, isolated by edition/source; a separate bounded, short-lived cache for retries of individual opening draws. |
+| `security.js` | Rate-limit checks that fail closed, the `429` response, security headers on every response, and the page's Content Security Policy (`PAGE_CSP`). |
+| `languages.js` | The 15 supported languages, shared by the router and shared collections. |
+| `travel.js` | Travel search rules: reading one or more places, matching guides to a place, alternating between places, and the per-place pagination cursor. |
+
+### Everything else
+
+| Path | Purpose |
+|---|---|
+| `test/` | `node --test` suites for the Worker modules, plus browser logic extracted from `public/*.js` and run in `node:vm` sandboxes. |
+| `scripts/` | `deploy.sh` (token-scoped deployment), `build.mjs` + `astro-offline.mjs` (static build and offline stylesheet integration), `build-branding.mjs` (regenerates icons and renders the outlined share image). |
+| `branding/` | Logo sources and the approved raster social artwork. |
+| `wrangler.jsonc` | Worker configuration: static assets, rate-limit bindings and observability. |
+| `docs/` | This documentation and the images used in the README. |
+
+## Data model
+
+Articles move through the system in one small shape:
+
+```js
+{ id: 'w12345',            // 'w' = Wikipedia, 'v' = Wikivoyage, then the page ID
+  src: 'wiki',             // 'wiki' | 'how' (Wikivoyage)
+  title, body,             // plain text, stripped of HTML
+  img: 'https://upload.wikimedia.org/…',
+  url: 'https://en.wikipedia.org/wiki/…',
+  desc?, topic?, needs? }  // short description, requested topic, maintenance needs
+```
+
+The browser stores data under stable keys: `ws_liked`, `ws_collections`, `ws_history`, `ws_settings`, `ws_topics`, `ws_travel_filters`, `ws_stats_*`, `ws_weekly_*` and `ws_feed_reserves`, plus the `wikiscroll` IndexedDB database. These keys are part of the app's compatibility contract: changing them would erase readers' libraries.
+
+## Invariants
+
+These rules hold across the codebase, and many are enforced by tests. Changes should preserve them.
+
+- **No personalization from behavior.** Feed requests contain explicit choices (source, language, depth, topics, Help Wikipedia mode and travel filters), a batch slot, and an ephemeral opening draw when needed. Likes and previous cards never personalize live selection; history stays on-device and can order offline reserves.
+- **Depth means readership, not length.** Excerpt length is never used as a stand-in for depth. Pages with unknown readership never qualify as *Obscure*.
+- **One feed generation at a time.** Changing source, language or filters increments `fillGeneration`, aborts in-flight requests and cancels animations. Any reply or animation frame from an older generation is discarded.
+- **The visible card is never lost.** Clean-up, resizes, supply gaps and gestures keep the reader on the article they are reading.
+- **Swipe right only saves.** Swiping right and double-tapping add a save and never remove one. Only the Save button and <kbd>L</kbd> toggle.
+- **Shared content is re-verified.** Collection links carry IDs. Displayed titles, excerpts and images come from Wikimedia, not from the link.
+- **Rate limits fail closed.** If a rate-limit binding is missing or errors, the Worker refuses expensive work instead of doing it without a limit.
+- **Mirrored tables stay identical.** `app.js` keeps copies of `VIEW_SCALE`, the list of Wikivoyage languages, `HELP_LANGS` and the 15 languages (`worker/languages.js`) from the Worker. Tests fail if they drift.
+- **No inline scripts.** Pages run under a Content Security Policy without `'unsafe-inline'` for scripts, so behavior is attached with listeners, never with `on…=""` attributes or inline `<script>` blocks (JSON-LD data is fine). The API sends no CORS headers; it serves only WikiScroll's own pages.
+- **No dead CSS.** `test/unused-css.test.js` fails when a style rule targets a class or ID that no page or script uses.
+
+## Cross-cutting concerns
+
+- **Request isolation:** each invocation owns its upstream queue, timers and abort controllers, with at most three active upstream calls and 48 combined fetch/cache operations (44 fetch maximum). Plain host cooldown data is shared across invocations. Pending batch entries expire at their original work deadline; late cleanup cannot remove a newer replacement job. Browser refills retry topic/Help partial results and recover random remainders in at most two background lanes without blocking fresh foreground work. During an upstream cooldown, a continuing feed may read complete matching batches from eight edge-cache slots per recovery request. This path never starts upstream work, uses at most eight windows per pause, and is disabled for new openings.
+- **Caching layers:** browser (queued cards in memory, saved reserves in `localStorage`, service-worker cache), then Worker (in-flight request maps, per-isolate memory for the vital-article lists), then the Cloudflare edge cache (article batches and topic batches for 24 hours, complete travel search pages for 1 hour, vital-article lists for 7 days, "On this day" data for 6 hours, verified metadata for 24 hours).
+- **Cache versioning:** cache keys include a version (`version=8` for articles, `v=7` for topics). Front-end assets use `?v=` query strings that must match the `SHELL` list and the `CACHE` name in `sw.js`.
+- **Security headers:** `secure()` in `worker/security.js` adds `nosniff`, `DENY` framing, a strict referrer policy, a permissions policy and HSTS to every response, and the app's Content Security Policy (`PAGE_CSP`) to its pages. `public/_headers` sends the same policy for files served without the Worker. Generated pages (link previews, collection pages) set their own stricter CSP.
+- **Localization:** interface strings are translated by text match in `i18n.js`, with templates for messages that contain a collection name or a count (`Added to "{name}"`). New labels need entries in every `translations/<lang>.js`; `test/i18n.test.js` checks the core controls and every toast message.

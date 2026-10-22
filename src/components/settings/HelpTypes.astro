@@ -1,0 +1,16 @@
+---
+import Icon from "../Icon.astro";
+import {HELP_TYPES,availableHelpTypes} from '../../../worker/needs.js';
+const {prefix} = Astro.props;
+const labels = {sources:'Citations',images:'Photos',copyedit:'Copy editing',clarify:'Clarity',outdated:'Updates',detail:'More detail'};
+const titles = {sources:'Citations & sources',clarify:'Needs clarification',detail:'Needs more detail'};
+const config = Object.fromEntries(Object.entries(HELP_TYPES).map(([id,needs])=>[id,{needs,langs:['en','de','fr','es'].filter(lang=>availableHelpTypes(lang).includes(id))}]));
+---
+<div class="help-type-options wikipedia-only help-only" id={`${prefix}HelpTypes`} data-help-config={JSON.stringify(config)} hidden>
+  <div class="help-type-heading"><span id={`${prefix}HelpTypesLabel`}>Help types</span><button type="button" class="help-types-all">Select all</button></div>
+  <p class="help-type-description">Choose one or more types of work.</p>
+  <div class="help-type-grid" role="group" aria-labelledby={`${prefix}HelpTypesLabel`}>
+    {Object.entries(labels).map(([id,label])=><button type="button" data-help-type={id} aria-pressed="true" title={titles[id] || label}><Icon name={id} /><span>{label}</span></button>)}
+  </div>
+  <p class="help-type-note" hidden>Help types vary by language.</p>
+</div>

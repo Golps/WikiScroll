@@ -1,0 +1,20 @@
+---
+import Icon from '../Icon.astro';
+const { desktop = false } = Astro.props;
+const row = desktop ? 'sp-row' : 'burger-row', label = `${row}-label`, sub = `${row}-sub`;
+const readingLabel = `${desktop ? 'dk' : 'm'}ReadingLabel`;
+---
+<div class={`${row} reading-size-row`}>
+  <div class={label}><span class="ico" aria-hidden="true">Aa</span><div><div id={readingLabel}>Reading text</div><div class={sub}>Larger text, shorter excerpts. Your feed stays the same.</div></div></div>
+  <div class="reading-size-choices" role="radiogroup" aria-labelledby={readingLabel}>
+    <button type="button" role="radio" data-reading-size="standard" aria-checked="true" class="on">Standard</button><button type="button" role="radio" data-reading-size="large" aria-checked="false" tabindex="-1">Large</button><button type="button" role="radio" data-reading-size="larger" aria-checked="false" tabindex="-1">Larger</button>
+  </div>
+</div>
+<div class={`${row} reading-option-row`}>
+  <div class={label}><span class="ico"><Icon name="dim-images" /></span><div><div>Dim images in dark mode</div><div class={sub}>Soften bright photos while reading at night.</div></div></div>
+  <button type="button" class="toggle-sw" id={desktop ? 'dkDimImagesToggle' : 'dimImagesToggle'} role="switch" aria-label="Dim images in dark mode" aria-checked="false"></button>
+</div>
+<div class={`${row} reading-option-row`}>
+  <div class={label}><span class="ico"><Icon name="ambient" /></span><div><div>Ambient Mode</div><div class={sub}>{desktop ? 'Spacebar for distraction-free reading.' : 'Long-press for distraction-free reading.'}</div></div></div>
+  <button class="toggle-sw on" id={desktop ? 'dkAmbientToggle' : 'ambientToggle'} role="switch" aria-label="Ambient Mode" aria-checked="true"></button>
+</div>

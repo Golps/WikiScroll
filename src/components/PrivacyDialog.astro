@@ -1,0 +1,31 @@
+<!-- PRIVACY POLICY MODAL -->
+<dialog class="privacy-dialog" id="privacyDialog" aria-labelledby="privacyTitle">
+  <div style="position:relative;">
+    <button class="modal-close" id="privacyClose" aria-label="Close privacy policy">✕</button>
+    <div class="modal-logo" id="privacyTitle" style="text-align:center;">Privacy Policy</div>
+    <div style="font-size:13px;line-height:1.75;color:rgba(255,255,255,.65);">
+      <p style="margin-bottom:12px;font-size:11px;color:var(--dim);">Last updated: September 2026</p>
+
+      <p style="margin-bottom:14px;"><strong style="color:rgba(255,255,255,.85);">What WikiScroll is.</strong> WikiScroll is a free web application that displays random articles from Wikipedia and Wikivoyage. It is hosted on Cloudflare Workers.</p>
+
+      <p style="margin-bottom:14px;"><strong style="color:rgba(255,255,255,.85);">Data we collect.</strong> WikiScroll does not require an account or automatically upload your saved collections. To load articles, your browser asks WikiScroll's server on Cloudflare for batches of cards, which it fetches from Wikimedia; these requests contain your chosen source, language, article depth, topics, Help Wikipedia setting and travel filters, plus technical details such as a batch number and today's date, but never your saved articles, collections or reading history. If you share a collection, its selected contents are included in the link and processed by Cloudflare to display the collection and its preview image. We do not set tracking cookies or use advertising SDKs. When enabled, Cloudflare Web Analytics provides cookieless, non-identifying measurements of visits and performance; it does not receive your saved articles, collections, or reading history. We do not know who you are.</p>
+
+      <p style="margin-bottom:14px;"><strong style="color:rgba(255,255,255,.85);">Local storage.</strong> Your preferences (saved articles, reading history, settings, theme, and collections) are stored exclusively in your browser's localStorage and IndexedDB. This data stays on your device unless you choose to share a collection. Shared links contain the selected collection name, article titles, excerpts, and article identifiers. Anyone with the link, and the messaging service generating its preview, can read that snapshot. Links cannot be revoked; deleting a local collection does not delete a previously shared snapshot. You can clear it at any time through your browser settings.</p>
+
+      <p style="margin-bottom:14px;"><strong style="color:rgba(255,255,255,.85);">Third-party services.</strong> WikiScroll loads content from the following external services:
+      </p>
+      <ul style="margin:0 0 14px 18px;padding:0;">
+        <li style="margin-bottom:6px;"><strong>Wikipedia / Wikivoyage / Wikimedia APIs</strong>: Article content, images, and pageview statistics. Subject to the Wikimedia Foundation's privacy policy.</li>
+        <li style="margin-bottom:6px;"><strong>Cloudflare Workers</strong>: Hosting and CDN delivery. Cloudflare may collect standard web server logs (IP address, user agent, timestamps) as part of their infrastructure. Subject to Cloudflare's privacy policy.</li>
+        <li>Leaflet, OpenStreetMap / Nominatim, CARTO and cdnjs: map software, map tiles and delivery. Maps use Wikivoyage's own coordinates; when a guide has none, its place name is sent to Nominatim to locate it. Requests are subject to each provider’s privacy policy.</li>
+      </ul>
+
+      <p style="margin-bottom:14px;"><strong style="color:rgba(255,255,255,.85);">Service Worker.</strong> WikiScroll registers a service worker to cache articles for offline use. This caching is entirely local to your device.</p>
+
+      <p style="margin-bottom:14px;"><strong style="color:rgba(255,255,255,.85);">Changes to this policy.</strong> WikiScroll reserves the right to update, modify, or replace this privacy policy at any time and for any reason. Any changes will be reflected on this page with an updated revision date. Your continued use of WikiScroll after changes constitutes acceptance of the revised policy. We recommend reviewing this policy periodically.</p>
+
+      <p style="margin-bottom:0;"><strong style="color:rgba(255,255,255,.85);">Contact.</strong> If you have questions about this policy, contact us at contact@wikiscroll.com.</p>
+    </div>
+  </div>
+</dialog>
+

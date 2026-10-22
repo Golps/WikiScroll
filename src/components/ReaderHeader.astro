@@ -1,0 +1,37 @@
+<!-- HEADER -->
+<header class="hdr">
+  <div class="hdr-left"><div class="brand"><h1 class="logo" data-text="WikiScroll" style="margin:0"><img class="wordmark wordmark-dark" src="/images/wordmark-dark.svg" alt="WikiScroll"><img class="wordmark wordmark-light" src="/images/wordmark-light.svg" alt="WikiScroll"></h1><span class="brand-note">The discovery reader</span></div></div>
+  <div class="hdr-mid" aria-label="Article source">
+    <div class="toggle">
+      <button class="tbtn won on" id="wBtn"><span>Wikipedia</span><small>Discover knowledge</small></button>
+      <button class="tbtn" id="hBtn"><span>Wikivoyage</span><small>Explore places</small></button>
+
+    </div>
+  </div>
+  <div class="hdr-tools-left"><button id="headerTheme" class="pill" type="button" aria-label="Toggle light mode"><svg class="atlas-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/></svg></button>
+    <div class="lang-wrap">
+      <button class="pill" id="langBtn"><svg class="atlas-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><ellipse cx="12" cy="12" rx="4" ry="9"/><path d="M3 12h18"/></svg><span id="langTxt">English</span></button>
+      <div class="lang-dd" id="langDd"></div>
+    </div>
+
+  </div>
+  <div class="hdr-right">
+    <button class="pill" id="likesBtn">
+      <svg class="atlas-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h12v18l-6-4-6 4z"/></svg><span>Saved</span>
+      <span class="badge" id="badge" style="display:none">0</span>
+    </button>
+    <button class="pill wikipedia-only" id="topicsBtn">
+      <svg class="atlas-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg><span>Topics</span>
+      <span class="badge topic-badge" id="topicBadge" style="display:none">0</span>
+    </button>
+    <button class="pill" id="settingsBtn"><svg class="atlas-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h6m4 0h8M3 12h12m4 0h2M3 18h2m4 0h12"/><circle cx="11" cy="6" r="2"/><circle cx="17" cy="12" r="2"/><circle cx="7" cy="18" r="2"/></svg><span>Settings</span></button>
+    <button class="burger-btn" id="burgerBtn" title="Menu" aria-label="Menu">
+      <svg viewBox="0 0 18 18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+        <line x1="2" y1="4.5" x2="16" y2="4.5"/>
+        <line x1="2" y1="9" x2="16" y2="9"/>
+        <line x1="2" y1="13.5" x2="16" y2="13.5"/>
+      </svg>
+    </button>
+  </div>
+</header>
+

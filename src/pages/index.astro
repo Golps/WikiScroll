@@ -1,0 +1,39 @@
+---
+import PageLayout from "../layouts/PageLayout.astro";
+import ReaderHead from "../components/ReaderHead.astro";
+import ReaderHeader from "../components/ReaderHeader.astro";
+import MobileSettings from "../components/MobileSettings.astro";
+import TopicsPanel from "../components/TopicsPanel.astro";
+import SavedPanel from "../components/SavedPanel.astro";
+import HistoryPanel from "../components/HistoryPanel.astro";
+import ReaderFeed from "../components/ReaderFeed.astro";
+import AboutDialog from "../components/AboutDialog.astro";
+import PrivacyDialog from "../components/PrivacyDialog.astro";
+import DesktopSettings from "../components/DesktopSettings.astro";
+import MapExplorer from "../components/MapExplorer.astro";
+import AmbientReader from "../components/AmbientReader.astro";
+import KeyboardHints from "../components/KeyboardHints.astro";
+import ImageInspection from "../components/ImageInspection.astro";
+import SourceGuide from "../components/SourceGuide.astro";
+import CollectionDialogs from "../components/collections/CollectionDialogs.astro";
+import ReaderScripts from "../components/ReaderScripts.astro";
+---
+<PageLayout>
+<ReaderHead slot="head" />
+<ReaderHeader />
+<MobileSettings />
+<TopicsPanel />
+<SavedPanel />
+<HistoryPanel />
+<ReaderFeed />
+<AboutDialog />
+<PrivacyDialog />
+<DesktopSettings />
+<MapExplorer />
+<AmbientReader />
+<KeyboardHints />
+<ImageInspection />
+<SourceGuide />
+<CollectionDialogs />
+<ReaderScripts />
+</PageLayout>

@@ -1,0 +1,71 @@
+/* Shared two-tone icons: decorative SVGs retain adjacent readable labels. */
+.ws-icon { width:1.15em; height:1.15em; display:inline-block; flex:none; vertical-align:-.16em; color:var(--ui-icon-color,#91b1ea); }
+.ws-icon[data-ui-icon="space"] { --ui-icon-color:#a8a4ef; }
+.ws-icon[data-ui-icon="architecture"] { --ui-icon-color:#a8b6ca; }
+.ws-icon[data-ui-icon="music"] { --ui-icon-color:#c6a7e9; }
+.ws-icon[data-ui-icon="biology"] { --ui-icon-color:#86c7aa; }
+.ws-icon[data-ui-icon="food"] { --ui-icon-color:#dbb58a; }
+.ws-icon[data-ui-icon="science"] { --ui-icon-color:#84bfd0; }
+.ws-icon[data-ui-icon="history"] { --ui-icon-color:#d1b888; }
+.ws-icon[data-ui-icon="geo"] { --ui-icon-color:#89b7df; }
+.ws-icon[data-ui-icon="arts"] { --ui-icon-color:#d6a3a8; }
+.ws-icon[data-ui-icon="tech"] { --ui-icon-color:#8daee3; }
+.ws-icon[data-ui-icon="people"] { --ui-icon-color:#baa8cf; }
+.ws-icon[data-ui-icon="sports"] { --ui-icon-color:#c0c98b; }
+.ws-icon[data-ui-icon="sources"] { --ui-icon-color:#91b1ea; }
+.ws-icon[data-ui-icon="images"] { --ui-icon-color:#86b8cf; }
+.ws-icon[data-ui-icon="copyedit"] { --ui-icon-color:#b7a2d4; }
+.ws-icon[data-ui-icon="clarify"] { --ui-icon-color:#d5be8f; }
+.ws-icon[data-ui-icon="outdated"] { --ui-icon-color:#8cbfa3; }
+.ws-icon[data-ui-icon="detail"] { --ui-icon-color:#a3b5d1; }
+.ws-icon[data-ui-icon="discovery"] { --ui-icon-color:#8facdd; }
+.ws-icon[data-ui-icon="folder"] { --ui-icon-color:#a7b6cc; }
+.ws-icon[data-ui-icon="bookmark"] { --ui-icon-color:#91b1ea; }
+.ws-icon[data-ui-icon="stats"] { --ui-icon-color:#8cbfa3; }
+.ws-icon[data-ui-icon="clock"] { --ui-icon-color:#a7b6cc; }
+.ws-icon[data-ui-icon="depth"] { --ui-icon-color:#84bfd0; }
+.ws-icon[data-ui-icon="swipe"] { --ui-icon-color:#b7a2d4; }
+.ws-icon[data-ui-icon="map"] { --ui-icon-color:#86b8cf; }
+.ws-icon[data-ui-icon="offline"] { --ui-icon-color:#d5be8f; }
+.ws-icon[data-ui-icon="calendar"] { --ui-icon-color:#a3b5d1; }
+.ws-icon[data-ui-icon="ambient"] { --ui-icon-color:#a8a4ef; }
+.ws-icon[data-ui-icon="check"] { --ui-icon-color:#8cbfa3; }
+body.light .ws-icon[data-ui-icon="space"] { --ui-icon-color:#6159a5; }
+body.light .ws-icon[data-ui-icon="architecture"] { --ui-icon-color:#536a88; }
+body.light .ws-icon[data-ui-icon="music"] { --ui-icon-color:#79559c; }
+body.light .ws-icon[data-ui-icon="biology"] { --ui-icon-color:#37785b; }
+body.light .ws-icon[data-ui-icon="food"] { --ui-icon-color:#8a643a; }
+body.light .ws-icon[data-ui-icon="science"] { --ui-icon-color:#31748a; }
+body.light .ws-icon[data-ui-icon="history"] { --ui-icon-color:#81632c; }
+body.light .ws-icon[data-ui-icon="geo"] { --ui-icon-color:#3d6d96; }
+body.light .ws-icon[data-ui-icon="arts"] { --ui-icon-color:#97545e; }
+body.light .ws-icon[data-ui-icon="tech"] { --ui-icon-color:#486da4; }
+body.light .ws-icon[data-ui-icon="people"] { --ui-icon-color:#775c95; }
+body.light .ws-icon[data-ui-icon="sports"] { --ui-icon-color:#667638; }
+body.light .ws-icon[data-ui-icon="sources"] { --ui-icon-color:#416ba8; }
+body.light .ws-icon[data-ui-icon="images"] { --ui-icon-color:#396f8a; }
+body.light .ws-icon[data-ui-icon="copyedit"] { --ui-icon-color:#735793; }
+body.light .ws-icon[data-ui-icon="clarify"] { --ui-icon-color:#80632e; }
+body.light .ws-icon[data-ui-icon="outdated"] { --ui-icon-color:#3c7757; }
+body.light .ws-icon[data-ui-icon="detail"] { --ui-icon-color:#516e98; }
+body.light .ws-icon[data-ui-icon="discovery"] { --ui-icon-color:#496a9e; }
+body.light .ws-icon[data-ui-icon="folder"] { --ui-icon-color:#536b8b; }
+body.light .ws-icon[data-ui-icon="bookmark"] { --ui-icon-color:#416ba8; }
+body.light .ws-icon[data-ui-icon="stats"] { --ui-icon-color:#3c7757; }
+body.light .ws-icon[data-ui-icon="clock"] { --ui-icon-color:#536b8b; }
+body.light .ws-icon[data-ui-icon="depth"] { --ui-icon-color:#31748a; }
+body.light .ws-icon[data-ui-icon="swipe"] { --ui-icon-color:#735793; }
+body.light .ws-icon[data-ui-icon="map"] { --ui-icon-color:#396f8a; }
+body.light .ws-icon[data-ui-icon="offline"] { --ui-icon-color:#80632e; }
+body.light .ws-icon[data-ui-icon="calendar"] { --ui-icon-color:#516e98; }
+body.light .ws-icon[data-ui-icon="ambient"] { --ui-icon-color:#6159a5; }
+body.light .ws-icon[data-ui-icon="check"] { --ui-icon-color:#3c7757; }
+.cat-tag, body.light .cat-tag { display:inline-flex; align-items:center; gap:6px; }
+.burger-row-label .ico,.sp-row-label .ico { display:inline-flex; align-items:center; justify-content:center; flex:none; }
+.ico .ws-icon { width:22px; height:22px; }
+.topic-chip .ws-icon,.btopic .ws-icon { width:18px; height:18px; }
+.empty-ico .ws-icon,.err-ico .ws-icon { width:1em; height:1em; }
+.heart .ws-icon { width:64px; height:64px; filter:drop-shadow(0 2px 12px #0005); }
+.hi-time .ws-icon { width:14px; height:14px; margin-inline-end:3px; }
+.map-loading-text,.ambient-label { display:flex; align-items:center; justify-content:center; gap:8px; }
+.language-code { font-size:11px; font-weight:650; letter-spacing:.04em; color:var(--muted); min-width:24px; display:inline-block; }

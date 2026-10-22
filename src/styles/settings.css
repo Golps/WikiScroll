@@ -1,0 +1,30 @@
+/* Maintenance filters are one inline group, shared by both settings panels. */
+.help-type-options { margin:14px 0 20px; padding:16px; border:1px solid var(--border); border-radius:14px; background:var(--surface); animation:help-options-in 220ms ease-out both; }
+.help-type-options[hidden],.help-type-grid button[hidden],.help-type-note[hidden] { display:none; }
+.help-type-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; font-size:14px; font-weight:650; }
+.help-types-all { font:inherit; font-size:12px; font-weight:500; border:0; background:none; color:var(--accent); padding:6px 0; cursor:pointer; }
+.help-types-all:disabled { opacity:.5; cursor:default; }
+.help-type-description,.help-type-note { color:var(--muted); font-size:12px; line-height:1.5; margin:6px 0 14px; }
+.help-type-note { margin:12px 0 0; }
+.help-type-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); grid-auto-rows:1fr; gap:8px; }
+.help-type-grid button { display:flex; align-items:center; gap:8px; height:48px; min-width:0; padding:10px 9px; border:1px solid var(--border); border-radius:9px; background:transparent; color:var(--muted); font:inherit; font-size:13px; text-align:start; cursor:pointer; }
+.help-type-options[data-help-count="1"] .help-type-grid { grid-template-columns:1fr; }
+.help-type-grid button > span { white-space:nowrap; }
+.help-type-grid button[aria-pressed="true"] { border-color:var(--accent); background:color-mix(in srgb,var(--accent) 12%,transparent); color:var(--ink); }
+.help-type-grid button[aria-pressed="false"] .ws-icon { opacity:.5; }
+.help-type-grid button:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+.help-type-grid .ws-icon { width:18px; height:18px; }
+body[data-help-mode="only"] .burger-row.help-row { border-bottom:0; padding-bottom:0; }
+@media(max-width:359px) { .help-type-grid { grid-template-columns:1fr; } }
+@keyframes help-options-in { from { opacity:0; transform:translateY(-5px); } to { opacity:1; transform:none; } }
+@media(prefers-reduced-motion:reduce) { .help-type-options { animation:none; } }
+
+/* Reading switches: centered icons in a common column; toggles align with titles. */
+.ws-icon[data-ui-icon="dim-images"] { --ui-icon-color:#86b8cf; }
+body.light .ws-icon[data-ui-icon="dim-images"] { --ui-icon-color:#396f8a; }
+.burger-row.reading-option-row, #settingsPanel .sp-row.reading-option-row { align-items:flex-start; gap:16px; }
+.reading-option-row .burger-row-label,.reading-option-row .sp-row-label { display:grid; grid-template-columns:24px minmax(0,1fr); gap:10px; align-items:start; flex:1; }
+.reading-option-row .ico { width:24px; height:24px; align-self:center; }
+.reading-option-row .burger-row-label > div > div:first-child,.reading-option-row .sp-row-label > div > div:first-child { line-height:24px; }
+.reading-option-row > .toggle-sw { margin-top:0; }
+@media(min-width:768px) { #settingsPanel .sp-row.reading-option-row > .toggle-sw { margin-top:-1px; } }

@@ -1,0 +1,55 @@
+const CACHE='wikiscroll-atlas-v112';
+const SHELL=['/images/ui-icons.svg?v=3','/discovery.js?v=49','/about/','/about.css?v=51','/about.js?v=48','/images/wordmark-dark.svg','/images/wordmark-light.svg','/images/favicon.ico?v=42','/images/apple-touch-icon.png?v=42','/images/icon-192.png?v=42','/images/icon-512.png?v=42','/lang.js?v=10','/translations/es.js?v=10','/translations/fr.js?v=10','/translations/de.js?v=10','/translations/it.js?v=10','/translations/pt.js?v=10','/translations/ru.js?v=10','/translations/ja.js?v=10','/translations/zh.js?v=10','/translations/ar.js?v=10','/translations/hi.js?v=10','/translations/ko.js?v=10','/translations/nl.js?v=10','/translations/pl.js?v=10','/translations/he.js?v=10','/i18n.js?v=55','/data/starter-en.json','/features.js?v=71','/webmcp.js?v=1','/','/app.js?v=97','/atlas.js?v=57','/manifest.json','/images/icon-192.png','/images/icon-512.png',/* ASTRO_STYLES */];
+// Wikimedia serves article images from both hosts (thumb.wikimedia.org since 2026).
+const IMAGE_HOSTS=new Set(['upload.wikimedia.org','thumb.wikimedia.org']);
+self.addEventListener('install',event=>{
+  event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(SHELL)).then(()=>self.skipWaiting()));
+});
+self.addEventListener('activate',event=>{
+  event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k.startsWith('wikiscroll-')&&k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim()));
+});
+self.addEventListener('fetch',event=>{
+  const req=event.request,url=new URL(req.url);
+  if(url.pathname.startsWith('/collection'))return;
+  if(req.method!=='GET'||url.pathname.includes('/api.php')||url.pathname.includes('/api/rest_v1/')||url.pathname.startsWith('/api/')||url.hostname==='wikimedia.org'||url.hostname.endsWith('.wikimedia.org')&&!IMAGE_HOSTS.has(url.hostname))return;
+  if(req.mode==='navigate'&&url.origin===self.location.origin){
+    event.respondWith((async()=>{
+      const cache=await caches.open(CACHE).catch(()=>null);
+      // Query parameters select cards inside the home app; distinct public
+      // pages must keep their own offline document.
+      const key=url.pathname==='/index.html'?'/':url.pathname;
+      const network=fetch(req).then(response=>{
+        if(response.ok&&cache)event.waitUntil(cache.put(key,response.clone()).catch(()=>{}));
+        return response;
+      });
+      event.waitUntil(network.catch(()=>{}));
+      let timer;
+      const winner=await Promise.race([network.catch(()=>null),new Promise(resolve=>{timer=setTimeout(()=>resolve(null),2500);})]);
+      clearTimeout(timer);
+      return winner||await cache?.match(key).catch(()=>null)||await network.catch(()=>new Response('Offline — reconnect to load WikiScroll.',{status:503,headers:{'Content-Type':'text/plain'}}));
+    })());
+    return;
+  }
+  // The About film streams with range requests straight from the network; it is never cached.
+  if(req.destination==='video'||url.pathname.startsWith('/media/'))return;
+  const local=url.origin===self.location.origin;
+  const image=IMAGE_HOSTS.has(url.hostname)&&req.destination==='image';
+  if(!local&&!image)return;
+  event.respondWith((async()=>{
+    const cache=await caches.open(CACHE).catch(()=>null),cached=await cache?.match(req).catch(()=>null);
+    if(cached)return cached;
+    try{
+      // Wikimedia serves images with CORS headers. A CORS copy is cached at its
+      // real size; an opaque one is charged several megabytes of storage quota
+      // each, which could crowd out the reader's saved library.
+      const response=image?await fetch(req.url,{mode:'cors',credentials:'omit'}).catch(()=>fetch(req)):await fetch(req);
+      if(cache&&(response.ok||image&&response.type==='opaque')){
+        event.waitUntil((async()=>{
+          await cache.put(req,response.clone());
+          if(image){const keys=await cache.keys();const images=keys.filter(k=>IMAGE_HOSTS.has(new URL(k.url).hostname));for(const key of images.slice(0,Math.max(0,images.length-80)))await cache.delete(key);}
+        })().catch(()=>{}));
+      }
+      return response;
+    }catch{return Response.error();}
+  })());
+});

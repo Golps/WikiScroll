@@ -1,0 +1,69 @@
+---
+import Icon from "./Icon.astro";
+import DiscoveryControls from "./settings/DiscoveryControls.astro";
+import ReadingPreferences from "./settings/ReadingPreferences.astro";
+import TravelFilters from "./settings/TravelFilters.astro";
+---
+<!-- MOBILE BURGER MENU -->
+<div class="burger-backdrop" id="burgerBackdrop"></div>
+<div class="burger-menu" id="burgerMenu" role="region" aria-label="Settings">
+  <div class="mobile-settings-heading"><div><h2>Settings</h2><p id="settingsSource">Wikipedia</p></div><button type="button" id="burgerDone" aria-label="Close settings">Done</button></div>
+<div class="burger-inner">
+    <div class="burger-row" style="flex-direction:column;align-items:stretch;">
+      <div class="burger-row-label"><span class="ico"><Icon name="stats" /></span><span>Today's Stats</span></div>
+      <div class="streak-display" style="margin-top:6px;">
+        <div class="streak-main">
+          <span><span class="streak-num" id="streakCount">0</span> <span class="streak-unit">articles today</span></span>
+        </div>
+        <div class="week-heatmap" id="weekHeatmap"></div>
+      </div>
+    </div>
+    <div class="burger-row saved-row">
+      <div class="burger-row-label"><span class="ico"><Icon name="bookmark" /></span><div><div>Saved Articles</div><div class="burger-row-sub">Your personal discovery library</div></div></div>
+      <button class="burger-action history-action" id="burgerLikesBtn">View saved <span class="badge" id="burgerBadge" style="display:none">0</span><span aria-hidden="true">›</span></button>
+    </div>
+    <div class="burger-row history-row">
+      <div class="burger-row-label"><span class="ico"><Icon name="clock" /></span><div><div>History</div><div class="burger-row-sub">Revisit articles you have discovered</div></div></div>
+      <button class="burger-action history-action" id="burgerHistoryBtn">View history <span aria-hidden="true">›</span></button>
+    </div>
+    <TravelFilters index={1} />
+    <div class="settings-group-title wikipedia-only">Discovery</div>
+    <div class="burger-row wikipedia-only">
+      <div class="burger-row-label"><span class="ico"><Icon name="discovery" /></span><div><div>Topics</div><div class="burger-row-sub" id="burgerTopicsSub"><span class="topics-mix">Random mix</span><span class="topics-count" hidden><span class="topics-n">0</span> <span>selected</span></span></div></div></div>
+      <button class="burger-action history-action" id="burgerTopicsBtn">Filter ›</button>
+    </div>
+    <div class="burger-topics wikipedia-only" id="burgerTopics">
+      <div class="burger-topic-grid" id="burgerTopicGrid"></div>
+    </div>
+    <DiscoveryControls />
+    <div class="settings-group-title ">Language</div>
+    <div class="burger-row">
+      <div class="burger-row-label"><span class="ico"><Icon name="geo" /></span><div><div>Language</div><div class="burger-row-sub" id="burgerLangTxt">English</div></div></div>
+      <button class="burger-action history-action" id="burgerLangBtn">Change ›</button>
+    </div>
+    <div class="burger-lang-grid" id="burgerLangGrid"></div>
+    <div class="settings-group-title ">Reading</div>
+    <ReadingPreferences />
+    <div class="settings-group-title ">Gestures</div>
+    <div class="burger-row">
+      <div class="burger-row-label">
+        <span class="ico"><Icon name="swipe" /></span>
+        <div><div>Swipe Gestures</div><div class="burger-row-sub">Left to skip · Right to save</div></div>
+      </div>
+      <button class="toggle-sw on" id="swipeToggle" role="switch" aria-label="Toggle swipe gestures"></button>
+    </div>
+    <div class="settings-group-title ">About</div>
+    <div class="burger-row" style="flex-direction:column;align-items:stretch;gap:0;padding:14px 0 0 0;border-bottom:none;">
+      <div class="sp-about" style="margin:0;">
+        <div class="sp-about-logo"><img class="wordmark wordmark-dark" src="/images/wordmark-dark.svg" alt="WikiScroll"><img class="wordmark wordmark-light" src="/images/wordmark-light.svg" alt="WikiScroll"></div>
+        <div class="sp-about-body">
+          Turn doomscrolling into discovery. Explore unexpected ideas and remarkable places, and leave with something worth knowing.<br><br>
+          Swipe right to save · Left to skip · Long-press for Ambient Mode.
+        </div>
+        <div class="sp-about-contact">contact@wikiscroll.com</div>
+        <div class="sp-about-links"><a class="about-link" href="/about/" data-about-link>About WikiScroll</a><button type="button" class="privacy-link-btn" data-open-privacy="burger">Privacy Policy</button><a class="about-link about-link-icon" href="https://github.com/Golps/WikiScroll" target="_blank" rel="noopener" aria-label="Source Code" title="Source Code"><svg viewBox="0 0 16 16" width="20" height="20" aria-hidden="true" focusable="false"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg></a></div>
+      </div>
+    </div>
+  </div>
+</div>
+

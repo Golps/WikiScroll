@@ -1,0 +1,23 @@
+---
+import Icon from "./Icon.astro";
+---
+<!-- WIKIVOYAGE MAP EXPLORER -->
+<div class="map-overlay" id="mapOverlay">
+  <div class="map-container">
+    <div class="map-hdr">
+      <div class="map-title" id="mapTitle" dir="auto">Exploring…</div>
+      <button class="map-close" id="mapClose" aria-label="Close map">✕</button>
+    </div>
+    <div class="map-loading" id="mapLoading">
+      <div class="map-loading-text"><Icon name="map" /><span>Loading map…</span></div>
+    </div>
+    <div id="mapCanvas"></div>
+    <div class="map-badge" id="mapBadge">
+      <Icon name="map" />
+      <span id="mapBadgeText" dir="auto">Location</span>
+      <span>·</span>
+      <a href="#" id="mapReadLink" target="_blank">Read on Wikivoyage ↗</a>
+    </div>
+  </div>
+</div>
+

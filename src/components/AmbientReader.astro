@@ -1,0 +1,15 @@
+---
+import Icon from "./Icon.astro";
+---
+<!-- AMBIENT OVERLAY -->
+<div class="ambient-overlay" id="ambientOverlay" role="region" aria-label="Ambient Mode">
+  <div class="ambient-bg" id="ambientBg"></div>
+  <div class="ambient-content">
+    <div class="ambient-label"><Icon name="ambient" /><span>Ambient Mode</span></div>
+    <div class="ambient-title" id="ambientTitle" dir="auto"></div>
+    <div class="ambient-excerpt" id="ambientExcerpt" dir="auto"></div>
+  </div>
+  <button class="ambient-close" id="ambientClose" aria-label="Close ambient mode">✕</button>
+  <div class="ambient-hint">Tap anywhere to exit</div>
+</div>
+

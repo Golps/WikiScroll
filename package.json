@@ -1,0 +1,26 @@
+{
+  "name": "wikiscroll",
+  "version": "2.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev --config wrangler.jsonc",
+    "check": "node --check public/app.js && node --check public/atlas.js && node --check worker/index.js && pnpm test",
+    "deploy": "bash scripts/deploy.sh",
+    "build": "node scripts/build.mjs",
+    "dev:ui": "astro dev",
+    "preview": "wrangler dev --config wrangler.jsonc",
+    "test": "pnpm build && node --test test/*.test.js"
+  },
+  "devDependencies": {
+    "astro": "7.4.1",
+    "wrangler": "4.134.0"
+  },
+  "dependencies": {
+    "@resvg/resvg-wasm": "2.6.2"
+  },
+  "engines": {
+    "node": ">=22.22.0"
+  },
+  "packageManager": "pnpm@11.25.0"
+}

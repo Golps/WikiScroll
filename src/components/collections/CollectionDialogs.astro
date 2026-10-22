@@ -1,0 +1,25 @@
+<!-- Inert shells, cloned only when requested. User-provided text is filled with textContent. -->
+<template id="collectionChooserTemplate">
+  <dialog class="source-dialog collection-dialog" aria-labelledby="collectionChooserTitle">
+    <h2 id="collectionChooserTitle">Save to collection</h2>
+    <p class="collection-article" dir="auto"></p>
+    <p class="collection-guidance">Tap a collection below to add this article immediately.</p>
+    <div class="collection-options"></div>
+    <div class="collection-start collection-dialog-actions">
+      <button class="collection-choice collection-create" type="button">＋ Create new collection</button>
+      <button class="source-close" type="button">Cancel</button>
+    </div>
+    <form hidden>
+      <label for="collectionChoiceName">Create a new collection</label>
+      <input id="collectionChoiceName" class="collection-name-input" placeholder="New collection name…" maxlength="30" required>
+      <div class="collection-dialog-actions"><button class="feature-action" type="submit">Create and save</button><button class="source-close collection-back" type="button">Back</button></div>
+    </form>
+  </dialog>
+</template>
+<template id="collectionImportTemplate">
+  <dialog class="source-dialog collection-dialog" aria-labelledby="collectionImportTitle">
+    <h2 id="collectionImportTitle"></h2>
+    <p class="collection-import-note"></p>
+    <div class="collection-dialog-actions"><button type="button" class="feature-action">Save collection</button><button type="button" class="source-close">Cancel</button></div>
+  </dialog>
+</template>

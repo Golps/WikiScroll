@@ -104,7 +104,7 @@ The same reader adapts to a portrait screen, with full-page settings and cards t
 
 ### See the reader move
 
-These recordings show real interactions with the current app, using a small documentation fixture of real Wikimedia articles. Desktop uses the right arrow; mobile uses a touch swipe. Saving does not personalize subsequent discovery.
+These demos use the current app and a small fixture of real Wikimedia articles. Desktop uses the right arrow; mobile uses a touch swipe. Saving does not personalize subsequent discovery. The inline previews run at 50 fps; open the videos below for 60 fps playback.
 
 <table>
 <tr>
@@ -113,12 +113,14 @@ These recordings show real interactions with the current app, using a small docu
 </tr>
 </table>
 
+[**Play desktop demo · 60 fps**](docs/demos/swipe-desktop-60fps.mp4) · [**Play mobile demo · 60 fps**](docs/demos/swipe-mobile-60fps.mp4)
+
 ## Ambient reading
 
 Press <kbd>Space</kbd> on desktop, or long-press a card on a phone, and everything else steps back: the introduction is set in large serif type over a dimmed version of the article's photo. Press <kbd>Space</kbd> again or tap anywhere to return. Ambient Mode is enabled by default and can be switched off in Settings.
 
 <p align="center">
-  <img src="docs/images/ambient-desktop.jpg" alt="Ambient mode on desktop: the title Mandarin duck and its full introduction in large serif type over a dark, softened photo of the two ducks." width="860">
+  <img src="docs/images/ambient-desktop.jpg" alt="Ambient mode on desktop: the article title and introduction over a dimmed Wikimedia photograph." width="860">
 </p>
 
 ## Reading preferences

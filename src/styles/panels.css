@@ -1,0 +1,217 @@
+/* Tablet portrait: a broad image above readable text, including split-view widths. */
+@media (min-width:768px) and (max-width:1023px) and (orientation:portrait){
+  .card,body.light .card{padding:154px 32px 36px}
+  .panel,body.light .panel{display:flex;flex-direction:column;width:min(720px,100%);height:calc(var(--vh) - 190px);max-height:calc(var(--vh) - 190px);gap:0}
+  .panel>.art-media{order:0;flex:0 0 auto;width:100%;height:32dvh;max-height:40%;aspect-ratio:16/10;margin:0 0 22px}
+  .panel>.chip{order:1;flex-shrink:0;margin:0 0 10px}
+  .panel>.art-title{order:2;flex-shrink:0;font-size:clamp(30px,4.3vw,42px);line-height:1.15;margin:0 0 14px;-webkit-line-clamp:2}
+  .panel>.meta-row{order:3;flex-shrink:0;margin:0 0 12px}
+  .panel>.art-body{order:4;flex:1;min-height:0;font-size:19px;line-height:1.65;margin:0 0 18px}
+  .panel>.acts{order:5;flex-shrink:0;display:grid;grid-template-columns:1fr 1fr 1.6fr;gap:12px;width:100%;padding-top:16px}
+  .panel>.acts>.act{min-width:0;min-height:48px;justify-content:center;white-space:normal}
+  .kb-bar{display:none}
+}
+/* Wide but short windows: iPad landscape and opened compact foldables. */
+@media (min-width:768px) and (max-height:800px){
+  .hdr,body.light .hdr{height:112px;grid-template-rows:64px 44px}
+  .card,body.light .card{padding:132px 4vw 34px}
+  .panel,body.light .panel{height:calc(var(--vh) - 166px);max-height:calc(var(--vh) - 166px);width:92vw;column-gap:28px;grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+  .panel>.art-title{font-size:clamp(26px,3.1vw,40px);margin-bottom:12px;-webkit-line-clamp:2}
+  .panel>.chip{margin-bottom:10px}.panel>.meta-row{margin-bottom:10px}
+  .panel>.art-body{font-size:17px;line-height:1.55;margin-bottom:12px}
+  .panel>.acts{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding-top:12px}
+  .panel>.acts>.act.cta{grid-column:1/-1}.panel>.acts>.act{min-height:44px;padding:9px 12px}
+  .kb-bar{display:none}
+}
+@media (pointer:coarse) and (min-width:768px){
+  .pill,body.light .pill,.lopt,.topic-chip,.btopic{min-height:44px}
+  .kb-bar{display:none}
+  .panel>.acts>.act{min-height:48px}
+}
+@media (min-width:768px) and (max-width:1100px){
+  .hdr,body.light .hdr{padding-inline:24px;column-gap:12px}
+  .hdr-tools-left,.hdr-right{gap:4px}
+}
+/* One outlined About-card wordmark: no platform-dependent font substitution. */
+.wordmark{display:block;width:100%;height:100%;object-fit:contain}.wordmark-light{display:none}body.light .wordmark-dark{display:none}body.light .wordmark-light{display:block}
+.logo,body.light .logo,body.how .logo{width:220px;height:46px;line-height:1;margin:0;display:block}
+.sp-about-logo,body .sp-about-logo,body.how .sp-about-logo,body.light .sp-about-logo{width:180px;height:38px;margin:0 auto 16px;display:block}
+@media(max-width:767px){.logo,body.light .logo,body.how .logo{width:min(192px,calc(100vw - 128px));height:40px}}
+.rtl-ui .meta-row,.rtl-ui .mobile-settings-heading{direction:rtl;text-align:right}.rtl-ui .act{direction:rtl}.rtl-ui .brand{direction:ltr}
+
+/* The discovery cue enters gently and fades away once discovery begins. */
+#hint{display:flex;flex-direction:row;align-items:center;gap:14px;min-height:32px;bottom:max(2px,env(safe-area-inset-bottom));padding:5px 16px;border:1px solid var(--rule);border-radius:999px;background:var(--surface);color:var(--ink);font:inherit;box-shadow:0 4px 18px #0002;cursor:pointer;opacity:0;visibility:hidden;pointer-events:none;transform:translate(-50%,8px);animation:none;transition:opacity .35s ease,transform .45s cubic-bezier(.22,1,.36,1),visibility 0s .45s}
+#hint.is-visible{opacity:1;visibility:visible;pointer-events:auto;transform:translate(-50%,0);transition-delay:0s}
+#hint .hint-txt{font-size:12px;font-weight:500;letter-spacing:.02em;color:var(--ink)}
+#hint .hint-arr{width:8px;height:8px;margin:-4px 1px 0;border-width:0 1.5px 1.5px 0;border-color:var(--accent);transform:rotate(45deg);animation:none}
+#hint.is-visible .hint-arr{animation:discovery-nudge 2.2s .5s 3 ease-in-out}
+#hint:active{transform:translate(-50%,1px)}
+@keyframes discovery-nudge{0%,70%,100%{transform:translateY(0) rotate(45deg)}35%{transform:translateY(4px) rotate(45deg)}}
+@media(max-width:767px){#hint{min-height:32px;bottom:max(2px,env(safe-area-inset-bottom));padding:5px 14px}}
+@media(prefers-reduced-motion:reduce){#hint,#hint .hint-arr,#hint.is-visible .hint-arr{animation:none;transition:none}}
+
+/* Preserve the media geometry and map action when a remote image fails. */
+.art-media-fallback{display:none}.art-media.image-unavailable>.art-backdrop{display:none}.art-media.image-unavailable>.art-media-fallback{position:absolute;inset:0;display:grid;place-items:center;background:var(--surface-alt);color:var(--muted)}.art-media-fallback svg{width:76px;height:76px;opacity:.38}
+button.hi{display:block;width:100%;font:inherit;color:inherit;text-align:start;cursor:pointer}
+
+/* Reserve the home-indicator area without shrinking the controls. */
+@media(max-width:767px){.card,body.light .card{padding-bottom:calc(38px + env(safe-area-inset-bottom))}.panel,body.light .panel{height:calc(var(--vh) - 172px - env(safe-area-inset-bottom));max-height:calc(var(--vh) - 172px - env(safe-area-inset-bottom))}}
+
+/* Balance the subtitle directly beneath the outlined wordmark. */
+.brand-note,body.light .brand-note,body.how .brand-note{position:relative;top:-5px;line-height:1.1}
+@media(max-width:767px){.brand-note,body.light .brand-note,body.how .brand-note{top:-4px}}
+
+/* Unified panels: every child is painted and animated with its container. */
+#lp,#hp,#topicSheet{contain:paint;isolation:isolate;backface-visibility:hidden}
+#lp,#hp{right:0;opacity:0;visibility:hidden;pointer-events:none;transform:translate3d(102%,0,0);transition:transform .24s cubic-bezier(.22,.68,0,1),opacity .18s ease,visibility 0s .24s}
+#lp.open,#hp.open{right:0;opacity:1;visibility:visible;pointer-events:auto;transform:translate3d(0,0,0);transition:transform .28s cubic-bezier(.22,.68,0,1),opacity .22s ease,visibility 0s}
+.sheet-overlay{display:block;opacity:0;visibility:hidden;pointer-events:none;transition:opacity .18s ease,visibility 0s .24s}
+.sheet-overlay.open{display:block;opacity:1;visibility:visible;pointer-events:auto;transition:opacity .22s ease,visibility 0s}
+.sp-backdrop{visibility:hidden;transition:opacity .22s ease,visibility 0s .24s}
+.sp-backdrop.open{visibility:visible;transition:opacity .22s ease,visibility 0s}
+.topic-sheet-header{display:flex;align-items:center;justify-content:space-between;gap:20px}
+.topic-close{display:none}
+@media(min-width:768px){
+ #topicSheet,body.light #topicSheet{box-sizing:border-box;top:0;right:0;bottom:auto;left:auto;width:min(480px,100vw);height:var(--vh);max-height:none;padding:max(38px,env(safe-area-inset-top)) 30px max(32px,env(safe-area-inset-bottom));border:0;border-left:1px solid var(--rule);border-radius:0;overflow-y:auto;opacity:0;visibility:hidden;pointer-events:none;transform:translate3d(102%,0,0);transition:transform .24s cubic-bezier(.22,.68,0,1),opacity .18s ease,visibility 0s .24s}
+ #topicSheet.open,body.light #topicSheet.open{bottom:auto;opacity:1;visibility:visible;pointer-events:auto;transform:translate3d(0,0,0);transition:transform .28s cubic-bezier(.22,.68,0,1),opacity .22s ease,visibility 0s}
+ #topicSheet .sheet-handle{display:none}
+ #topicSheet .topic-sheet-header{border-bottom:1px solid var(--rule);margin-bottom:18px;padding-bottom:20px;min-height:44px}
+ #topicSheet .sheet-title{margin:0;font-size:32px;line-height:1.2}
+ #topicSheet .sheet-sub{margin-bottom:22px}
+ #topicSheet .topic-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+ #topicSheet .topic-chip{justify-content:flex-start;width:100%}
+ #topicSheet .sheet-reset{width:100%;min-height:44px;margin-top:22px}
+ #topicSheet .topic-close{display:grid;place-items:center;flex:none;width:44px;height:44px;padding:0;border:1px solid var(--rule);border-radius:2px;background:transparent;color:var(--muted);font-size:18px;cursor:pointer}
+ #topicSheet .topic-close:hover{color:var(--ink);background:var(--surface-alt)}
+}
+/* Compact discovery cue: the entire bubble gives one calm directional nudge. */
+#hint{gap:9px;padding:5px 12px}
+#hint .hint-txt{font-size:11px}
+#hint.is-visible{animation:discovery-bubble 2.2s .65s 3 ease-in-out}
+#hint.is-visible .hint-arr{animation:none}
+@keyframes discovery-bubble{0%,70%,100%{transform:translate(-50%,0)}35%{transform:translate(-50%,4px)}}
+@media(prefers-reduced-motion:reduce){#lp,#hp,#topicSheet,.sheet-overlay,.sp-backdrop,#hint{animation:none!important;transition:none!important}}
+
+/* History is an explicit library action; theme remains available in the header. */
+.history-row{gap:14px}
+.history-action,.sp-history-action{border:1px solid color-mix(in srgb,var(--accent),var(--rule) 60%);background:color-mix(in srgb,var(--accent),transparent 92%);color:var(--ink);box-shadow:inset 0 1px rgba(255,255,255,.05);transition:background .18s ease,border-color .18s ease,transform .18s ease}
+.history-action{min-height:40px;padding:8px 13px;border-radius:10px;font:600 12px/1 var(--sans)}
+.history-action:hover,.sp-history-action:hover{border-color:var(--accent);background:color-mix(in srgb,var(--accent),transparent 86%)}
+.history-action:active,.sp-history-action:active{transform:scale(.98)}
+.sp-history-action{display:flex;align-items:center;justify-content:space-between;gap:16px;width:100%;padding:14px 15px;border-radius:12px;text-align:left;cursor:pointer}
+.sp-history-action .sp-row-label>span:last-child{display:flex;flex-direction:column;gap:4px}
+.sp-history-action strong{font:600 14px/1.2 var(--sans)}
+.sp-history-action small{color:var(--muted);font:400 11px/1.35 var(--sans)}
+.sp-history-arrow{display:grid;place-items:center;flex:none;width:27px;height:27px;border:1px solid var(--rule);border-radius:50%;color:var(--accent);font-size:20px;line-height:1}
+@media(prefers-reduced-motion:reduce){.history-action,.sp-history-action{transition:none}}
+
+/* Release 53: one compact library hierarchy and calmer desktop drawer motion. */
+.saved-row{gap:14px}
+.sp-library-actions{display:grid;gap:9px;margin-top:12px}
+@media(min-width:768px){
+ #settingsPanel,body.light #settingsPanel,#lp,#hp,#topicSheet,body.light #topicSheet{transition:transform .32s cubic-bezier(.32,.72,0,1),opacity .26s ease,visibility 0s .32s}
+ #settingsPanel.open,body.light #settingsPanel.open,#lp.open,#hp.open,#topicSheet.open,body.light #topicSheet.open{transition:transform .36s cubic-bezier(.32,.72,0,1),opacity .28s ease,visibility 0s}
+ .sheet-overlay,.sp-backdrop{transition:opacity .26s ease,visibility 0s .32s}
+ .sheet-overlay.open,.sp-backdrop.open{transition:opacity .28s ease,visibility 0s}
+}
+@media(prefers-reduced-motion:reduce){#settingsPanel,#lp,#hp,#topicSheet,.sheet-overlay,.sp-backdrop{transition:none!important}}
+@media(min-width:768px){.sp-library-actions{margin-top:4px}}
+
+/* Settings rhythm: compact sections, consistent controls, and calm surfaces. */
+@media(min-width:768px){
+ #settingsPanel{padding:28px 28px 32px}
+ #settingsPanel .sp-hdr{margin:0 0 20px;padding:0 0 20px;font-size:30px}
+ #settingsPanel .stats-source{margin:0 0 16px;padding:0;font-size:12px;line-height:1.5}
+ #settingsPanel .sp-section{margin:0;padding:20px 0;border-bottom:1px solid var(--rule)}
+ #settingsPanel .sp-section:last-child{border:0;padding-bottom:0}
+ #settingsPanel .sp-section-title{margin:0 0 12px;letter-spacing:1.5px;font-size:10px;line-height:1.4}
+ #settingsPanel .sp-row{padding:10px 0;border:0;gap:16px}
+ #settingsPanel .sp-row-label{font-size:14px;line-height:1.4}
+ #settingsPanel .sp-row-sub{font-size:12px;line-height:1.5;margin-top:4px}
+ #settingsPanel .sp-library-actions{margin-top:16px;gap:8px}
+ #settingsPanel .sp-history-action{min-height:60px;padding:12px 14px;border:1px solid var(--rule);border-radius:12px;background:var(--surface-alt);box-shadow:none}
+ #settingsPanel .sp-history-action:hover{border-color:var(--accent)}
+ #settingsPanel .sp-history-action strong{font-size:14px;line-height:1.4}
+ #settingsPanel .sp-history-action small{font-size:12px;line-height:1.4}
+ #settingsPanel .sp-history-arrow{border:0;width:20px;height:24px;font-size:24px}
+ #settingsPanel .toggle-sw{width:44px;height:26px;border-radius:999px;flex-shrink:0}
+ #settingsPanel .toggle-sw:after{width:20px;height:20px;top:3px;left:3px;border-radius:50%;background:#fff}
+ #settingsPanel .toggle-sw.on:after{transform:translateX(18px)}
+ #settingsPanel .sp-x{display:grid;place-items:center;width:40px;height:40px;border-radius:12px;background:var(--surface-alt)}
+ #settingsPanel .sp-about{padding:18px;border-radius:12px}
+}
+.li-acts .li-btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:40px;padding:9px 12px;line-height:1.3}
+.li-acts .li-btn .atlas-icon{width:16px;height:16px;flex:none;color:var(--accent)}
+.li-acts .li-btn[data-unlike] .atlas-icon{color:inherit}
+
+/* Original article imagery makes the saved library easy to scan. */
+.saved-image{width:100%;height:160px;margin:0 0 14px;overflow:hidden;border-radius:12px;background:var(--surface-alt);display:flex;align-items:center;justify-content:center}
+.saved-image img{display:block;width:100%;height:100%;object-fit:contain}
+@media(max-width:767px){.saved-image{height:140px;margin-bottom:12px}}
+
+/* A visual library: two compact columns with consistent action placement. */
+#likedList{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;align-items:stretch}
+#likedList>.empty,#likedList>div:not(.li){grid-column:1/-1}
+#likedList .li{min-width:0;padding:12px;display:flex;flex-direction:column}
+#likedList .saved-image{height:112px;margin-bottom:10px;border-radius:8px;flex-shrink:0}
+#likedList .li-src{font-size:9px;letter-spacing:1px;overflow-wrap:anywhere}
+#likedList .li-ttl{font-size:18px;line-height:1.25;margin:6px 0 10px;overflow-wrap:anywhere}
+#likedList .li-body{display:none}
+#likedList .li-acts{margin-top:auto;gap:6px;padding-top:8px}
+#likedList .li-btn{padding:7px 4px;gap:4px;font-size:11px;min-height:40px}
+#likedList .li-btn .atlas-icon{width:14px;height:14px}
+#likedList .li-btn[data-unlike]{grid-column:1/-1}
+@media(min-width:768px){#lp,body.light #lp{width:min(600px,100vw)}#likedList .saved-image{height:136px}}
+@media(max-width:767px){#lp{padding-inline:16px}#likedList{gap:10px}#likedList .li{padding:10px}}
+@media(max-width:359px){#likedList{grid-template-columns:1fr}}
+
+/* History follows the saved library's compact visual grid. */
+#historyList{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;align-items:stretch}
+#historyList>.empty{grid-column:1/-1}
+#historyList .hi{min-width:0;width:100%;margin:0;padding:12px;display:flex;flex-direction:column;text-align:start;border:1px solid var(--rule);border-radius:12px;background:var(--surface)}
+#historyList .hi:hover{border-color:var(--accent);background:var(--surface-alt)}
+#historyList .saved-image{height:112px;margin-bottom:10px;border-radius:8px;flex-shrink:0}
+#historyList .hi-ttl{font-size:18px;line-height:1.25;margin:6px 0 10px;overflow-wrap:anywhere}
+#historyList .hi-time{font-size:11px;line-height:1.4}
+.history-read{display:flex;align-items:center;justify-content:center;gap:7px;margin-top:auto;padding:9px;border:1px solid var(--rule);border-radius:9px;min-height:40px;box-sizing:border-box;font:600 11px/1.3 var(--sans);color:var(--accent)}
+.history-read .atlas-icon{width:14px;height:14px;flex:none}
+@media(min-width:768px){#hp,body.light #hp{width:min(600px,100vw)}#historyList .saved-image{height:136px}}
+@media(max-width:767px){#hp{padding-inline:16px}#historyList{gap:10px}#historyList .hi{padding:10px}}
+@media(max-width:359px){#historyList{grid-template-columns:1fr}}
+
+/* Collection actions share the reader's typography and control geometry. */
+.coll-new-input,.collection-name-input{font:400 14px/1.4 var(--sans);min-width:0}
+#likedList .li-btn[data-unlike]{grid-column:auto}
+#likedList .li-btn[data-collect]{font-size:10px}
+#deleteCollBtn{min-height:44px;padding:10px 18px!important;border:1px solid color-mix(in srgb,#e87070,transparent 50%)!important;background:color-mix(in srgb,#e87070,transparent 94%)!important;border-radius:12px!important;font:500 13px/1.4 var(--sans);margin-top:12px}
+.collection-dialog{width:min(460px,calc(100vw - 32px));box-sizing:border-box;border-radius:18px;padding:26px;max-height:85dvh;overflow:auto}
+.collection-dialog h2{margin:0 0 14px;font:600 22px/1.3 var(--sans)}
+.collection-dialog p{margin:0 0 20px;color:var(--muted);line-height:1.5}
+.collection-dialog-actions{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:22px}
+.collection-dialog .collection-dialog-actions button{margin:0;width:100%;min-height:46px;padding:12px;border-radius:12px;font:600 13px/1.4 var(--sans)}
+.collection-options{display:grid;gap:8px;margin-bottom:22px}
+.collection-options:empty{display:none}
+.collection-choice{min-height:46px;text-align:start;padding:12px;border:1px solid var(--rule);border-radius:12px;background:var(--surface-alt);color:var(--ink);font:500 14px/1.4 var(--sans);cursor:pointer;overflow-wrap:anywhere}
+.collection-choice:disabled{opacity:.5;cursor:default}
+.collection-dialog label{display:block;margin-bottom:10px;font:600 13px/1.4 var(--sans)}
+.collection-dialog input{box-sizing:border-box;width:100%;padding:12px;border:1px solid var(--rule);border-radius:12px;background:var(--surface-alt);color:var(--ink)}
+.collection-dialog [hidden]{display:none!important}
+#likedList .li-btn[data-collect]{font-size:11px}
+#likedList .li-btn[data-collect] span{white-space:nowrap}
+.collection-start{grid-template-columns: minmax(0,2fr) minmax(0,1fr)}
+#likedList>.empty{padding-bottom:12px;margin-bottom:0}
+#likedList>.empty+div{margin-top:0!important}
+#likedList>.empty+div #deleteCollBtn{margin-top:0}
+.collection-dialog .collection-guidance{font-size:13px;margin-bottom:12px}
+.collection-start{border-top:1px solid var(--rule);padding-top:18px;margin-top:18px;grid-template-columns:1fr}
+.collection-dialog .collection-create{background:transparent;color:var(--accent);border:1px solid var(--rule);text-align:center}
+.collection-dialog .collection-create:hover{background:var(--surface-alt);border-color:var(--accent)}
+.collection-start .source-close{background:transparent;border-color:transparent}
+@media(max-width:767px){input:not([type=range]):not([type=checkbox]):not([type=radio]),textarea,select,.coll-new-input,.collection-name-input,.travel-filters input,.travel-filters select,.collection-dialog input{font-size:16px!important}}
+#likedList .li-btn[data-unlike]{border-color:#d96767;color:#e87070;background:transparent}
+body.light #likedList .li-btn[data-unlike]{border-color:#c23b3b;color:#c23b3b}
+#likedList #deleteCollBtn{color:#f87171}body.light #likedList #deleteCollBtn{color:#c23b3b}
+#likedList .li-btn[data-unlike]:hover{background:color-mix(in srgb,#e87070,transparent 90%)}
+.collection-heading{font:400 25px/1.25 var(--serif);color:var(--ink);margin:20px 0 16px;overflow-wrap:anywhere;text-align:start}
+.collection-heading[hidden]{display:none}
+@media(max-width:767px){.collection-heading{font-size:23px;margin:18px 0 14px}}

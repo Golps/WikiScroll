@@ -1,0 +1,93 @@
+/* ── On this day (release 69) ────────────────────────────────────────────
+   Badge on cards whose subject's anniversary is today (worker/today.js).
+   It flips in once, with one light sweep across the photo, when the card is
+   reached. Styled like the map button so it belongs to the card. */
+.today-badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 7px 12px 7px 10px; border-radius: 12px;
+  font: 600 12px/1.2 var(--sans); color: var(--ink);
+  background: var(--surface); border: 1px solid var(--rule);
+  box-shadow: 0 3px 12px #0003; white-space: nowrap;
+}
+.today-year { color: var(--accent); font-variant-numeric: tabular-nums; }
+.today-year::before { content: "·"; color: var(--muted); margin-inline-end: 6px; }
+.art-media > .today-badge {
+  position: absolute; z-index: 3; top: 12px; inset-inline-start: 12px;
+  max-width: calc(100% - 24px); overflow: hidden; text-overflow: ellipsis;
+  opacity: 0; transform: perspective(500px) rotateX(-75deg) translateY(-6px); transform-origin: 50% 0;
+}
+.meta-row > .today-badge { margin-inline-end: 8px; opacity: 0; transform: translateY(4px) scale(.96); }
+.art-media > .today-sheen {
+  position: absolute; inset: 0; z-index: 2; pointer-events: none;
+  background: linear-gradient(105deg, transparent 30%, rgba(255,255,255,.26) 48%, rgba(255,255,255,.08) 56%, transparent 70%);
+  transform: translateX(-130%); opacity: 0;
+}
+.card.today-revealed .today-badge { animation: today-badge-in var(--motion-open) var(--ease-spring) 240ms both; }
+.card.today-revealed .today-sheen { animation: today-sheen 1100ms cubic-bezier(.45, 0, .2, 1) 420ms both; }
+.card.today-revealed .today-ico { display: inline-block; animation: today-ico 520ms var(--ease-spring) 560ms both; }
+@keyframes today-badge-in { to { opacity: 1; transform: none; } }
+@keyframes today-sheen { 0% { opacity: 1; transform: translateX(-130%); } 100% { opacity: 1; transform: translateX(130%); } }
+@keyframes today-ico { 0% { transform: scale(1); } 45% { transform: scale(1.28) rotate(-8deg); } 100% { transform: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .card.is-today .today-badge { opacity: 1; transform: none; animation: none !important; }
+  .card.is-today .today-sheen { display: none; }
+  .card.is-today .today-ico { animation: none !important; }
+}
+
+/* Language lists: languages without a Wikivoyage edition are hidden in
+   Wikivoyage mode (syncLangOptions); the option styles set display, which
+   overrode [hidden]. The phone list opens tall enough for every language. */
+.blopt[hidden], .lopt[hidden] { display: none !important; }
+.burger-lang-grid.burger-lang-grid.open { max-height: 640px; }
+
+/* ── Typography (release 71) ─────────────────────────────────────────────
+   Two families only: var(--serif) for titles, var(--sans) for everything
+   else. Panel titles share one size and weight; no UI text below 11px. */
+@media (min-width: 768px) {
+  #settingsPanel .sp-hdr > span, #lp .lp-hdr > span, #hp .hp-hdr > span, #topicSheet #topicSheet .sheet-title, #topicSheet .sheet-title {
+    font: 600 24px/1.25 var(--sans); letter-spacing: -.025em;
+  }
+}
+body .mobile-settings-heading h2 { font: 600 24px/1.25 var(--sans); letter-spacing: -.025em; }
+#sourceDialog #sourceTitle { font: 600 24px/1.25 var(--sans); letter-spacing: -.025em; padding-right: 48px; }
+#sourceDialog .source-eyebrow { font-size: 11px; }
+#sourceDialog h3 span { font-size: 11px; }
+#settingsPanel .sp-section-title, .sp-section-title { font: 600 12px/1.4 var(--sans); letter-spacing: .025em; text-transform: none; }
+.depth-steps .depth-step span { font-size: 11px; }
+.week-heatmap .week-day-lbl, .week-heatmap .week-day-cnt, .week-heatmap .week-day-today { font-size: 11px; }
+#likedList .li-src, .card .panel .chip { font-size: 11px; }
+/* Row actions on the phone settings sheet: one style, one line. */
+.burger-row .history-action { white-space: nowrap; min-height: 40px; font: 600 12px/1 var(--sans); }
+.pill.has-topics { background: color-mix(in srgb, var(--accent), transparent 88%); }
+
+/* Restoring a deleted collection (Saved Articles). */
+.coll-undo { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; padding: 8px 8px 8px 14px; border: 1px solid var(--rule); border-radius: 10px; font-size: 13px; color: var(--muted); }
+
+/* Hidden for a moment while a non-English reader's interface language loads (lang.js). */
+html.i18n-pending body { visibility: hidden; }
+
+/* Place field in the travel filters, with an ⓘ button that explains the search. */
+.travel-place { margin: 15px 0; font-size: 12px; line-height: 1.5; }
+.travel-place-head { display: flex; align-items: center; gap: 8px; }
+.travel-info { position: relative; display: inline-grid; place-items: center; width: 18px; height: 18px; padding: 0; border: 1px solid currentColor; border-radius: 50%; background: none; color: var(--muted); font: italic 600 11px/1 var(--serif); cursor: pointer; }
+.travel-info::after { content: ''; position: absolute; inset: -13px; }
+.travel-info[aria-expanded="true"] { background: var(--accent-solid); border-color: var(--accent-solid); color: #fff; }
+.travel-help { margin: 6px 0 8px; padding: 10px 12px; border: 1px solid var(--rule); border-radius: 2px; background: var(--surface); }
+.travel-filters .travel-help p { margin: 0 0 6px; }
+.travel-filters .travel-help p:last-child { margin-bottom: 0; }
+/* End of a travel filter's results: one action per line. */
+.travel-end-filter { color: var(--ink); font-weight: 600; margin: -8px 0 18px; }
+.travel-end-actions { display: flex; flex-direction: column; gap: 10px; }
+.travel-end-actions .err-btn + .err-btn { background: none; color: var(--ink); border: 1px solid var(--rule); }
+.travel-end h2.err-ttl { margin-top: 0; }
+
+/* Settings About card footer: About, Privacy Policy and the GitHub icon as one
+   evenly spaced, centred row that wraps cleanly on narrow phones. */
+.sp-about-links { display: flex; flex-wrap: wrap; justify-content: center; gap: 0 20px; margin-top: 12px; }
+.sp-about-links .about-link, .sp-about-links .privacy-link-btn, body.light .sp-about-links .privacy-link-btn {
+  display: inline-flex; align-items: center; min-height: 36px; padding: 0; margin: 0;
+  font: 400 12px/1.2 var(--sans); color: var(--accent) !important;
+  text-decoration: underline; text-underline-offset: 3px; background: none; border: 0; cursor: pointer;
+}
+.sp-about-links .about-link-icon { text-decoration: none; justify-content: center; min-width: 36px; }
+.sp-about-links .about-link-icon svg { display: block; }

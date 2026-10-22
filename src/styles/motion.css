@@ -1,0 +1,125 @@
+/* ── Motion system (release 68) ─────────────────────────────────────────
+   One iOS-style curve for everything that opens: a critically damped
+   spring (starts from rest, no overshoot, long gentle settle), expressed
+   with linear(). Panels slide without fading so they read as solid
+   surfaces; only backdrops fade. Opening takes a little longer than
+   closing, as on iOS. Older browsers get a close cubic-bezier. */
+:root {
+  --motion-open: 460ms;   /* drawers, sheets, full-screen menus */
+  --motion-close: 340ms;
+  --motion-pop: 300ms;    /* dialogs, dropdowns, small controls */
+  --motion-pop-out: 180ms;
+  --motion-fade-in: 280ms;
+  --motion-fade-out: 220ms;
+  --ease-spring: cubic-bezier(.22, .8, .26, 1);
+  --ease-fade: cubic-bezier(.33, 0, .25, 1);
+}
+@supports (transition-timing-function: linear(0, 1)) {
+  :root { --ease-spring: linear(0 0%, .010 2%, .036 4%, .073 6%, .118 8%, .168 10%, .248 13%, .329 16%, .433 20%, .527 24%, .610 28%, .698 33%, .768 38%, .834 44%, .882 50%, .922 57%, .952 65%, .972 74%, .985 84%, 1 100%); }
+}
+/* Side drawers: Saved and History at every width; Settings and Topics on desktop. */
+#lp#lp, #hp#hp {
+  opacity: 1;
+  transition: transform var(--motion-close) var(--ease-spring), visibility 0s var(--motion-close);
+}
+#lp#lp.open, #hp#hp.open {
+  transition: transform var(--motion-open) var(--ease-spring), visibility 0s;
+}
+@media (min-width: 768px) {
+  #settingsPanel#settingsPanel, #topicSheet#topicSheet {
+    opacity: 1;
+    transition: transform var(--motion-close) var(--ease-spring), visibility 0s var(--motion-close);
+  }
+  #settingsPanel#settingsPanel.open, #topicSheet#topicSheet.open {
+    transition: transform var(--motion-open) var(--ease-spring), visibility 0s;
+  }
+}
+/* Phone topic sheet: slides up on the compositor (it animated `bottom`
+   before) and stays visible while it slides away (it vanished instantly). */
+@media (max-width: 767px) {
+  #topicSheet#topicSheet {
+    bottom: 0;
+    transform: translate3d(0, calc(100% + 16px), 0);
+    transition: transform var(--motion-close) var(--ease-spring), visibility 0s var(--motion-close);
+  }
+  #topicSheet#topicSheet.open {
+    transform: translate3d(0, 0, 0);
+    transition: transform var(--motion-open) var(--ease-spring), visibility 0s;
+  }
+  body .burger-menu.burger-menu {
+    transition: transform var(--motion-close) var(--ease-spring), opacity var(--motion-fade-out) var(--ease-fade), visibility 0s var(--motion-close), background-color .24s;
+  }
+  body .burger-menu.burger-menu.open {
+    transition: transform var(--motion-open) var(--ease-spring), opacity var(--motion-fade-in) var(--ease-fade), visibility 0s, background-color .24s;
+  }
+}
+/* Backdrops fade; closed backdrops stop catching clicks immediately. */
+.sp-backdrop.sp-backdrop, .sheet-overlay.sheet-overlay {
+  pointer-events: none;
+  transition: opacity var(--motion-fade-out) var(--ease-fade), visibility 0s var(--motion-fade-out);
+}
+.sp-backdrop.sp-backdrop.open, .sheet-overlay.sheet-overlay.open {
+  pointer-events: auto;
+  transition: opacity var(--motion-fade-in) var(--ease-fade), visibility 0s;
+}
+.burger-backdrop.burger-backdrop { transition: opacity var(--motion-fade-out) var(--ease-fade); }
+.burger-backdrop.burger-backdrop.open { transition: opacity var(--motion-fade-in) var(--ease-fade); }
+/* Dialogs rise in and now also fade out (browsers without @starting-style
+   simply open and close instantly, as before). */
+dialog.privacy-dialog, dialog.source-dialog {
+  opacity: 0;
+  transform: translateY(8px) scale(.97);
+  transition: opacity var(--motion-pop-out) var(--ease-fade), transform var(--motion-pop-out) var(--ease-fade),
+    overlay var(--motion-pop-out) allow-discrete, display var(--motion-pop-out) allow-discrete;
+}
+dialog.privacy-dialog[open], dialog.source-dialog[open] {
+  animation: none;
+  opacity: 1;
+  transform: none;
+  transition: opacity var(--motion-fade-in) var(--ease-fade), transform var(--motion-open) var(--ease-spring),
+    overlay var(--motion-open) allow-discrete, display var(--motion-open) allow-discrete;
+}
+@starting-style {
+  dialog.privacy-dialog[open], dialog.source-dialog[open] { opacity: 0; transform: translateY(8px) scale(.97); }
+}
+dialog.privacy-dialog::backdrop, dialog.source-dialog::backdrop {
+  opacity: 0;
+  transition: opacity var(--motion-pop-out) var(--ease-fade), overlay var(--motion-pop-out) allow-discrete, display var(--motion-pop-out) allow-discrete;
+}
+dialog.privacy-dialog[open]::backdrop, dialog.source-dialog[open]::backdrop {
+  opacity: 1;
+  transition: opacity var(--motion-fade-in) var(--ease-fade), overlay var(--motion-open) allow-discrete, display var(--motion-open) allow-discrete;
+}
+@starting-style {
+  dialog.privacy-dialog[open]::backdrop, dialog.source-dialog[open]::backdrop { opacity: 0; }
+}
+/* Language menu: a short drop instead of appearing instantly. */
+.lang-dd.lang-dd {
+  opacity: 0;
+  transform: translateY(-6px) scale(.98);
+  transform-origin: top;
+  transition: opacity var(--motion-pop-out) var(--ease-fade), transform var(--motion-pop-out) var(--ease-fade), display var(--motion-pop-out) allow-discrete;
+}
+.lang-dd.lang-dd.open {
+  opacity: 1;
+  transform: none;
+  transition: opacity var(--motion-pop-out) var(--ease-fade), transform var(--motion-pop) var(--ease-spring), display var(--motion-pop) allow-discrete;
+}
+@starting-style {
+  .lang-dd.lang-dd.open { opacity: 0; transform: translateY(-6px) scale(.98); }
+}
+/* Wikipedia / Wikivoyage switch pill. */
+.toggle.toggle:before { transition: transform var(--motion-pop) var(--ease-spring); }
+/* Map and Ambient: their content rises with the same spring. */
+.map-overlay.map-overlay .map-container { transition: opacity var(--motion-fade-out) var(--ease-fade), transform var(--motion-close) var(--ease-spring); }
+.map-overlay.map-overlay.open .map-container { transition: opacity var(--motion-fade-in) var(--ease-fade) 40ms, transform var(--motion-open) var(--ease-spring) 40ms; }
+.ambient-overlay.ambient-overlay .ambient-content { transition: opacity var(--motion-fade-out) var(--ease-fade), transform var(--motion-close) var(--ease-spring); }
+.ambient-overlay.ambient-overlay.open .ambient-content { transition: opacity var(--motion-fade-in) var(--ease-fade) 40ms, transform var(--motion-open) var(--ease-spring) 40ms; }
+@media (prefers-reduced-motion: reduce) {
+  #lp#lp, #hp#hp, #settingsPanel#settingsPanel, #topicSheet#topicSheet, body .burger-menu.burger-menu,
+  .sp-backdrop.sp-backdrop, .sheet-overlay.sheet-overlay, .burger-backdrop.burger-backdrop,
+  dialog.privacy-dialog, dialog.source-dialog, dialog.privacy-dialog::backdrop, dialog.source-dialog::backdrop,
+  .lang-dd.lang-dd, .toggle.toggle:before, .map-overlay .map-container, .ambient-overlay .ambient-content {
+    transition: none !important; animation: none !important;
+  }
+}

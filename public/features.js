@@ -62,7 +62,7 @@ function showTravelEnd(){
  let card=feed.querySelector('.travel-end');
  if(!card){card=document.createElement('div');card.className='card travel-end';feed.appendChild(card);}
  const place=travelFilters.place||'',style=travelFilters.style||'';
- card.innerHTML=`<div class="cbg"><div class="cveil"></div></div><div class="err"><div class="err-ico">${uiIcon("discovery")}</div><h2 class="err-ttl">${found?"That's every matching guide":'No matching guides'}</h2><div class="err-msg">${found?"You've seen every guide that matches your travel filters.":'Nothing on Wikivoyage matches your travel filters.'}</div><p class="travel-end-filter"></p><div class="travel-end-actions"></div></div>`;
+ card.innerHTML=`<div class="cbg"><div class="cveil"></div></div><div class="err"><div class="err-ico">${uiIcon("discovery")}</div><h2 class="err-ttl">${found?"No more matching guides":'No matching guides'}</h2><div class="err-msg">${found?"You've seen every guide that matches your travel filters.":'Nothing on Wikivoyage matches your travel filters.'}</div><p class="travel-end-filter"></p><div class="travel-end-actions"></div></div>`;
  const filter=card.querySelector('.travel-end-filter');
  if(place){const name=document.createElement('span');name.className='travel-end-place';name.dir='auto';name.textContent=place;filter.append(name);}
  if(place&&style)filter.append(' · ');

@@ -50,7 +50,7 @@ test('messages shown after an action are translated in every language, including
   '📍 Could not locate this place','Map could not load. Close it and try again.','❌ Map failed to render','Tap a collection below to add this article immediately.',
   '＋ Create new collection','Create a new collection','Create and save','Back','Create your first collection to organize this article.',
   'Shareable collections support up to 30 articles. Create a smaller collection to share.','Could not verify this collection. Please reopen the link to try again.',
-  "That's every matching guide","You've seen every guide that matches your travel filters.",'No matching guides','Nothing on Wikivoyage matches your travel filters.',
+  "No more matching guides","You've seen every guide that matches your travel filters.",'No matching guides','Nothing on Wikivoyage matches your travel filters.',
   'Try any trip style','Explore all destinations','Change filters','How place search works','Type a country, region or city, like Japan or Tuscany.',
   'To search several places at once, separate them with commas: Japan, Tuscany. Guides from each place take turns in your feed.',
   'Guides are matched using Wikivoyage’s geographic hierarchy, with their name and introduction as a fallback.',"When you've seen every matching guide, the feed tells you and lets you widen the search.",'🌍 Travel','View map','📖 Just now','Enter a collection name','Read on Wikivoyage ↗',

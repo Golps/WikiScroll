@@ -279,7 +279,7 @@ test('the end of a travel filter offers the closest next step first', () => {
   };
   const end = run({place: 'Japan', style: 'coast'}, true, '');
   assert.deepEqual(end.buttons, ['Try any trip style', 'Explore all destinations', 'Change filters']);
-  assert.match(end.html, /That's every matching guide/);
+  assert.match(end.html, /No more matching guides/);
   assert.deepEqual(run({place: 'Japn', style: ''}, false, 'Japan').buttons, ['Search for “Japan”', 'Explore all destinations', 'Change filters']);
   assert.match(run({place: 'Japn', style: ''}, false, 'Japan').html, /No matching guides/);
   assert.deepEqual(run({place: '', style: 'city'}, true, '').buttons, ['Explore all destinations', 'Change filters']);

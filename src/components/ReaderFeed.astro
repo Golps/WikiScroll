@@ -35,11 +35,23 @@ import Icon from "./Icon.astro";
   </div>
 </div>
 
-<!-- HINT -->
-<button class="hint" id="hint" type="button" aria-hidden="true" tabindex="-1">
-  <span class="hint-txt">Scroll to discover</span>
-  <span class="hint-arr" aria-hidden="true"></span>
-</button>
+<!-- GESTURE COACH: shown on launch until the reader has scrolled and swiped once -->
+<div class="coach" id="coach" role="note" aria-hidden="true">
+  <div class="coach-row" data-gesture="scroll">
+    <svg class="coach-ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <g class="coach-track"><path d="M1.4 3.6 3.2 1.6 5 3.6M1.4 9.4l1.8 2 1.8-2M3.2 2.4v8.8"/></g>
+      <g class="coach-move"><path class="coach-hand" d="M8 13.4V4.6a1.6 1.6 0 0 1 3.2 0v6.2m0-.6a1.6 1.6 0 0 1 3.2 0v1.2m0-.4a1.6 1.6 0 0 1 3.2 0v.8m0 0a1.6 1.6 0 0 1 3.2 0v3.3a6.8 6.8 0 0 1-6.8 6.8h-1.4a5.6 5.6 0 0 1-4.3-2l-3-3.6a1.5 1.5 0 0 1 2.3-1.9L8 15"/></g>
+    </svg>
+    <p><strong>Scroll.</strong> <span class="coach-touch">Swipe up for the next discovery.</span><span class="coach-desk">Scroll or press the down arrow for the next discovery.</span></p>
+  </div>
+  <div class="coach-row" data-gesture="swipe">
+    <svg class="coach-ico" viewBox="0 -2 24 26" aria-hidden="true" focusable="false">
+      <g class="coach-track"><path d="M7.6-2.4 5.8-.8l1.8 1.6m8.8-3.2 1.8 1.6-1.8 1.6M6.4-.8h11.2"/></g>
+      <g class="coach-move"><path class="coach-hand" d="M8 13.4V4.6a1.6 1.6 0 0 1 3.2 0v6.2m0-.6a1.6 1.6 0 0 1 3.2 0v1.2m0-.4a1.6 1.6 0 0 1 3.2 0v.8m0 0a1.6 1.6 0 0 1 3.2 0v3.3a6.8 6.8 0 0 1-6.8 6.8h-1.4a5.6 5.6 0 0 1-4.3-2l-3-3.6a1.5 1.5 0 0 1 2.3-1.9L8 15"/></g>
+    </svg>
+    <p><span class="coach-touch"><strong>Swipe.</strong> Right to save, left to skip.</span><span class="coach-desk"><strong>Save or skip.</strong> Right arrow to save, left arrow to skip.</span></p>
+  </div>
+</div>
 
 <!-- PULL TO REFRESH -->
 <div class="ptr-indicator" id="ptrIndicator" aria-hidden="true">

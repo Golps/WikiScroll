@@ -100,3 +100,12 @@ test('a dictionary that arrives after the page is shown is applied to it',async(
  assert.deepEqual(loads,['load es','wsi18n:ready']);
  api.setLanguage('en');assert.equal(loads.length,2,'English needs no download');
 });
+
+test('the gesture coach is translated in every language',()=>{
+ const w=harness(),api=w.WSI18n;
+ const html=fs.readFileSync(new URL('../dist/index.html',import.meta.url),'utf8');
+ const coach=html.slice(html.indexOf('id="coach"'),html.indexOf('ptrIndicator'));
+ const strings=[...coach.matchAll(/>([^<>]*\p{L}[^<>]*)</gu)].map(m=>m[1].trim()).filter(Boolean);
+ assert.ok(strings.length>=7,strings.join(' | '));
+ for(const lang of Object.keys(w.WS_TRANSLATIONS))for(const text of strings)assert.notEqual(api.translate(text,lang),text,lang+': '+text);
+});

@@ -9,21 +9,27 @@ const classes=()=>{const set=new Set();return {add:n=>set.add(n),remove:n=>set.d
 test('sharing falls back to copy on failure, reports copy failure, and quietly honors cancellation',async()=>{
  const code=app.slice(app.indexOf('async function doShare'),app.indexOf('// ── TOPICS'));
  const messages=[],copies=[];const navigator={share:async()=>{throw Error('Unavailable')},clipboard:{writeText:async url=>copies.push(url)}};
- const c=vm.createContext({navigator,deepLinkUrl:()=> 'https://wikiscroll.com/?a=w1',toast:m=>messages.push(m)});vm.runInContext(code,c);
+ const c=vm.createContext({navigator,window:{},deepLinkUrl:()=> 'https://wikiscroll.com/?a=w1',toast:m=>messages.push(m)});vm.runInContext(code,c);
  await c.doShare({id:'w1'});assert.equal(copies.length,1);assert.equal(messages[0],'Link copied!');
  navigator.share=async()=>{throw Object.assign(Error(),{name:'AbortError'})};await c.doShare({id:'w1'});assert.equal(messages.length,1);assert.equal(copies.length,1);
  delete navigator.share;navigator.clipboard.writeText=async()=>{throw Error('Denied')};await c.doShare({id:'w1'});assert.match(messages[1],/Could not share/);
 });
 
-test('discovery cue advances one card without saving, fades on scroll and pauses dismissal while focused',()=>{
- const events={},attrs={};let timer,scroll,focus;
- const hint={classList:classes(),setAttribute:(k,v)=>attrs[k]=v,removeAttribute:k=>delete attrs[k],addEventListener:(e,f)=>events[e]=f};
- const feed={scrollTop:0,addEventListener:(e,f)=>events['feed'+e]=f,querySelectorAll:()=>[1,2,3],scrollTo:arg=>scroll=arg,focus:()=>focus=true};
- const document={activeElement:null,getElementById:id=>id==='hint'?hint:feed,addEventListener(){}};const window={addEventListener(){}};
- vm.runInNewContext(read('discovery.js'),{document,window,setTimeout:f=>{timer=f;return 1},clearTimeout(){},feedMotionLocked:false,ensureFeedAhead(){},getCurrentFeedCard:()=>1,feedCardTop:card=>card*700,matchMedia:()=>({matches:true})});
- window.WSDiscoveryHint.show();assert.ok(hint.classList.contains('is-visible'));document.activeElement=hint;timer();assert.ok(hint.classList.contains('is-visible'));
- events.click();assert.equal(scroll.top,1400);assert.equal(scroll.behavior,'instant');assert.ok(focus);assert.equal(attrs['aria-hidden'],'true');
- document.activeElement=null;window.WSDiscoveryHint.show();feed.scrollTop=80;events.feedscroll();assert.equal(attrs['aria-hidden'],'true');assert.equal(hint.tabIndex,-1);
+test('gesture coach teaches scroll and swipe until each is learned, and hides on scroll or tap',()=>{
+ const events={},attrs={},store={};let timer;
+ const rows={scroll:{hidden:false},swipe:{hidden:false}};
+ const coach={classList:classes(),setAttribute:(k,v)=>attrs[k]=v,removeAttribute:k=>delete attrs[k],addEventListener:(e,f)=>events[e]=f,querySelector:q=>rows[q.match(/"(\w+)"/)[1]]};
+ const feed={scrollTop:0,addEventListener:(e,f)=>events['feed'+e]=f};
+ const localStorage={getItem:k=>store[k]??null,setItem:(k,v)=>store[k]=v};
+ const load=()=>{const window={addEventListener(){}};vm.runInNewContext(read('discovery.js'),{document:{getElementById:id=>id==='coach'?coach:feed,addEventListener(){},documentElement:{classList:classes()}},window,localStorage,addEventListener(){},setTimeout:f=>{timer=f;return 1},clearTimeout(){}});return window.WSDiscoveryHint;};
+ let coachApi=load();
+ coachApi.show({swipe:true});assert.ok(coach.classList.contains('is-visible'));assert.equal(rows.scroll.hidden,false);assert.equal(rows.swipe.hidden,false);
+ timer();assert.equal(attrs['aria-hidden'],'true');
+ coachApi.show({swipe:false});assert.equal(rows.swipe.hidden,true,'no swipe row when swiping is off');
+ feed.scrollTop=80;events.feedscroll();assert.equal(attrs['aria-hidden'],'true');feed.scrollTop=0;
+ coachApi=load();coachApi.show({swipe:true});assert.equal(rows.scroll.hidden,true,'scrolling is remembered');assert.equal(rows.swipe.hidden,false);
+ events.click();assert.ok(!coach.classList.contains('is-visible'));
+ coachApi.learned('swipe');coachApi=load();coachApi.show({swipe:true});assert.ok(!coach.classList.contains('is-visible'),'nothing left to teach');
 });
 
 test('failed map lookup clears the old destination and keeps the failure visible',async()=>{
@@ -65,4 +71,28 @@ test('cloned dialog shells scope root ARIA references and input labels per insta
  assert.equal(first.attrs['aria-describedby'],'external '+first.children.title.id);
  assert.equal(first.children.label.attrs.for,first.children.input.id);
  assert.notEqual(first.children.input.id,second.children.input.id);
+});
+
+test('focus rings hide after a tap or click and return on any key press',()=>{
+ const listeners={},root={classList:classes()};
+ vm.runInNewContext(read('discovery.js').slice(read('discovery.js').indexOf('/* Focus rings')),{document:{documentElement:root},addEventListener:(e,f)=>listeners[e]=f});
+ listeners.pointerdown();assert.ok(root.classList.contains('pointer-input'));
+ listeners.keydown({metaKey:false,ctrlKey:false,altKey:false});assert.ok(!root.classList.contains('pointer-input'));
+ listeners.touchstart();listeners.keydown({metaKey:true});assert.ok(root.classList.contains('pointer-input'),'shortcuts do not count as keyboard navigation');
+ const css=fs.readFileSync(new URL('../src/styles/discovery.css',import.meta.url),'utf8');
+ assert.match(css,/\.pointer-input :focus, \.pointer-input :focus-visible \{ outline: none !important; \}/);
+});
+
+test('share sends the branded image with the link when it is ready, and the link alone otherwise',async()=>{
+ const code=app.slice(app.indexOf('async function doShare'),app.indexOf('// ── TOPICS'));
+ const shared=[],prepared=[],file={name:'Octopus.jpg'};let ready=null;
+ const navigator={share:async data=>{shared.push(data)},canShare:data=>Array.isArray(data.files)};
+ const window={WSShareCard:{ready:()=>ready,prepare:a=>prepared.push(a.id)}};
+ const c=vm.createContext({navigator,window,deepLinkUrl:()=> 'https://wikiscroll.com/?a=w1',toast(){}});vm.runInContext(code,c);
+ await c.doShare({id:'w1',title:'Octopus'});
+ assert.equal(JSON.stringify(shared[0]),'{"url":"https://wikiscroll.com/?a=w1"}','never waits for the image');assert.equal(prepared.join(),'w1');
+ ready=file;await c.doShare({id:'w1',title:'Octopus'});
+ assert.equal(shared[1].files[0],file);assert.equal(shared[1].url,'https://wikiscroll.com/?a=w1');
+ navigator.share=async data=>{if(data.files)throw Object.assign(Error(),{name:'NotAllowedError'});shared.push(data)};
+ await c.doShare({id:'w1',title:'Octopus'});assert.equal(JSON.stringify(shared[2]),'{"url":"https://wikiscroll.com/?a=w1"}','falls back to the link');
 });

@@ -4,6 +4,13 @@ Releases of this repository. Each entry describes what changed in the code; [doc
 
 ## Unreleased
 
+- Replace the bouncing "Scroll to discover" toast with a gesture coach: animated line-art hands show scrolling and swiping (keyboard wording on desktop). Each row stops appearing once the reader has made that gesture.
+- On phones, Saved Articles, History and Topics open as full pages with the same heading and Done button as Settings, instead of an inset drawer with a visible left edge. Drawers on wider screens share the Settings close button.
+- Wikivoyage mode uses a travel green as its accent (active tab, buttons, links, toggles); saved and visited items keep their own source's colour in either mode. The "Waiting for Wikipedia" notice now sits under the header instead of over the card's Save and Share buttons.
+- After a tap or click, buttons and links no longer stay outlined (for example the About links or a panel's close button); keyboard focus rings return on any key press.
+- One corner scale across the app: 8 px for small controls, 12 px for buttons and cards, 20 px for sheets, full pills for switches and floating indicators; no square controls remain. Switches are rounded with a white knob in both themes, the waiting screen drops its box, and light mode settings use the same text sizes as dark mode.
+- Share now sends a branded image with the link: the article photo, serif title, short excerpt and WikiScroll wordmark (no domain or source label), drawn on the device (`public/share-card.js`) with nothing uploaded. It is prepared while a card is on screen or as Share is pressed, so the share sheet still opens on the tap; until it is ready, Share sends the plain link.
+- Saved article actions stack each icon over its label so all four buttons line up. Wikivoyage items in Saved and History carry a map icon and their own green, and Remove inside a collection is red like Remove in All.
 - Add a daily usage check that opens an issue when Worker requests or R2 storage or operations pass half of the free allowance.
 - Pin workflow actions to exact commits (checkout v5.1.0, setup-node v5.0.0 on Node 24), drop stored Git credentials from jobs that never push, and let Dependabot propose action updates monthly.
 - Pick each library image's upload folder from the image table (files actually uploaded to English Wikipedia) rather than File: pages, many of which describe Commons files; an image that still fails tries the other folder before falling back to text.

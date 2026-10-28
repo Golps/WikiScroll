@@ -121,6 +121,7 @@ body.light .coach { box-shadow: 0 12px 36px #0002; }
 .coach.is-visible { opacity: 1; visibility: visible; pointer-events: auto; transform: translate(-50%, 0); transition-delay: 0s; }
 .coach-row { display: grid; grid-template-columns: 40px minmax(0, 1fr); align-items: center; gap: 14px; }
 .coach-row[hidden] { display: none; }
+.rtl-ui .coach { direction: rtl; }
 .coach-row p { margin: 0; font: 400 14px/1.4 var(--sans); color: var(--muted); }
 .coach-row strong { font-weight: 600; color: var(--ink); }
 .coach-ico { width: 40px; height: 40px; overflow: visible; fill: none; stroke: var(--ink); stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }

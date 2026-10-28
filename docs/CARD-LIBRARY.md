@@ -1,21 +1,34 @@
 # Card library
 
-The card library is a prebuilt set of English Wikipedia cards stored in Cloudflare R2 and served from `cards.wikiscroll.com`. It lets the feed draw from millions of ready cards without calling the Wikimedia API. This page covers how it is built and how to set it up. The browser does not read it yet; that is a separate change.
+The card library is a prebuilt set of English Wikipedia and Wikivoyage cards stored in Cloudflare R2 and served from `cards.wikiscroll.com`. It lets the feed draw from millions of ready cards without calling the Wikimedia API. This page covers how it is built, how the site reads it, and how to set it up.
 
 ## How a build works
 
-`.github/workflows/card-library.yml` runs every Tuesday (and on demand) on GitHub Actions:
+`.github/workflows/card-library.yml` runs on GitHub Actions early every Monday, the day after Wikimedia publishes its weekly dump, and on demand:
 
 1. Finds the newest weekly CirrusSearch index dump for `enwiki_content` on dumps.wikimedia.org. If that dump is already live, the run stops, so a rerun never repeats uploads.
-2. Downloads the `page_props` dump (lead images, short descriptions, disambiguation flags).
-3. Streams the search-index dump through `scripts/build-library.mjs`, which:
-   - turns each article into a card in the feed's `{id, src, title, body, img, url, desc}` shape, using the same rules as the starter pool (`scripts/build-starter.mjs`): an image is required, and lists, disambiguation pages and short introductions are left out;
-   - converts each page's `popularity_score` (its share of the week's views) into average daily views with English Wikipedia's daily total, then groups it with the Worker's own depth bands (`DEPTH_BANDS`). Pages with unknown readership never count as Obscure;
-   - puts the vital articles into Popular (Level 3) and Known (Level 4 minus Level 3), matching titles through redirects;
-   - shuffles every set across all of its cards and packs them into gzipped shards of 100.
+2. Downloads the twice-monthly table dumps: `page_props` (lead images, short descriptions, disambiguation flags), `page` and `categorylinks` (plus `linktarget` where the dump uses it) for the category tree and talk-page photo requests, and the English Wikivoyage search-index dump with its `page_props`.
+3. Streams the search-index dump through `scripts/build-library.mjs`, which builds one set of cards for every feed the site offers:
+   - **Depth (`wiki-en-1` … `wiki-en-5`):** cards with an image, like the live random feed. Each page's `popularity_score` (its share of the week's views) times English Wikipedia's average daily views gives its readership, grouped with the Worker's `DEPTH_BANDS`; pages with unknown readership never count as Obscure. Popular and Known are the vital articles (Level 3, and Level 4 minus Level 3), matched through redirects.
+   - **Topics (`topic-en-<topic>-<depth>`):** pages in a topic's root categories (`roots` in `worker/topics.js`) or up to two levels below them (three for Niche and Obscure), as the live category walk reaches, with the topic feeds' own readership bands.
+   - **Help Wikipedia (`help-en-<type>-<depth>`):** pages whose hidden maintenance categories (`NEED_CATEGORIES`) or talk-page photo requests match a Help type. Every card in every set carries its maintenance tags (`needs`), in the live order.
+   - **Mature topics:** a Wikipedia card whose categories, title or short description name sex, pornography, nudity or graphic abuse carries `mature: 1` (`worker/mature.js`). It stays in its sets; the reader skips it unless Settings → Mature topics is on (off by default). Live and starter cards get the same flag from their title and description, and the reader checks cards without a flag the same way.
+   - **A topic with Help on (`topic-en-<topic>-help-<type>-<depth>`):** the topic cards that need that type of help, so the browser never sifts through topic cards for the few that match.
+   - **Wikivoyage (`how-en`):** travel guides with a readable introduction, image optional, without phrasebooks or travel-topic pages.
+   - Every set is shuffled across all of its cards and packed into gzipped shards of 100. Topic and Help sets keep a random sample of up to `SLICE_CAP` (40,000) cards each and topic-with-Help sets up to `COMBO_CAP` (10,000); the depth and travel sets keep every card.
 4. Uploads the shards under `v1/en/<dump date>/<set>/<n>.json`, then writes `v1/en/current.json`, which points readers at the new build. After that, it deletes the previous build.
 
-A thin build (fewer cards than `MINIMUM`), a failed download or a missing upstream list fails the job before anything is uploaded, and the current library keeps serving.
+A thin build (fewer cards than `MINIMUM`), a misread table, a failed download, a missing upstream list, or more than 5% broken links among the sampled images that answered (rate-limited checks are ignored) fails the job before anything is uploaded, and the current library keeps serving.
+
+## How the site reads it
+
+`public/app.js` (`fetchLibraryBatch`) reads `v1/en/current.json`, then one random shard of the set that matches the reader's settings, straight from `cards.wikiscroll.com`. These downloads never pass through the Worker, so they don't count against its daily request limit. Every English Wikipedia setting and Wikivoyage browsing come from the library:
+
+- Several topics or Help types: each draw picks one of the matching sets at random, so the feed mixes them.
+- Each visit draws a shard only once. When the reader's own depth has no shards left, or never had any (Popular articles rarely need work), the next draw comes from the nearest depth in the library, not from the live API.
+- When every depth of a setting is drawn, the feed ends on a "You're all caught up" card with *Start over* and *Change settings*.
+
+The Worker and the live API serve only what the library can't: other languages, travel search, On this day, an older library without the reader's set, or a failed download (the library is retried a minute later). The offline starter pool stays the last resort.
 
 ## Staying inside the free tier
 
@@ -24,6 +37,7 @@ R2's free tier includes 10 GB of storage, 1 million writes and 10 million reads 
 - **Writes:** a build is refused at more than `MAX_FILES` (190,000) shards, so five weekly builds a month stay under 1 million. A dump that is already live is never rebuilt unless the run is started with *force*.
 - **Storage:** a build is refused at more than `MAX_BYTES` (4.5 GB), so the old and new builds together stay under 10 GB during the swap. Only one build is kept.
 - **Reads:** shards never change and are cached for a year, and the manifest for 5 minutes. With the cache rule below, most downloads never reach R2.
+- **Early warning:** the daily *Usage check* workflow (`scripts/usage-check.mjs`) compares yesterday's Worker requests (free: 100,000 a day) and this month's R2 storage and operations with the free allowances, and opens an issue once any passes half. It needs a `CF_ANALYTICS_TOKEN` secret: a Cloudflare API token with only *Account Analytics: Read*. Until it is set the check is skipped.
 
 ## One-time setup
 

@@ -114,7 +114,8 @@ export function* sqlRows(line, continued = false) {
             i = start = slash + 2;
           } else { text += line.slice(start, quote); i = quote + 1; break; }
         }
-        row.push(text);
+        // A copy, not a slice: a slice keeps its whole multi-megabyte INSERT line alive.
+        row.push(text.length > 12 ? (' ' + text).slice(1) : text);
       } else {
         let j = i;
         while (j < n && line[j] !== ',' && line[j] !== ')') j++;

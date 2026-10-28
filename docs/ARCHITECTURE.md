@@ -103,7 +103,7 @@ The browser stores data under stable keys: `ws_liked`, `ws_collections`, `ws_his
 These rules hold across the codebase, and many are enforced by tests. Changes should preserve them.
 
 - **No personalization from behavior.** Feed requests contain explicit choices (source, language, depth, topics, Help Wikipedia mode and travel filters), a batch slot, and an ephemeral opening draw when needed. Likes and previous cards never personalize live selection; history stays on-device and can order offline reserves.
-- **Depth means readership, not length.** Excerpt length is never used as a stand-in for depth. Pages with unknown readership never qualify as *Obscure*.
+- **Depth means readership, not length.** Excerpt length is never used as a stand-in for depth. Pages with unknown readership never qualify as *Obscure*. The only exception is a reported Wikimedia outage, when an empty feed may show saved or starter cards from another depth under the "Waiting for Wikipedia" notice.
 - **One feed generation at a time.** Changing source, language or filters increments `fillGeneration`, aborts in-flight requests and cancels animations. Any reply or animation frame from an older generation is discarded.
 - **The visible card is never lost.** Clean-up, resizes, supply gaps and gestures keep the reader on the article they are reading.
 - **Swipe right only saves.** Swiping right and double-tapping add a save and never remove one. Only the Save button and <kbd>L</kbd> toggle.

@@ -12,6 +12,7 @@ Releases of this repository. Each entry describes what changed in the code; [doc
 - Give requests that join an in-flight article or topic job the shared job's failure code and full Retry-After, instead of a default 5-second retry.
 - Pause a Wikimedia edition after three consecutive 5xx or connection failures without Retry-After (5 s, doubling to 60 s), and answer an uncached feed request during such an outage from complete batches already in the edge cache.
 - When the Worker reports a Wikimedia outage on an empty feed, show the device's exact-settings reserve or the bundled English starter set instead of an empty "Waiting for Wikipedia" screen, and log each upstream failure (host, status, pause) for Workers Observability.
+- Extend the outage fallback to every discovery depth and to depth or filter changes made during the pause: use saved cards from another depth or matching topic in the same language before the starter set, keep language, Help-only and travel filters strict, and never save stand-ins as the new feed's reserve.
 
 - Refresh social previews with a two-line serif headline, “Turn doomscrolling into discovery.”, and a new versioned image URL across site and collection previews.
 

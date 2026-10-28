@@ -695,8 +695,11 @@ function persistFeedReserve() {
     const nodes=Array.from(feed.querySelectorAll('.card[data-id]'));
     const start=Math.max(0,nodes.indexOf(current));
     const ids=new Set(nodes.slice(start).map(c=>c.dataset.id));
-    const remaining=[...articles.filter(a=>ids.has(a.id)),...queue].slice(0,160);
+    // Outage stand-ins belong to other settings: never save them as this feed's reserve.
+    const remaining=[...articles.filter(a=>ids.has(a.id)),...queue].filter(a=>!a.outage).slice(0,160);
     const stored=lsGet('ws_feed_reserves')||{};
+    // An empty context must not evict another context's reserve.
+    if(!remaining.length){if(stored[key]){delete stored[key];lsSet('ws_feed_reserves',stored);}return;}
     stored[key]={at:Date.now(),items:remaining};
     const kept=Object.fromEntries(Object.entries(stored).sort((a,b)=>b[1].at-a[1].at).slice(0,4));
     lsSet('ws_feed_reserves',kept);
@@ -705,6 +708,20 @@ function persistFeedReserve() {
 function restoreFeedReserve() {
   const saved=lsGet('ws_feed_reserves')?.[feedContextKey()];
   return saved && Date.now()-saved.at<7*864e5 && Array.isArray(saved.items) ? saved.items.filter(validReserveArticle) : [];
+}
+// Only while the Worker reports a Wikimedia outage: real cards this device
+// saved for the same source and language under another depth or filter.
+// A topic feed takes only cards of a selected topic, Help-only still rejects
+// untagged cards (acceptSupply), and filtered travel is never relaxed.
+function restoreOutageReserve() {
+  if(curMode==='how'&&(travelFilters.place||travelFilters.style))return [];
+  const stored=lsGet('ws_feed_reserves')||{},current=feedContextKey(),items=[];
+  for(const [key,saved] of Object.entries(stored)){
+    const [version,mode,lang]=key.split('|');
+    if(key===current||version!=='topics-v5'||mode!==curMode||lang!==curLang||!(Date.now()-saved?.at<7*864e5)||!Array.isArray(saved.items))continue;
+    for(const a of saved.items)if(validReserveArticle(a)&&(!curTopics.size||curTopics.has(a.topic)))items.push(a);
+  }
+  return items;
 }
 function acceptSupply(batch,gen,randomize=true) {
   if(gen!==fillGeneration)return 0;
@@ -718,9 +735,10 @@ function acceptSupply(batch,gen,randomize=true) {
   return added;
 }
 let starterPromise;
-function loadStarterLibrary(gen) {
+function loadStarterLibrary(gen,outage=false) {
   // Never silently replace language, topic, or destination choices with English random cards.
-  if((curMode==='how'?voyageLang():curLang)!=='en'||curMode==='wiki'&&(curTopics.size||helpOnly()||depthLevel!==3)||curMode==='how'&&(travelFilters.place||travelFilters.style))return Promise.resolve([]);
+  // Depth is relaxed only during a reported outage, when the waiting notice is shown.
+  if((curMode==='how'?voyageLang():curLang)!=='en'||curMode==='wiki'&&(curTopics.size||helpOnly()||!outage&&depthLevel!==3)||curMode==='how'&&(travelFilters.place||travelFilters.style))return Promise.resolve([]);
   const mode=curMode;
   starterPromise ||= (async()=>{
     const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),4000);
@@ -742,8 +760,10 @@ function startStartupFallback(gen,outage=false) {
   return new Promise(resolve=>setTimeout(async()=>{
     try {
       if(gen!==fillGeneration||articles.length)return;
-      let backup=restoreFeedReserve();
-      if(!backup.length)backup=await loadStarterLibrary(gen);
+      let backup=restoreFeedReserve(),standIn=false;
+      if(!backup.length&&outage){backup=restoreOutageReserve();standIn=true;}
+      if(!backup.length)backup=await loadStarterLibrary(gen,outage);
+      if(standIn)backup=backup.map(a=>({...a,outage:true}));
       if(gen!==fillGeneration||articles.length)return;
       const recent=new Set(history.map(savedKey));
       const shuffledBackup=shuffled(backup);
@@ -760,7 +780,8 @@ function retryAfterMillis(value){
 }
 // Upstream pauses belong to one Wikimedia edition. Actual Worker/IP limits
 // remain global; switching source must not bypass them.
-const workerSourceCooldowns=new Map();let workerGlobalCooldownUntil=0;
+// workerOutages: sources whose pause the Worker blamed on Wikimedia (upstream_*).
+const workerSourceCooldowns=new Map(),workerOutages=new Map();let workerGlobalCooldownUntil=0;
 function workerSourceKey(mode=curMode,lang=mode==='how'?voyageLang():curLang){return mode+'|'+lang;}
 function restoreWorkerCooldown(){
  const now=Date.now();for(const [key,until] of workerSourceCooldowns)if(until<=now)workerSourceCooldowns.delete(key);
@@ -771,8 +792,8 @@ async function noteWorkerCooldown(response,gen,key,payload){
  try{code=(payload||await response.json()).code||'';}catch{}
  if(gen!==fillGeneration)return null;
  if(code.startsWith('upstream_'))globalThis.WSFeedStatus?.waiting();
- if(code.startsWith('upstream_')&&!articles.length&&!queue.length)startStartupFallback(gen,true);
  const until=Date.now()+delay;
+ if(code.startsWith('upstream_')){workerOutages.set(key,Math.max(workerOutages.get(key)||0,until));if(!articles.length&&!queue.length)startStartupFallback(gen,true);}
  if(response.status===429||code==='work_rate_limited')workerGlobalCooldownUntil=Math.max(workerGlobalCooldownUntil,until);
  else workerSourceCooldowns.set(key,Math.max(workerSourceCooldowns.get(key)||0,until));
  restoreWorkerCooldown();
@@ -782,6 +803,9 @@ async function noteWorkerCooldown(response,gen,key,payload){
 async function fetchWorkerBatch(gen) {
   if(Date.now()<workerCooldownUntil){
     if(pendingWorkerBatch?.cacheRecovery&&articles.length)return fetchCachedSupply(pendingWorkerBatch,gen);
+    // A feed opened or switched during a known outage (a new depth or filter
+    // on the same source) gets the outage stand-ins without another request.
+    if(!articles.length&&!queue.length&&(workerOutages.get(workerSourceKey())||0)>Date.now())startStartupFallback(gen,true);
     return [];
   }
   const controller=new AbortController();supplyControllers.add(controller);

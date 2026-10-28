@@ -39,6 +39,7 @@ function harness() {
     const fetchWiki=()=>directRequest(),fetchWikiByTopic=()=>directRequest(),fetchVoyage=()=>directRequest();
     ${voyage}
     ${supply}
+    const liveFetchWorkerBatch=fetchWorkerBatch;
     fetchWorkerBatch=()=>workerRequest();
     function withTodaySurprises(batch){return batch;}`, context);
   const run = text => vm.runInContext(text, context);
@@ -226,4 +227,80 @@ test('an outage report never replaces live cards or fires for non-upstream pause
   const fresh=harness();
   fresh.context.reply=new Response(null,{status:429});await fresh.run(`noteWorkerCooldown(reply,fillGeneration,'wiki|en',{code:'work_rate_limited'})`);await fresh.fire(0);
   assert.equal(fresh.starterRequests,0);assert.equal(fresh.nodes.length,0);
+});
+
+// Every setting a reader can choose, during a reported Wikimedia outage.
+async function outageOpening(settings,reserves={}){
+  const h=harness();h.change(settings);
+  h.storage.set('ws_feed_reserves',JSON.stringify(reserves));
+  h.context.reply=new Response(null,{status:503,headers:{'Retry-After':'30'}});
+  await h.run(`noteWorkerCooldown(reply,fillGeneration,'x',{code:'upstream_rate_limited'})`);await h.fire(0);await tick();
+  return h;
+}
+const shown=h=>[...h.state().articles,...h.state().queue];
+const reserve=(key,items)=>({[key]:{at:Date.now(),items}});
+test('an outage shows cards at every discovery depth, not only Balanced',async()=>{
+  for(const depth of [1,2,3,4,5]){
+    const h=await outageOpening(`depthLevel=${depth};`);
+    assert.ok(shown(h).length>0,'depth '+depth+' shows cards');
+    assert.equal(h.starterRequests,1);
+  }
+});
+test('an outage prefers this device’s real cards from another depth over the starter set',async()=>{
+  for(const depth of [1,2,4,5]){
+    const h=await outageOpening(`depthLevel=${depth};`,reserve('topics-v5|wiki|en|3||',batch(20,700)));
+    assert.ok(shown(h).length>0);assert.ok(shown(h).every(id=>Number(id.slice(1))>=700),'depth '+depth);
+    assert.equal(h.starterRequests,0);
+  }
+});
+test('an outage in another language uses that language’s saved cards and never English starter cards',async()=>{
+  for(const depth of [1,3,5]){
+    const empty=await outageOpening(`curLang='fr';depthLevel=${depth};`,reserve('topics-v5|wiki|en|3||',batch(20,700)));
+    assert.deepEqual(shown(empty),[],'no English cards for a French reader');assert.equal(empty.starterRequests,0);
+    const french=await outageOpening(`curLang='fr';depthLevel=${depth};`,reserve('topics-v5|wiki|fr|2||',batch(20,800).map(a=>({...a,url:a.url.replace('en.','fr.')}))));
+    assert.ok(shown(french).length>0);assert.ok(shown(french).every(id=>Number(id.slice(1))>=800));
+  }
+});
+test('an outage keeps topic and Help-only choices: only matching saved cards, never generic ones',async()=>{
+  const topical=batch(10,900).map((a,i)=>({...a,topic:i<5?'science':'space'}));
+  const topic=await outageOpening(`curTopics.add('science');depthLevel=5;`,reserve('topics-v5|wiki|en|3|science,space|',topical));
+  assert.deepEqual(shown(topic).sort(),['w900','w901','w902','w903','w904']);assert.equal(topic.starterRequests,0);
+  const none=await outageOpening(`curTopics.add('music');`);
+  assert.deepEqual(shown(none),[]);assert.equal(none.starterRequests,0);
+  const tagged=batch(6,950).map((a,i)=>i%2?a:{...a,needs:['citations']});
+  const help=await outageOpening(`helpMode='only';depthLevel=1;`,reserve('topics-v5|wiki|en|3||',tagged));
+  assert.deepEqual(shown(help).sort(),['w950','w952','w954']);assert.equal(help.starterRequests,0);
+});
+test('an outage covers unfiltered travel but never substitutes guides for a travel filter',async()=>{
+  const voyage=await outageOpening(`curMode='how';`);
+  assert.ok(shown(voyage).length>0);assert.ok(shown(voyage).every(id=>id.startsWith('v')));
+  const filtered=await outageOpening(`curMode='how';travelFilters={place:'Japan',style:''};`,reserve('topics-v5|how|en|3||{"place":"","style":""}',batch(10,300,'how')));
+  assert.deepEqual(shown(filtered),[]);assert.equal(filtered.starterRequests,0);
+});
+test('outage stand-ins are never saved as the current feed’s reserve and never evict another reserve',async()=>{
+  const saved=reserve('topics-v5|wiki|en|3||',batch(20,700));
+  const h=await outageOpening(`depthLevel=5;`,saved);
+  assert.ok(shown(h).length>0);h.persist();
+  const stored=JSON.parse(h.storage.get('ws_feed_reserves'));
+  assert.equal(stored['topics-v5|wiki|en|5||'],undefined,'Balanced cards are not stored as an Obscure reserve');
+  assert.equal(stored['topics-v5|wiki|en|3||'].items.length,20,'the source reserve is kept');
+});
+test('switching depth or filters while the source is paused for an outage still shows cards',async()=>{
+  for(const settings of ['depthLevel=5;','depthLevel=1;','curTopics.add("science");']){
+    const h=harness();
+    h.storage.set('ws_feed_reserves',JSON.stringify(reserve('topics-v5|wiki|en|3||',batch(10,700).map(a=>({...a,topic:'science'})))));
+    h.context.reply=new Response(null,{status:503,headers:{'Retry-After':'56'}});
+    await h.run(`noteWorkerCooldown(reply,fillGeneration,workerSourceKey(),{code:'upstream_rate_limited'})`);await h.fire(0);await tick();
+    h.change(settings+'restoreWorkerCooldown();');
+    assert.equal((await h.run('liveFetchWorkerBatch(fillGeneration)')).length,0,'no request during the pause');
+    await h.fire(0);await tick();
+    assert.ok(shown(h).length>0,settings);
+  }
+});
+test('a short non-outage pause never substitutes cards for a slow opening',async()=>{
+  const h=harness();
+  h.context.reply=new Response(null,{status:503,headers:{'Retry-After':'1'}});
+  await h.run(`noteWorkerCooldown(reply,fillGeneration,workerSourceKey(),{code:'batch_pending'})`);await h.fire(0);
+  h.run('restoreWorkerCooldown();');await h.run('liveFetchWorkerBatch(fillGeneration)');await h.fire(0);await tick();
+  assert.deepEqual(shown(h),[]);assert.equal(h.starterRequests,0);
 });

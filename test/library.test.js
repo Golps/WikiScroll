@@ -49,6 +49,8 @@ test('the category tree and photo requests are read on both categorylinks schema
   assert.deepEqual([...photoTitles],['Lake Example']);
  }
  await assert.rejects(readCategoryLinks(table('categorylinks',['cl_from','cl_type','cl_target_id'],[[1,'page',1]])),/--linktarget/);
+ const emptied=await readCategoryLinks(table('categorylinks',['cl_from','cl_to','cl_type','cl_target_id'],[[100,'','subcat',1],[101,'','subcat',2],[200,'','page',3]]),targets);
+ assert.deepEqual(emptied.edges,[100,'Lakes',101,'Landforms'],'an emptied cl_to next to cl_target_id reads the targets');assert.deepEqual([...emptied.photoTalk],[200]);
 });
 
 test('topics reach categories up to three levels below their roots, at the shortest distance',()=>{

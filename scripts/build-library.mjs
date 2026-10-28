@@ -61,6 +61,9 @@ export const MINIMUM = {'wiki-en-1': 500, 'wiki-en-2': 3000, 'wiki-en-3': 50000,
 // fit the writes, and one build plus the next one during the swap must fit
 // the storage, so a build over either limit is refused before any upload.
 export const MAX_FILES = 190_000, MAX_BYTES = 4.5e9;
+// The category walk reaches hundreds of thousands of categories; far fewer
+// means the tree was misread, so the build stops before reading articles.
+export const MIN_TOPIC_CATEGORIES = 5000;
 const UA = 'WikiScroll-card-library/1.0 (https://wikiscroll.com; contact@wikiscroll.com)';
 const IMAGE = /\.(jpe?g|png|gif|svg|webp)$/i;
 const BAD_TITLE = /^(list of|lists of|index of|outline of|timeline of|glossary of|comparison of)\b/i;
@@ -159,8 +162,9 @@ export async function readPageProps(lines) {
 export const emptyProps = () => ({free: new Map(), any: new Map(), desc: new Map(), disambiguation: new Set()});
 
 // Category tree edges (child category page ID → parent title) and talk pages
-// in the photo-request category. Parent titles come from cl_to on the old
-// schema, or from linktarget on the new one.
+// in the photo-request category. Parent titles come from linktarget when the
+// dump has cl_target_id, or from cl_to on the old schema (a dump can carry an
+// emptied cl_to column next to cl_target_id).
 export async function readLinkTargets(lines) {
   const titles = new Map();
   const columns = await readTable(lines, (row, c) => { if (row[c.lt_namespace] === 14) titles.set(row[c.lt_id], row[c.lt_title]); });
@@ -169,11 +173,9 @@ export async function readLinkTargets(lines) {
 }
 export async function readCategoryLinks(lines, targets = null) {
   const edges = [], photoTalk = new Set(), photo = Object.keys(TALK_NEED_CATEGORIES[LANG] || {}).map(t => t.replace(/^Category:/, '').replace(/ /g, '_'));
-  let schema = null;
   const columns = await readTable(lines, (row, c) => {
-    schema ||= 'cl_to' in c ? 'title' : 'target';
-    const parent = schema === 'title' ? row[c.cl_to] : targets?.get(row[c.cl_target_id]);
-    if (parent === undefined || parent === null) return;
+    const parent = (targets && 'cl_target_id' in c ? targets.get(row[c.cl_target_id]) : null) || ('cl_to' in c ? row[c.cl_to] : null);
+    if (!parent) return;
     if (row[c.cl_type] === 'subcat') edges.push(row[c.cl_from], parent);
     else if (row[c.cl_type] === 'page' && photo.includes(parent)) photoTalk.add(row[c.cl_from]);
   });
@@ -467,13 +469,19 @@ if (process.argv[1] && import.meta.url === new URL(process.argv[1], 'file:').hre
     log('Reading the category tree');
     const targets = option('linktarget') ? await readLinkTargets(sqlLines(option('linktarget'))) : null;
     const links = await readCategoryLinks(sqlLines(option('categorylinks')), targets);
+    log(`Category targets: ${targets ? targets.size : 'none (cl_to)'}; subcategory edges: ${links.edges.length / 2}; photo-request talk pages: ${links.photoTalk.size}`);
     targets?.clear();
     const {children, photoTitles} = await readPages(sqlLines(option('page')), links);
+    const edgeCount = links.edges.length / 2;
     links.edges.length = 0;
     const reach = topicCategories(children);
+    log(`Categories with subcategories: ${children.size} of ${edgeCount} edges resolved; topic categories: ${reach.size}; photo requests: ${photoTitles.size}`);
     children.clear();
-    log(`Topic categories: ${reach.size}; photo requests: ${photoTitles.size}`);
-    const voyage = option('voyage') ? {lines: textLines(option('voyage')), props: option('voyage-props') ? await readPageProps(sqlLines(option('voyage-props'))) : emptyProps()} : null;
+    if (reach.size < MIN_TOPIC_CATEGORIES) throw Error(`Only ${reach.size} topic categories: the category tree was misread, keeping the current library.`);
+    if (!photoTitles.size) log('Warning: no talk-page photo requests found; the Photos Help sets will be empty.');
+    // Opened only when read: a reader opened now would drop its lines while the articles stream in.
+    const voyageFile = option('voyage');
+    const voyage = voyageFile ? {get lines() { return textLines(voyageFile); }, props: option('voyage-props') ? await readPageProps(sqlLines(option('voyage-props'))) : emptyProps()} : null;
     const tmpDir = await fsp.mkdtemp(path.join(option('tmp') || outDir, '.buckets-'));
     log('Reading articles');
     const result = await buildLibrary({lines: readline.createInterface({input: process.stdin, crlfDelay: Infinity}), props, dailyTotal, levels: vitalLevels(level3, level4),

@@ -92,3 +92,14 @@ html.i18n-pending body { visibility: hidden; }
 }
 .sp-about-links .about-link-icon { text-decoration: none; justify-content: center; min-width: 36px; }
 .sp-about-links .about-link-icon svg { display: block; }
+
+/* A failed feed request should explain the wait without covering the reader. */
+.feed-waiting .err { background: none; border-color: transparent; }
+.feed-waiting .err-ttl { text-wrap: balance; font-size: clamp(24px, 5.8vw, 30px); line-height: 1.2; }
+.feed-waiting-saved { margin: 20px 0 0; color: var(--muted); font-size: 12px; line-height: 1.6; }
+.feed-service-status { position: fixed; z-index: 6; left: 50%; bottom: max(12px, env(safe-area-inset-bottom)); transform: translate(-50%, 6px); width: max-content; max-width: min(420px, calc(100% - 32px)); display: flex; flex-wrap: wrap; justify-content: center; gap: 2px 10px; padding: 10px 16px; border: 1px solid var(--rule); border-radius: 12px; background: var(--surface); color: var(--muted); text-align: center; font: 400 12px/1.5 var(--sans); opacity: 0; visibility: hidden; pointer-events: none; transition: opacity .22s ease, transform .22s ease, visibility .22s ease; }
+.feed-service-status.visible { transform: translate(-50%, 0); opacity: 1; visibility: visible; }
+.feed-service-label { color: var(--ink); }
+.feed-service-detail { color: var(--muted); }
+body:has(#ambientOverlay.open) .feed-service-status { opacity: 0; visibility: hidden; }
+@media (prefers-reduced-motion: reduce) { .feed-service-status { transition: none; } }

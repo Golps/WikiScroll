@@ -1387,6 +1387,8 @@ function showError() {
       notice.append(label,detail);document.body.appendChild(notice);
     }
     notice.children[0].textContent=sourceLabel();notice.children[1].textContent='We’ll retry automatically.';
+    // Sit just under the header, clear of the card's Save and Share row at the bottom.
+    notice.style.top=Math.round((document.querySelector('.hdr')?.getBoundingClientRect().bottom||0)+10)+'px';
     notice.hidden=false;notice.setAttribute('aria-hidden','false');notice.classList.add('visible');
     window.WSDiscoveryHint?.hide();
   }

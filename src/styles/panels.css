@@ -224,8 +224,13 @@ body.light #likedList .li-btn[data-unlike]{border-color:#c23b3b;color:#c23b3b}
 #likedList .li-btn>span{display:block;white-space:nowrap}
 
 /* Each source keeps its own colour wherever it is named: Wikipedia blue, Wikivoyage green. */
-:root{--voyage:#6fcf97}
-body.light{--voyage:#1d7a4f}
+:root{--wiki:#94b8ff;--voyage:#6fcf97;--voyage-solid:#1d7a4f}
+body.light{--wiki:#36c;--voyage:#1d7a4f}
+/* Wikivoyage mode takes the travel green as its accent; surfaces and text stay the same. */
+body.how,body.light.how{--accent:var(--voyage);--accent-solid:var(--voyage-solid);--travel:var(--voyage);--travel-solid:var(--voyage-solid)}
+/* A saved or visited item keeps its own source's accent in either mode. */
+#likedList .li,#historyList .hi{--accent:var(--wiki)}
+#likedList .li.voyage,#historyList .hi.voyage{--accent:var(--voyage)}
 .li-src,.hi-src{display:flex;align-items:center;gap:6px;color:var(--accent)}
 .li-src .ws-icon,.hi-src .ws-icon{--ui-icon-color:currentColor;width:13px;height:13px;flex:none}
 .li-src.voyage,.hi-src.voyage,.card .panel .chip.h{color:var(--voyage)}

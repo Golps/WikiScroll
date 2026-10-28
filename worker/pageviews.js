@@ -55,6 +55,10 @@ export async function completePageviews(pages, fetchChunk) {
 // articles with English (72-170 articles per language, September 2026).
 // public/app.js keeps an identical copy; test/discovery-quality.test.js checks.
 export const VIEW_SCALE = {en:1, ja:1, ru:0.6, de:0.5, he:0.4, fr:0.3, it:0.25, pt:0.25, es:0.25, pl:0.2, zh:0.2, ko:0.2, hi:0.15, ar:0.15, nl:0.1};
+// Average daily English views per depth (Balanced and Niche overlap on purpose).
+// Popular and Known come from the vital-article lists (vital.js); their bands
+// only describe them. The bundled starter pool is grouped with the same table.
+export const DEPTH_BANDS = {1: [300, Infinity], 2: [100, 300], 3: [10, Infinity], 4: [2, 30], 5: [0, 2]};
 export function scaleBand([low, high], lang) {
   const factor = VIEW_SCALE[lang] ?? 1;
   return [low * factor, high * factor];

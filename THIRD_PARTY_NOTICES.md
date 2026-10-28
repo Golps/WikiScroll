@@ -14,10 +14,10 @@ This repository does include some Wikimedia text:
 
 | Path | Content | License |
 |---|---|---|
-| `public/data/starter-en.json` | Opening excerpts from 33 English Wikipedia articles and 33 English Wikivoyage guides, retrieved in September 2026 ([details](docs/STARTER-SOURCES.md)) | [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/). Each entry includes its source URL; the authors are listed in that article's page history. The excerpts may have been shortened. |
+| `public/data/starter/*.json` | Opening excerpts from up to 1,500 English Wikipedia articles and 300 English Wikivoyage guides, refreshed weekly ([details](docs/STARTER-SOURCES.md)) | [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/). Each entry includes its source URL; the authors are listed in that article's page history. The excerpts may have been shortened. |
 | `docs/images/*` screenshots | Screenshots of the app showing article excerpts and photographs | See [docs/images/ATTRIBUTION.md](docs/images/ATTRIBUTION.md) |
 
-The starter file contains image *URLs*, not image files. **Images on Wikimedia don't all share one license.** Each photo has its own terms on its Wikimedia Commons file page, and some English Wikipedia images are non-free and may only be used under that site's fair-use rules. Anyone reusing screenshots or images must check each file's page.
+The starter files contain image *URLs*, not image files. **Images on Wikimedia don't all share one license.** Each photo has its own terms on its Wikimedia Commons file page, and some English Wikipedia images are non-free and may only be used under that site's fair-use rules. Anyone reusing screenshots or images must check each file's page.
 
 ## Fonts
 

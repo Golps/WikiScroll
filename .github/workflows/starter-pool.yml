@@ -1,0 +1,35 @@
+name: Starter pool
+# Refreshes the bundled outage/offline cards in public/data/starter/ each week.
+# A thin or failed fetch fails the job and keeps the current pool.
+on:
+  schedule:
+    - cron: '17 6 * * 1'
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: wikiscroll-starter-pool
+  cancel-in-progress: false
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+      - name: Install pnpm
+        run: npm install --global pnpm@11.25.0
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Build the pool
+        run: node scripts/build-starter.mjs
+      - name: Test suite
+        run: pnpm test
+      - name: Commit the new pool
+        run: |
+          git add public/data/starter
+          if git diff --cached --quiet; then echo "Pool unchanged."; exit 0; fi
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'Refresh starter pool'
+          git push

@@ -1,0 +1,98 @@
+name: Card library
+# Builds the English prebuilt card library from Wikimedia's weekly
+# search-index dump and uploads it to the R2 bucket behind cards.wikiscroll.com.
+# A thin, failed or oversized build fails the job and the current library
+# keeps serving. Upload runs only when the R2 secrets are set.
+on:
+  schedule:
+    # The search-index dump is published on Sundays around 12:00 UTC.
+    - cron: '41 5 * * 2'
+  workflow_dispatch:
+    inputs:
+      upload:
+        description: Upload the build to R2 (off for a dry run)
+        type: boolean
+        default: true
+      force:
+        description: Rebuild even if this dump is already live
+        type: boolean
+        default: false
+permissions:
+  contents: read
+concurrency:
+  group: wikiscroll-card-library
+  cancel-in-progress: false
+env:
+  UA: 'WikiScroll-card-library/1.0 (https://wikiscroll.com; contact@wikiscroll.com)'
+  DUMPS: https://dumps.wikimedia.org
+  AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+  AWS_DEFAULT_REGION: auto
+  # R2 accepts only the checksums S3 requires.
+  AWS_REQUEST_CHECKSUM_CALCULATION: when_required
+  AWS_RESPONSE_CHECKSUM_VALIDATION: when_required
+  R2_ENDPOINT: ${{ secrets.R2_ACCOUNT_ID && format('https://{0}.r2.cloudflarestorage.com', secrets.R2_ACCOUNT_ID) || '' }}
+  R2_BUCKET: ${{ secrets.R2_BUCKET }}
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 345
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+      - name: Install parallel bzip2
+        run: sudo apt-get install -y -qq lbzip2
+      - name: Find the newest complete English dump
+        id: dump
+        run: |
+          set -euo pipefail
+          base="$DUMPS/other/cirrus_search_index"
+          for date in $(curl -fsSL -A "$UA" "$base/" | grep -oE 'href="[0-9]{8}/"' | grep -oE '[0-9]{8}' | sort -r | head -n 3); do
+            files=$(curl -fsSL -A "$UA" "$base/$date/index_name=enwiki_content/" | grep -oE 'href="[^"]+\.json\.bz2"' | sed -E 's/^href="(.*)"$/\1/' | sed -E 's#^.*/##' | sort -V || true)
+            if [ -n "$files" ]; then
+              echo "date=$date" >> "$GITHUB_OUTPUT"
+              printf '%s\n' $files > "$RUNNER_TEMP/files.txt"
+              echo "Dump $date: $(wc -l < "$RUNNER_TEMP/files.txt") files."
+              exit 0
+            fi
+          done
+          echo "No complete enwiki_content dump found." >&2; exit 1
+      - name: Skip a dump that is already live
+        id: live
+        run: |
+          set -euo pipefail
+          if [ -n "$R2_ENDPOINT" ] && [ "${{ inputs.force }}" != "true" ]; then
+            live=$(aws s3 cp "s3://$R2_BUCKET/v1/en/current.json" - --endpoint-url "$R2_ENDPOINT" 2>/dev/null | gunzip | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{console.log(JSON.parse(s).build)}catch{}})' || true)
+            if [ "$live" = "${{ steps.dump.outputs.date }}" ]; then echo "skip=true" >> "$GITHUB_OUTPUT"; echo "Dump ${{ steps.dump.outputs.date }} is already live."; fi
+          fi
+      - name: Download page properties
+        if: steps.live.outputs.skip != 'true'
+        run: curl -fsSL --retry 5 -A "$UA" -o "$RUNNER_TEMP/page_props.sql.gz" "$DUMPS/enwiki/latest/enwiki-latest-page_props.sql.gz"
+      - name: Build the library
+        if: steps.live.outputs.skip != 'true'
+        run: |
+          set -euo pipefail
+          base="$DUMPS/other/cirrus_search_index/${{ steps.dump.outputs.date }}/index_name=enwiki_content"
+          mkdir -p "$RUNNER_TEMP/library"
+          while read -r file; do curl -fsSL --retry 5 -A "$UA" "$base/$file" | lbzip2 -dc; done < "$RUNNER_TEMP/files.txt" \
+            | node --max-old-space-size=12288 scripts/build-library.mjs --build "${{ steps.dump.outputs.date }}" \
+                --page-props "$RUNNER_TEMP/page_props.sql.gz" --out "$RUNNER_TEMP/library" --tmp "$RUNNER_TEMP" \
+            | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Upload, then switch the site to the new build
+        if: steps.live.outputs.skip != 'true' && env.R2_ENDPOINT != '' && inputs.upload != false
+        run: |
+          set -euo pipefail
+          build="${{ steps.dump.outputs.date }}"
+          aws configure set default.s3.max_concurrent_requests 32
+          # Shards never change once uploaded; the manifest is re-read every few minutes.
+          aws s3 sync "$RUNNER_TEMP/library/$build" "s3://$R2_BUCKET/v1/en/$build" --endpoint-url "$R2_ENDPOINT" --only-show-errors \
+            --content-type application/json --content-encoding gzip --cache-control 'public, max-age=31536000, immutable'
+          aws s3 cp "$RUNNER_TEMP/library/current.json" "s3://$R2_BUCKET/v1/en/current.json" --endpoint-url "$R2_ENDPOINT" --only-show-errors \
+            --content-type application/json --content-encoding gzip --cache-control 'public, max-age=300'
+          # Only one build stays stored, which keeps the library inside R2's free 10 GB.
+          for old in $(aws s3 ls "s3://$R2_BUCKET/v1/en/" --endpoint-url "$R2_ENDPOINT" | awk '$1=="PRE"{print $2}' | tr -d /); do
+            if [ "$old" != "$build" ]; then aws s3 rm "s3://$R2_BUCKET/v1/en/$old" --recursive --endpoint-url "$R2_ENDPOINT" --only-show-errors; fi
+          done
+          echo "Library $build is live." | tee -a "$GITHUB_STEP_SUMMARY"

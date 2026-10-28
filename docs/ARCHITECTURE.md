@@ -78,7 +78,7 @@ The browser asks the Worker for batches and keeps a reserve queued ahead of the 
 | Path | Purpose |
 |---|---|
 | `test/` | `node --test` suites for the Worker modules, plus browser logic extracted from `public/*.js` and run in `node:vm` sandboxes. |
-| `scripts/` | `deploy.sh` (token-scoped deployment), `build.mjs` + `astro-offline.mjs` (static build and offline stylesheet integration), `build-branding.mjs` (regenerates icons and renders the outlined share image). |
+| `scripts/` | `deploy.sh` (token-scoped deployment), `build.mjs` + `astro-offline.mjs` (static build and offline stylesheet integration), `build-branding.mjs` (regenerates icons and renders the outlined share image), `build-starter.mjs` (the bundled starter pool), `build-library.mjs` (the prebuilt English card library in R2; see [CARD-LIBRARY.md](CARD-LIBRARY.md)). |
 | `branding/` | Logo sources and the approved raster social artwork. |
 | `wrangler.jsonc` | Worker configuration: static assets, rate-limit bindings and observability. |
 | `docs/` | This documentation and the images used in the README. |

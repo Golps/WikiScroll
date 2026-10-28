@@ -52,7 +52,7 @@ The browser asks the Worker for batches and keeps a reserve queued ahead of the 
 | `discovery.js` | The dismissible "follow your curiosity" hint for first-time readers. |
 | `lang.js`, `i18n.js` + `translations/<lang>.js` | Interface localization. `lang.js` loads the reader's dictionary (one small file per language) as early as possible; `i18n.js` applies it through a `MutationObserver`. Article text is excluded. |
 | `sw.js` | Service worker: offline app shell, network-first page loads with a 2.5-second fallback to cache, and a cache of up to 80 Wikimedia images. |
-| `data/starter-en.json` | A small bundled set of English articles for eligible offline openings when there is no matching local reserve. Online openings wait for an independent live draw. See [STARTER-SOURCES.md](STARTER-SOURCES.md). |
+| `data/starter/` | The bundled English card pool for offline openings and Wikimedia outages, grouped by depth and travel and split into shards of 60. Each reader loads one random shard; the service worker keeps one per set. Rebuilt weekly by `scripts/build-starter.mjs`. Online openings still wait for an independent live draw. See [STARTER-SOURCES.md](STARTER-SOURCES.md). |
 
 ### `worker/`: the Cloudflare Worker
 

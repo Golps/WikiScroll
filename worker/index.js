@@ -6,7 +6,7 @@ export {retryDelay} from './runtime.js';
 import {topicResponse} from './topics.js';
 import {verifiedArticle} from './verified.js';
 import { collectionResponse } from './collections.js';
-import {averageViews,lagDays,completePageviews,scaleBand} from './pageviews.js';
+import {averageViews,lagDays,completePageviews,scaleBand,DEPTH_BANDS} from './pageviews.js';
 import {completeExtracts,extractParams,completeLeadFallback,fullTextParams,guideReadable,FALLBACK_MAX} from './extracts.js';
 import {vitalArticles} from './vital.js';
 import {completeNeeds,HELP_LANGS} from './needs.js';
@@ -71,7 +71,7 @@ function selectCandidates(values,lang,mode,depth) {
   // Discovery depth measures article popularity only. There is no saved-item,
   // previous-card, category-similarity or other personalization input here.
   // Bands are English readership; smaller editions are scaled (pageviews.js).
-  const [low,high]=scaleBand(({1:[300,Infinity],2:[100,300],3:[10,Infinity],4:[2,30],5:[0,2]})[depth],lang);
+  const [low,high]=scaleBand(DEPTH_BANDS[depth],lang);
   const eligible=[],fallback=[],lag=lagDays(candidates);
   for(const page of candidates){
     const views=averageViews(page,lag);

@@ -113,3 +113,30 @@ test('article images are cached as CORS copies, not opaque responses that inflat
  const second=await plain.request(url,{navigate:false,destination:'image'});
  assert.equal(await second.response.text(),'opaque bytes','an image without CORS headers still loads');assert.equal(fallback,1);
 });
+
+test('starter pool shards refresh from the network and fall back to any cached shard of the same set offline',async()=>{
+ let offline=false;const cache=cacheStore();
+ await cache.put('/data/starter/wiki-en-4-002.json',Response.json([{id:'w42'}]));
+ const sw=harness({cache,fetcher:async request=>{if(offline)throw TypeError('offline');return Response.json([{id:'w1',url:keyOf(request)}]);}});
+ let result=await sw.request('/data/starter/wiki-en-4-000.json',{navigate:false});await result.done();
+ assert.equal((await result.response.json())[0].id,'w1','online reads the current pool');
+ offline=true;
+ result=await sw.request('/data/starter/wiki-en-4-000.json',{navigate:false});
+ assert.equal((await result.response.json())[0].id,'w1','offline reads the copy saved from the network');
+ result=await sw.request('/data/starter/wiki-en-4-001.json',{navigate:false});
+ const body=await result.response.json();assert.ok(['w1','w42'].includes(body[0].id),'another shard of the same set');
+ result=await sw.request('/data/starter/wiki-en-5-000.json',{navigate:false});
+ assert.equal(result.response.status,503,'never a shard of another depth');
+});
+test('install keeps one random shard of every starter set for offline openings',async()=>{
+ const cache=cacheStore(),handlers=new Map(),fetched=[];
+ const scope={URL,Response,setTimeout,clearTimeout,caches:{open:async()=>cache,keys:async()=>[]},
+  self:{location:new URL(origin),addEventListener:(name,handler)=>handlers.set(name,handler),skipWaiting:()=>{}},
+  fetch:async request=>{const path=new URL(typeof request==='string'?request:request.url,origin).pathname;fetched.push(path);return path==='/data/starter/index.json'?Response.json({v:1,sets:{'wiki-en-1':3,'wiki-en-2':0,'how-en':2}}):new Response('ok');}};
+ cache.addAll=async()=>{};cache.add=async request=>{const r=await scope.fetch(request);await cache.put(request,r);};
+ vm.runInNewContext(code,scope,{filename:'sw.js'});
+ let work;handlers.get('install')({waitUntil:p=>{work=p;}});await work;
+ const shards=fetched.filter(p=>/-\d{3}\.json$/.test(p));
+ assert.equal(shards.length,2);assert.ok(shards.some(p=>/^\/data\/starter\/wiki-en-1-00[0-2]\.json$/.test(p)));assert.ok(shards.some(p=>/^\/data\/starter\/how-en-00[01]\.json$/.test(p)));
+ assert.ok(await cache.match('/data/starter/index.json'));
+});

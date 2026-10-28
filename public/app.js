@@ -734,21 +734,31 @@ function acceptSupply(batch,gen,randomize=true) {
   if(added){refillAttempts=0;preloadQueueImages();persistFeedReserve();}
   return added;
 }
-let starterPromise;
+// The starter pool (scripts/build-starter.mjs) is grouped by source and depth
+// and split into shards; each visit draws one random shard of its set.
+const starterShards=new Map();
+async function starterJSON(path){
+  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),4000);
+  try {const response=await fetch(path,{signal:controller.signal});return response.ok?await response.json():null;}
+  catch {return null;} finally {clearTimeout(timer);}
+}
 function loadStarterLibrary(gen,outage=false) {
   // Never silently replace language, topic, or destination choices with English random cards.
-  // Depth is relaxed only during a reported outage, when the waiting notice is shown.
-  if((curMode==='how'?voyageLang():curLang)!=='en'||curMode==='wiki'&&(curTopics.size||helpOnly()||!outage&&depthLevel!==3)||curMode==='how'&&(travelFilters.place||travelFilters.style))return Promise.resolve([]);
-  const mode=curMode;
-  starterPromise ||= (async()=>{
-    const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),4000);
-    try {const response=await fetch('/data/starter-en.json',{signal:controller.signal});return response.ok?await response.json():null;}
-    catch {return null;} finally {clearTimeout(timer);}
-  })();
-  return starterPromise.then(data=>{
-    if(!data){starterPromise=null;return [];}
+  if((curMode==='how'?voyageLang():curLang)!=='en'||curMode==='wiki'&&(curTopics.size||helpOnly())||curMode==='how'&&(travelFilters.place||travelFilters.style))return Promise.resolve([]);
+  const wanted=curMode==='how'?'how-en':'wiki-en-'+depthLevel;
+  if(!starterShards.has(wanted))starterShards.set(wanted,(async()=>{
+    const sets=(await starterJSON('/data/starter/index.json'))?.sets||{};
+    // A depth without its own shards borrows Balanced cards only during an outage.
+    const set=sets[wanted]>0?wanted:outage&&curMode==='wiki'&&sets['wiki-en-3']>0?'wiki-en-3':null;
+    if(!set)return null;
+    const cards=await starterJSON(`/data/starter/${set}-${String(Math.floor(Math.random()*sets[set])).padStart(3,'0')}.json`);
+    return Array.isArray(cards)?cards:null;
+  })());
+  const src=curMode;
+  return starterShards.get(wanted).then(cards=>{
+    if(!cards){starterShards.delete(wanted);return [];}
     if(gen!==fillGeneration)return [];
-    return (data[mode]||[]).filter(validReserveArticle);
+    return cards.filter(a=>a?.src===src&&validReserveArticle(a));
   });
 }
 function startStartupFallback(gen,outage=false) {

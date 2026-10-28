@@ -8,6 +8,9 @@ Releases of this repository. Each entry describes what changed in the code; [doc
 - Add edition-aware Help Wikipedia filters for citations, photos, copy editing, clarification, updates and more detail, with persisted selections and matching cached/offline contexts.
 - Replace decorative interface emoji with custom two-tone SVG icons, balance reading-setting icons, and enable arrow navigation immediately after switching sources.
 - Serialize local builds and run the compiled-page checks in CI.
+- Keep optional Help Wikipedia tags from delaying cards whose text and image are ready: tag checks run in a low-priority upstream lane, the reader's answer goes out first, and the cached batch still carries the tags.
+- Give requests that join an in-flight article or topic job the shared job's failure code and full Retry-After, instead of a default 5-second retry.
+- Pause a Wikimedia edition after three consecutive 5xx or connection failures without Retry-After (5 s, doubling to 60 s), and answer an uncached feed request during such an outage from complete batches already in the edge cache.
 
 - Refresh social previews with a two-line serif headline, “Turn doomscrolling into discovery.”, and a new versioned image URL across site and collection previews.
 

@@ -102,9 +102,9 @@ export async function vitalArticles(lang, depth, upstream, ctx, toArticle, info 
   // Cards whose introduction has already arrived. If the answer budget runs
   // out while a slower chunk is pending, the caller answers with these.
   info.snapshot = () => pages.filter(p => strip(p.extract).length >= 80).slice(0, 20).map(p => toArticle(p, lang, 'wiki'));
-  await Promise.all([
-    completeExtracts(pages, ids => upstream(api(lang, extractParams(ids)))),
-    HELP_LANGS.has(lang) ? completeNeeds(lang, pages, params => upstream(api(lang, params))) : null,
-  ]);
+  // Optional maintenance tags run in the low-priority lane; the caller
+  // answers once introductions arrive and caches after info.enrich settles.
+  if (HELP_LANGS.has(lang)) info.enrich = completeNeeds(lang, pages, params => upstream(api(lang, params), {optional: true})).catch(() => {});
+  await completeExtracts(pages, ids => upstream(api(lang, extractParams(ids))));
   return info.snapshot();
 }

@@ -7,6 +7,11 @@ export const FETCH_LIMIT = 44;
 export const CONCURRENCY = 3;
 export const UPSTREAM_TIMEOUT_MS = 6000;
 export const WORK_TIMEOUT_MS = 24000;
+// A Wikimedia edition that keeps failing without a Retry-After (a 5xx outage)
+// is paused like a rate-limited one, so a burst of readers cannot keep
+// hammering it: three failures in a row pause the host for 5 s, doubling to 60 s.
+export const BREAKER_STRIKES = 3;
+export const BREAKER_MS = 5000, BREAKER_MAX_MS = 60000;
 export function retryDelay(value, now = Date.now()) {
   if (/^\d+(\.\d+)?$/.test(value || '')) return Math.max(1000, Number(value) * 1000);
   const date = Date.parse(value);
@@ -22,7 +27,7 @@ export function expireJobs(jobs, now = Date.now()) {
   }
 }
 
-export function createNetwork(cooldowns = new Map()) {
+export function createNetwork(cooldowns = new Map(), strikes = new Map()) {
   const active = new Set();
   const waiting = [];
   // A Worker can cancel background work after a response. Its promise/finally
@@ -36,21 +41,35 @@ export function createNetwork(cooldowns = new Map()) {
     for(const job of active)if(job.deadline<=now)expire(job);
     for(let i=waiting.length-1;i>=0;i--)if(waiting[i].deadline<=now){const [job]=waiting.splice(i,1);expire(job);}
     while (active.size < CONCURRENCY && waiting.length) {
-      const job = waiting.shift(); if(job.expired)continue; clearTimeout(job.timer);active.add(job);
+      // Optional enrichment (maintenance tags) never runs ahead of the text
+      // and images a card needs; it takes a slot only when nothing else waits.
+      const next = waiting.findIndex(job => !job.optional);
+      const [job] = waiting.splice(next < 0 ? 0 : next, 1); if(job.expired)continue; clearTimeout(job.timer);active.add(job);
       Promise.resolve().then(job.run).then(job.resolve, job.reject).finally(() => {active.delete(job);drain();});
     }
   }
-  const schedule = (run, work, cancel) => new Promise((resolve, reject) => {
+  const schedule = (run, work, cancel, optional = false) => new Promise((resolve, reject) => {
     drain();
     if(waiting.length>=128){work?.fail('work_rate_limited',5000);resolve(null);return;}
-    const job={run,resolve,reject,work,cancel,expired:false,deadline:Date.now()+(work?.timeLeft()??WORK_TIMEOUT_MS)};
+    const job={run,resolve,reject,work,cancel,optional,expired:false,deadline:Date.now()+(work?.timeLeft()??WORK_TIMEOUT_MS)};
     if(work)job.timer=setTimeout(()=>{job.expired=true;work.fail('deadline_exceeded');const index=waiting.indexOf(job);if(index>=0)waiting.splice(index,1);resolve(null);},work.timeLeft());
     waiting.push(job);drain();
   });
   const delay = host => Math.max(0, (cooldowns.get(host) || 0) - Date.now());
+  const recovered = host => strikes.delete(host);
+  // Returns the pause in ms once the host has failed BREAKER_STRIKES times in a row.
+  function strike(host) {
+    const count = (strikes.get(host) || 0) + 1;
+    strikes.delete(host); strikes.set(host, count);
+    if (strikes.size > 256) strikes.delete(strikes.keys().next().value);
+    if (count < BREAKER_STRIKES) return 0;
+    const ms = Math.min(BREAKER_MAX_MS, BREAKER_MS * 2 ** (count - BREAKER_STRIKES));
+    cooldowns.set(host, Math.max(cooldowns.get(host) || 0, Date.now() + ms));
+    return ms;
+  }
   return {
     schedule, delay,
-    async json(url, work, timeoutMs = UPSTREAM_TIMEOUT_MS) {
+    async json(url, work, timeoutMs = UPSTREAM_TIMEOUT_MS, optional = false) {
       const host = new URL(url).hostname;
       const controller = new AbortController();
       return schedule(async () => {
@@ -69,8 +88,12 @@ export function createNetwork(cooldowns = new Map()) {
               cooldowns.set(host, Date.now() + ms); work.fail('upstream_rate_limited', ms);
               await response.body?.cancel().catch(() => {}); return null;
             }
-            if (!response.ok) { work.fail('upstream_unavailable'); await response.body?.cancel().catch(() => {}); return null; }
+            if (!response.ok) {
+              const pause = response.status >= 500 ? strike(host) : 0;
+              work.fail('upstream_unavailable', pause || 5000); await response.body?.cancel().catch(() => {}); return null;
+            }
             const data = await response.json();
+            recovered(host);
             if (data?.error) {
               const ms = data.error.code === 'maxlag' ? 5000 : 30000;
               if (data.error.code === 'maxlag' || data.error.code === 'ratelimited') cooldowns.set(host, Date.now() + ms);
@@ -78,9 +101,13 @@ export function createNetwork(cooldowns = new Map()) {
             }
             return data;
           })()]);
-        } catch { work.fail('upstream_unavailable'); return null; }
+        } catch {
+          // A refused connection counts toward the breaker; our own timeout does not.
+          const pause = controller.signal.aborted ? 0 : strike(host);
+          work.fail('upstream_unavailable', pause || 5000); return null;
+        }
         finally { clearTimeout(timer); }
-      }, work,()=>controller.abort());
+      }, work,()=>controller.abort(), optional);
     }
   };
 }
@@ -90,24 +117,27 @@ export function createWork(env = {}, ctx = {}, network = createNetwork()) {
   const work = {
     env, ctx, network,
     get used() { return used; }, get remaining() { return SUBREQUEST_LIMIT - used; },
-    get reason() { return reason; },
+    get reason() { return reason; }, get retryAt() { return retryUntil; },
     timeLeft: () => Math.max(0, WORK_TIMEOUT_MS - (Date.now() - started)),
     fail(code, ms = 5000) { if ((priority[code] || 0) >= (priority[reason] || 0)) reason = code; retryUntil = Math.max(retryUntil, Date.now() + ms); },
+    // A request that joined another invocation's job answers with that job's
+    // failure and full retry time, not with its own empty status.
+    absorb(other) { if (other && other !== work && other.reason) work.fail(other.reason, other.retryAt - Date.now()); },
     retrySeconds: (minimum = 5) => Math.max(minimum, Math.ceil((retryUntil - Date.now()) / 1000)),
     available() { if (work.timeLeft() > 0) return true; work.fail('deadline_exceeded'); return false; },
     charge(isFetch = false) {
       if (used >= SUBREQUEST_LIMIT || isFetch && fetched >= FETCH_LIMIT) { work.fail('budget_exhausted'); return false; }
       used++; if (isFetch) fetched++; return true;
     },
-    upstream: (url, options) => network.json(url, work, options?.timeoutMs),
+    upstream: (url, options) => network.json(url, work, options?.timeoutMs, options?.optional),
     // Pipeline fixtures and callers supplying their own query function still
     // get a complete invocation budget and the same concurrency bound.
-    request(query, url) {
+    request(query, url, options) {
       return network.schedule(async () => {
         if (!work.available() || !work.charge(true)) return null;
         try { const data = await query(url); if (!data || data.error) work.fail('upstream_unavailable'); return data?.error ? null : data; }
         catch { work.fail('upstream_unavailable'); return null; }
-      }, work);
+      }, work, undefined, options?.optional);
     },
     keep(promise) { ctx.waitUntil?.(promise.catch(() => {})); return promise; }
   };

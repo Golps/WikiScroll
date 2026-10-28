@@ -63,8 +63,12 @@ jobs:
         id: live
         run: |
           set -euo pipefail
-          if [ -n "$R2_ENDPOINT" ] && [ "${{ inputs.force }}" != "true" ]; then
-            live=$(aws s3 cp "s3://$R2_BUCKET/v1/en/current.json" - --endpoint-url "$R2_ENDPOINT" 2>/dev/null | gunzip | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{console.log(JSON.parse(s).build)}catch{}})' || true)
+          if [ -z "$R2_ENDPOINT" ]; then echo "No R2 secrets: the build will run without uploading."; exit 0; fi
+          # Fails the job on a wrong key or bucket before hours of building.
+          aws s3api head-bucket --bucket "$R2_BUCKET" --endpoint-url "$R2_ENDPOINT"
+          echo "R2 access confirmed."
+          if [ "${{ inputs.force }}" != "true" ] && aws s3api head-object --bucket "$R2_BUCKET" --key v1/en/current.json --endpoint-url "$R2_ENDPOINT" > /dev/null 2>&1; then
+            live=$(aws s3 cp "s3://$R2_BUCKET/v1/en/current.json" - --endpoint-url "$R2_ENDPOINT" | gunzip | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{console.log(JSON.parse(s).build)}catch{}})')
             if [ "$live" = "${{ steps.dump.outputs.date }}" ]; then echo "skip=true" >> "$GITHUB_OUTPUT"; echo "Dump ${{ steps.dump.outputs.date }} is already live."; fi
           fi
       - name: Download page properties
@@ -76,7 +80,14 @@ jobs:
           set -euo pipefail
           base="$DUMPS/other/cirrus_search_index/${{ steps.dump.outputs.date }}/index_name=enwiki_content"
           mkdir -p "$RUNNER_TEMP/library"
-          while read -r file; do curl -fsSL --retry 5 -A "$UA" "$base/$file" | lbzip2 -dc; done < "$RUNNER_TEMP/files.txt" \
+          # Each part is downloaded in full (resuming after a dropped connection)
+          # before it is decompressed: the dump servers close streams that wait
+          # on a slow reader. Only one part is on disk at a time.
+          part="$RUNNER_TEMP/part.json.bz2"
+          while read -r file; do
+            curl -fsSL --retry 8 --retry-all-errors --retry-delay 10 -C - -A "$UA" -o "$part" "$base/$file" >&2
+            lbzip2 -dc "$part"; rm -f "$part"
+          done < "$RUNNER_TEMP/files.txt" \
             | node --max-old-space-size=12288 scripts/build-library.mjs --build "${{ steps.dump.outputs.date }}" \
                 --page-props "$RUNNER_TEMP/page_props.sql.gz" --out "$RUNNER_TEMP/library" --tmp "$RUNNER_TEMP" \
             | tee -a "$GITHUB_STEP_SUMMARY"

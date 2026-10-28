@@ -4,6 +4,7 @@ Releases of this repository. Each entry describes what changed in the code; [doc
 
 ## Unreleased
 
+- Add a daily usage check that opens an issue when Worker requests or R2 storage or operations pass half of the free allowance.
 - Pin workflow actions to exact commits (checkout v5.1.0, setup-node v5.0.0 on Node 24), drop stored Git credentials from jobs that never push, and let Dependabot propose action updates monthly.
 - Pick each library image's upload folder from the image table (files actually uploaded to English Wikipedia) rather than File: pages, many of which describe Commons files; an image that still fails tries the other folder before falling back to text.
 - Hide mature topics (sex, pornography, nudity and graphic abuse) by default, with a Mature topics switch in Settings. Library cards are flagged from Wikipedia's categories; live, starter and On this day cards from their title and description.

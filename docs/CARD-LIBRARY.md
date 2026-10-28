@@ -37,6 +37,7 @@ R2's free tier includes 10 GB of storage, 1 million writes and 10 million reads 
 - **Writes:** a build is refused at more than `MAX_FILES` (190,000) shards, so five weekly builds a month stay under 1 million. A dump that is already live is never rebuilt unless the run is started with *force*.
 - **Storage:** a build is refused at more than `MAX_BYTES` (4.5 GB), so the old and new builds together stay under 10 GB during the swap. Only one build is kept.
 - **Reads:** shards never change and are cached for a year, and the manifest for 5 minutes. With the cache rule below, most downloads never reach R2.
+- **Early warning:** the daily *Usage check* workflow (`scripts/usage-check.mjs`) compares yesterday's Worker requests (free: 100,000 a day) and this month's R2 storage and operations with the free allowances, and opens an issue once any passes half. It needs a `CF_ANALYTICS_TOKEN` secret: a Cloudflare API token with only *Account Analytics: Read*. Until it is set the check is skipped.
 
 ## One-time setup
 

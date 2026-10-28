@@ -4,6 +4,7 @@ Releases of this repository. Each entry describes what changed in the code; [doc
 
 ## Unreleased
 
+- Pin workflow actions to exact commits (checkout v5.1.0, setup-node v5.0.0 on Node 24), drop stored Git credentials from jobs that never push, and let Dependabot propose action updates monthly.
 - Pick each library image's upload folder from the image table (files actually uploaded to English Wikipedia) rather than File: pages, many of which describe Commons files; an image that still fails tries the other folder before falling back to text.
 - Hide mature topics (sex, pornography, nudity and graphic abuse) by default, with a Mature topics switch in Settings. Library cards are flagged from Wikipedia's categories; live, starter and On this day cards from their title and description.
 - Build the reader and About views with Astro static components, shared settings/forms/dialog templates, and one compiled stylesheet with automatic offline precaching. Keep the existing Worker and classic browser runtime.

@@ -101,12 +101,19 @@ jobs:
           linktarget=(); if [ -f "$RUNNER_TEMP/linktarget.sql.gz" ]; then linktarget=(--linktarget "$RUNNER_TEMP/linktarget.sql.gz"); fi
           # Each part is downloaded in full (resuming after a dropped connection)
           # before it is decompressed: the dump servers close streams that wait
-          # on a slow reader. Only one part is on disk at a time.
-          part="$RUNNER_TEMP/part.json.bz2"
-          while read -r file; do
-            curl -fsSL --retry 8 --retry-all-errors --retry-delay 10 -C - -A "$UA" -o "$part" "$base/$file" >&2
-            lbzip2 -dc "$part"; rm -f "$part"
-          done < "$RUNNER_TEMP/files.txt" \
+          # on a slow reader. The next part downloads while this one is read,
+          # so at most two parts are on disk at a time.
+          get() { curl -fsSL --retry 8 --retry-all-errors --retry-delay 10 -C - -A "$UA" -o "$2" "$1" >&2; }
+          mapfile -t files < "$RUNNER_TEMP/files.txt"
+          {
+            get "$base/${files[0]}" "$RUNNER_TEMP/part-0.json.bz2"
+            for i in "${!files[@]}"; do
+              next=$((i + 1)); fetch=""
+              if [ "$next" -lt "${#files[@]}" ]; then get "$base/${files[$next]}" "$RUNNER_TEMP/part-$next.json.bz2" & fetch=$!; fi
+              lbzip2 -dc "$RUNNER_TEMP/part-$i.json.bz2"; rm -f "$RUNNER_TEMP/part-$i.json.bz2"
+              if [ -n "$fetch" ]; then wait "$fetch"; fi
+            done
+          } \
             | node --max-old-space-size=12288 scripts/build-library.mjs --build "${{ steps.dump.outputs.date }}" \
                 --page-props "$RUNNER_TEMP/page_props.sql.gz" --page "$RUNNER_TEMP/page.sql.gz" --categorylinks "$RUNNER_TEMP/categorylinks.sql.gz" "${linktarget[@]}" \
                 --voyage "$RUNNER_TEMP/voyage.ndjson" --voyage-props "$RUNNER_TEMP/voyage_props.sql.gz" \

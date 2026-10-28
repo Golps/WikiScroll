@@ -1115,7 +1115,10 @@ async function boot() {
     await Promise.all([fallback,supply]);
     if(gen!==fillGeneration)return;
     ensureFeedAhead();
-    if(!articles.length){if(Date.now()>=workerCooldownUntil){document.getElementById('spinner')?.remove();showError();}scheduleRefill();}
+    // A server-requested pause is a failed attempt, not active loading. Show
+    // the recovery card even during cooldown; the refill timer still waits
+    // for Retry-After and successful supply removes this card automatically.
+    if(!articles.length){document.getElementById('spinner')?.remove();showError();scheduleRefill();}
   } catch(error) {
     if(gen!==fillGeneration)return;
     console.warn('Feed recovery',error);

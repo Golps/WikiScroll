@@ -16,6 +16,7 @@ Releases of this repository. Each entry describes what changed in the code; [doc
 - Replace the fixed 66-card starter set with a weekly-refreshed pool of up to 300 cards per depth and 300 travel guides, split into shards so each reader gets a random slice for their own depth; the service worker keeps one shard per set for offline use.
 - Add a weekly card-library build: millions of English cards made from Wikimedia's search-index dump, grouped by depth, shuffled into 100-card shards and uploaded to R2 for `cards.wikiscroll.com`, with guards that keep it inside R2's free tier. It builds a set for every depth, topic, Help type, topic with Help type, and Wikivoyage browsing.
 - Read every English feed from the card library on `cards.wikiscroll.com`: one random, undrawn 100-card shard per draw, nearer depths from the library when a setting runs thin, and a "You're all caught up" card when every depth is drawn. The Worker and live API serve only other languages, travel search, On this day and library failures.
+- When a card's 960px photo still fails after its retry, try Wikimedia's 500px standard width before showing the text-only card.
 
 - Refresh social previews with a two-line serif headline, “Turn doomscrolling into discovery.”, and a new versioned image URL across site and collection previews.
 

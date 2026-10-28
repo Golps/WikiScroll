@@ -262,6 +262,14 @@ document.addEventListener('error', event => {
     }, 1500);
     return;
   }
+  // A 960px thumbnail Wikimedia can't serve right now (not yet rendered, or
+  // rate-limited) often exists at the smaller standard 500px width.
+  const smaller = img.getAttribute('src')?.replace(/\/((?:lang[a-z-]+-)?)960px-([^/?]+)(\?[^/]*)?$/, '/$1500px-$2$3');
+  if (!img.dataset.imageSmaller && navigator.onLine && smaller && smaller !== img.getAttribute('src')) {
+    img.dataset.imageSmaller = '1';
+    img.src = smaller;
+    return;
+  }
   finishImageFallback(img);
 }, true);
 

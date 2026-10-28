@@ -572,6 +572,7 @@ function fetchOne(url) {
   supplyControllers.add(ac);
   return fetch(url, {signal:ac.signal}).then(r => {
     if(requestGen!==fillGeneration)return null;
+    if(r.status===429||r.status>=500)globalThis.WSFeedStatus?.waiting();
     if (r.status === 429) {
       const value = r.headers.get('Retry-After') || '';
       const delay = /^\d+(\.\d+)?$/.test(value) ? Number(value)*1000 : Date.parse(value)-Date.now();
@@ -767,6 +768,7 @@ async function noteWorkerCooldown(response,gen,key,payload){
  const delay=retryAfterMillis(response.headers.get('Retry-After'));let code='';
  try{code=(payload||await response.json()).code||'';}catch{}
  if(gen!==fillGeneration)return null;
+ if(code.startsWith('upstream_'))globalThis.WSFeedStatus?.waiting();
  const until=Date.now()+delay;
  if(response.status===429||code==='work_rate_limited')workerGlobalCooldownUntil=Math.max(workerGlobalCooldownUntil,until);
  else workerSourceCooldowns.set(key,Math.max(workerSourceCooldowns.get(key)||0,until));
@@ -935,6 +937,7 @@ document.addEventListener('visibilitychange',()=>{if(!document.hidden){ensureFee
 function flushQueue(n=8) {
   const batch=withTodaySurprises(queue.splice(0,n));
   if(batch.length){
+    globalThis.WSFeedStatus?.recovered();
     document.getElementById('spinner')?.remove();
     document.querySelectorAll('#feed .err').forEach(e=>e.closest('.card')?.remove());
     articles.push(...batch);batch.forEach(renderCard);
@@ -1317,14 +1320,47 @@ function showError() {
   const offline = !navigator.onLine;
   // A travel filter with no results is an answer, not an error.
   if (!offline && isHow && travelExhausted && (travelFilters.place || travelFilters.style)) { showTravelEnd(); return; }
-  const msg = offline
-    ? "You're offline. Reconnect and try again. Your saved articles are still available."
-    : `${isHow?'Wikivoyage':'Wikipedia'} didn't respond.`;
-  const card = document.createElement('div'); card.className='card';
-  card.innerHTML = `<div class="cbg"><div class="cveil"></div></div><div class="err"><div class="err-ico">${uiIcon(offline?'offline':(isHow?'map':'sources'))}</div><div class="err-ttl">Nothing loaded</div><div class="err-msg">${msg}</div><button class="err-btn">Try again</button></div>`;
+  const title=offline?'Nothing loaded':isHow?'Waiting for Wikivoyage':'Waiting for Wikipedia';
+  const msg=offline?"You're offline. Reconnect and try again. Your saved articles are still available.":'We’ll retry automatically.';
+  const card = document.createElement('div'); card.className='card'+(offline?'':' feed-waiting');
+  card.innerHTML = `<div class="cbg"><div class="cveil"></div></div><div class="err"><div class="err-ico">${uiIcon(offline?'offline':(isHow?'map':'sources'))}</div><div class="err-ttl">${title}</div><div class="err-msg">${msg}</div><button class="err-btn">Try again</button>${offline?'':'<p class="feed-waiting-saved">Your saved articles are still available.</p>'}</div>`;
   card.querySelector('.err-btn').addEventListener('click', resetFeed);
   document.getElementById('feed').appendChild(card);
 }
+
+// Service messages are presentation only; they never change retry timing or supply.
+(() => {
+  let waiting=false,notice=null,hideTimer=null;
+  const sourceLabel=()=>curMode==='how'?'Waiting for Wikivoyage':'Waiting for Wikipedia';
+  function hide(immediate=false){
+    clearTimeout(hideTimer);if(!notice)return;
+    notice.classList.remove('visible');notice.setAttribute('aria-hidden','true');
+    if(immediate)notice.hidden=true;
+    else hideTimer=setTimeout(()=>{notice.hidden=true;},240);
+  }
+  function sync(){
+    if(!waiting||!navigator.onLine||!articles.length){hide();return;}
+    clearTimeout(hideTimer);
+    if(!notice){
+      notice=document.createElement('div');notice.id='feedServiceStatus';notice.className='feed-service-status';
+      notice.setAttribute('role','status');notice.setAttribute('aria-live','polite');notice.setAttribute('aria-atomic','true');
+      const label=document.createElement('span'),detail=document.createElement('span');
+      label.className='feed-service-label';detail.className='feed-service-detail';
+      notice.append(label,detail);document.body.appendChild(notice);
+    }
+    notice.children[0].textContent=sourceLabel();notice.children[1].textContent='We’ll retry automatically.';
+    notice.hidden=false;notice.setAttribute('aria-hidden','false');notice.classList.add('visible');
+    window.WSDiscoveryHint?.hide();
+  }
+  globalThis.WSFeedStatus={
+    waiting(){waiting=true;sync();},
+    recovered(){waiting=false;sync();},
+    reset(){waiting=false;hide(true);},
+    sync,
+  };
+  window.addEventListener('feed-reset',()=>globalThis.WSFeedStatus.reset());
+  window.addEventListener('offline',sync);
+})();
 
 // ── LIKES + IDB ────────────────────────────────────────────────────────────
 function toggleLike(id) {

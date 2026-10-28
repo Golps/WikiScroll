@@ -4,6 +4,9 @@ Releases of this repository. Each entry describes what changed in the code; [doc
 
 ## Unreleased
 
+- Replace the bouncing "Scroll to discover" toast with a gesture coach: animated line-art hands show scrolling and swiping (keyboard wording on desktop). Each row stops appearing once the reader has made that gesture.
+- On phones, Saved Articles, History and Topics open as full pages with the same heading and Done button as Settings, instead of an inset drawer with a visible left edge. Drawers on wider screens share the Settings close button.
+- Saved article actions stack each icon over its label so all four buttons line up. Wikivoyage items in Saved and History carry a map icon and their own green, and Remove inside a collection is red like Remove in All.
 - Build the reader and About views with Astro static components, shared settings/forms/dialog templates, and one compiled stylesheet with automatic offline precaching. Keep the existing Worker and classic browser runtime.
 - Add edition-aware Help Wikipedia filters for citations, photos, copy editing, clarification, updates and more detail, with persisted selections and matching cached/offline contexts.
 - Replace decorative interface emoji with custom two-tone SVG icons, balance reading-setting icons, and enable arrow navigation immediately after switching sources.

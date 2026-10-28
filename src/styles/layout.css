@@ -469,22 +469,6 @@ body.light .swipe-ind {
   border-radius: 2px;
 }
 
-.hint {
-  bottom: max(62px,calc(env(safe-area-inset-bottom) + 30px));
-}
-
-.hint-txt, body.light .hint-txt {
-  letter-spacing: 1px;
-  color: var(--muted);
-  font-size: 9px;
-}
-
-.hint-arr, body.light .hint-arr {
-  border-color: var(--accent);
-  width: 10px;
-  height: 10px;
-}
-
 .burger-btn, .burger-btn:hover {
   border: 1px solid var(--rule);
   color: var(--ink);
@@ -1484,19 +1468,6 @@ dialog.privacy-dialog::backdrop {
 
   .skip-ind {
     right: 30px;
-  }
-
-  .hint {
-    bottom: max(12px,env(safe-area-inset-bottom));
-  }
-
-  .hint-txt {
-    font-size: 8px;
-  }
-
-  .hint-arr {
-    width: 7px;
-    height: 7px;
   }
 
   .lp, .sp, .hp, body.light .lp, body.light .sp, body.light .hp {
@@ -2587,46 +2558,6 @@ body .sp-about-logo, body.how .sp-about-logo, body.light .sp-about-logo {
 .platform-stats {
   margin-top: 0;
   padding-top: 16px;
-}
-
-.hint {
-  background: var(--paper);
-  border: 1px solid var(--rule);
-  border-radius: 24px;
-  gap: 5px;
-  padding: 10px 18px;
-  transform: translate(-50%);
-  box-shadow: 0 3px 16px #0003;
-}
-
-.hint .hint-txt, body.light .hint .hint-txt {
-  letter-spacing: .4px;
-  color: var(--ink);
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.hint .hint-arr, body.light .hint .hint-arr {
-  border-color: var(--accent);
-  width: 10px;
-  height: 10px;
-}
-
-@media (width <= 767px) {
-  .hint {
-    bottom: max(8px,env(safe-area-inset-bottom));
-    flex-direction: row;
-    gap: 12px;
-    padding: 7px 16px;
-  }
-
-  .hint .hint-txt {
-    font-size: 12px;
-  }
-
-  .hint .hint-arr {
-    margin-top: -5px;
-  }
 }
 
 .card {

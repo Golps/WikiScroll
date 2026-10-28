@@ -15,15 +15,21 @@ test('sharing falls back to copy on failure, reports copy failure, and quietly h
  delete navigator.share;navigator.clipboard.writeText=async()=>{throw Error('Denied')};await c.doShare({id:'w1'});assert.match(messages[1],/Could not share/);
 });
 
-test('discovery cue advances one card without saving, fades on scroll and pauses dismissal while focused',()=>{
- const events={},attrs={};let timer,scroll,focus;
- const hint={classList:classes(),setAttribute:(k,v)=>attrs[k]=v,removeAttribute:k=>delete attrs[k],addEventListener:(e,f)=>events[e]=f};
- const feed={scrollTop:0,addEventListener:(e,f)=>events['feed'+e]=f,querySelectorAll:()=>[1,2,3],scrollTo:arg=>scroll=arg,focus:()=>focus=true};
- const document={activeElement:null,getElementById:id=>id==='hint'?hint:feed,addEventListener(){}};const window={addEventListener(){}};
- vm.runInNewContext(read('discovery.js'),{document,window,setTimeout:f=>{timer=f;return 1},clearTimeout(){},feedMotionLocked:false,ensureFeedAhead(){},getCurrentFeedCard:()=>1,feedCardTop:card=>card*700,matchMedia:()=>({matches:true})});
- window.WSDiscoveryHint.show();assert.ok(hint.classList.contains('is-visible'));document.activeElement=hint;timer();assert.ok(hint.classList.contains('is-visible'));
- events.click();assert.equal(scroll.top,1400);assert.equal(scroll.behavior,'instant');assert.ok(focus);assert.equal(attrs['aria-hidden'],'true');
- document.activeElement=null;window.WSDiscoveryHint.show();feed.scrollTop=80;events.feedscroll();assert.equal(attrs['aria-hidden'],'true');assert.equal(hint.tabIndex,-1);
+test('gesture coach teaches scroll and swipe until each is learned, and hides on scroll or tap',()=>{
+ const events={},attrs={},store={};let timer;
+ const rows={scroll:{hidden:false},swipe:{hidden:false}};
+ const coach={classList:classes(),setAttribute:(k,v)=>attrs[k]=v,removeAttribute:k=>delete attrs[k],addEventListener:(e,f)=>events[e]=f,querySelector:q=>rows[q.match(/"(\w+)"/)[1]]};
+ const feed={scrollTop:0,addEventListener:(e,f)=>events['feed'+e]=f};
+ const localStorage={getItem:k=>store[k]??null,setItem:(k,v)=>store[k]=v};
+ const load=()=>{const window={addEventListener(){}};vm.runInNewContext(read('discovery.js'),{document:{getElementById:id=>id==='coach'?coach:feed,addEventListener(){}},window,localStorage,setTimeout:f=>{timer=f;return 1},clearTimeout(){}});return window.WSDiscoveryHint;};
+ let coachApi=load();
+ coachApi.show({swipe:true});assert.ok(coach.classList.contains('is-visible'));assert.equal(rows.scroll.hidden,false);assert.equal(rows.swipe.hidden,false);
+ timer();assert.equal(attrs['aria-hidden'],'true');
+ coachApi.show({swipe:false});assert.equal(rows.swipe.hidden,true,'no swipe row when swiping is off');
+ feed.scrollTop=80;events.feedscroll();assert.equal(attrs['aria-hidden'],'true');feed.scrollTop=0;
+ coachApi=load();coachApi.show({swipe:true});assert.equal(rows.scroll.hidden,true,'scrolling is remembered');assert.equal(rows.swipe.hidden,false);
+ events.click();assert.ok(!coach.classList.contains('is-visible'));
+ coachApi.learned('swipe');coachApi=load();coachApi.show({swipe:true});assert.ok(!coach.classList.contains('is-visible'),'nothing left to teach');
 });
 
 test('failed map lookup clears the old destination and keeps the failure visible',async()=>{

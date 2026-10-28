@@ -349,18 +349,6 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   letter-spacing: 0;
 }
 
-.hint {
-  background: var(--surface);
-  border: 1px solid var(--rule);
-  box-shadow: none;
-  border-radius: 2px;
-}
-
-.hint .hint-txt {
-  letter-spacing: 0;
-  font-weight: 400;
-}
-
 .sp, .lp, .hp, .burger-menu, .topic-sheet, .lang-dd, .source-dialog, body.light .sp, body.light .lp, body.light .hp, body.light .burger-menu, body.light .topic-sheet, body.light .lang-dd, body.light .source-dialog {
   font-family: var(--sans);
   color: var(--ink);
@@ -648,15 +636,6 @@ body .sp-about-logo, body.how .sp-about-logo, body.light .sp-about-logo {
     display: none;
   }
 
-  .hint {
-    bottom: max(5px,env(safe-area-inset-bottom));
-    padding: 5px 12px;
-  }
-
-  .hint .hint-txt {
-    font-size: 11px;
-  }
-
   .burger-menu {
     max-height: calc(100dvh - 60px);
     top: 60px;
@@ -715,7 +694,7 @@ body .sp-about-logo, body.how .sp-about-logo, body.light .sp-about-logo {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .panel, .hint, .hint-arr {
+  .panel {
     animation: none !important;
   }
 }
@@ -989,10 +968,6 @@ body.light, body.light.how {
   padding: 12px 14px;
 }
 
-.hint {
-  border-radius: 24px;
-}
-
 .map-btn, body.light .map-btn {
   border-radius: 12px;
 }
@@ -1151,9 +1126,6 @@ body.light, body.light.how {
     top: 68px;
   }
 
-  .hint {
-    padding: 5px 12px;
-  }
 }
 
 @media (width <= 767px) and (height <= 700px) {
@@ -1295,7 +1267,7 @@ body.light, body.light.how {
     min-height: 32px;
   }
 
-  body.settings-open .hdr, body.settings-open #feed, body.settings-open .hint {
+  body.settings-open .hdr, body.settings-open #feed, body.settings-open .coach {
     visibility: hidden;
     pointer-events: none;
   }

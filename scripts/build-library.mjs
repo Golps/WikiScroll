@@ -167,8 +167,10 @@ export const emptyProps = () => ({free: new Map(), any: new Map(), desc: new Map
 // emptied cl_to column next to cl_target_id).
 export async function readLinkTargets(lines) {
   const titles = new Map();
-  const columns = await readTable(lines, (row, c) => { if (row[c.lt_namespace] === 14) titles.set(row[c.lt_id], row[c.lt_title]); });
+  let rows = 0, sample = null;
+  const columns = await readTable(lines, (row, c) => { rows++; sample ??= row; if (row[c.lt_namespace] === 14) titles.set(row[c.lt_id], row[c.lt_title]); });
   need(columns, 'lt_id', 'lt_namespace', 'lt_title');
+  if (rows && !titles.size) throw Error(`linktarget has ${rows} rows but no categories (columns ${Object.keys(columns).join(',')}; first row ${JSON.stringify(sample).slice(0, 200)}).`);
   return titles;
 }
 export async function readCategoryLinks(lines, targets = null) {

@@ -92,6 +92,13 @@ jobs:
             get "$base/$file" "$RUNNER_TEMP/voyage-part.json.bz2"; lbzip2 -dc "$RUNNER_TEMP/voyage-part.json.bz2" >> "$RUNNER_TEMP/voyage.ndjson"; rm -f "$RUNNER_TEMP/voyage-part.json.bz2"
           done
           ls -la "$RUNNER_TEMP"/*.sql.gz "$RUNNER_TEMP/voyage.ndjson"
+          # The schema and first row of each category table, for diagnosing a misread tree.
+          for table in categorylinks linktarget; do
+            if [ -f "$RUNNER_TEMP/$table.sql.gz" ]; then
+              echo "== $table"; (gzip -dc "$RUNNER_TEMP/$table.sql.gz" | grep -a -m 1 -A 12 '^CREATE TABLE' | cut -c 1-200) || true
+              (gzip -dc "$RUNNER_TEMP/$table.sql.gz" | grep -a -m 1 'INSERT INTO' | cut -c 1-300) || true
+            fi
+          done
       - name: Build the library
         if: steps.live.outputs.skip != 'true'
         run: |

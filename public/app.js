@@ -1510,9 +1510,15 @@ document.getElementById('likedList').addEventListener('click', ev => {
   else if (btn.dataset.collect) openCollectionChooser(btn.dataset.collect);
   else if (btn.dataset.unlike)   removeLike(btn.dataset.unlike);
   else if (btn.dataset.uncollect) removeFromCollection(activeCollection, btn.dataset.uncollect);
-  else if (btn.dataset.shareUrl) doShare({url: btn.dataset.shareUrl, title: btn.dataset.shareTitle, id: btn.dataset.shareId});
+  else if (btn.dataset.shareUrl) doShare(savedArticle(btn.dataset.shareId) || {url: btn.dataset.shareUrl, title: btn.dataset.shareTitle, id: btn.dataset.shareId});
   if (btn.id === 'deleteCollBtn' && activeCollection !== null) deleteCollection(activeCollection);
   if (btn.id === 'undoDeleteBtn') undoDeleteCollection();
+});
+// Start the share image on press so it is usually ready by the click.
+function savedArticle(id) { return [...liked.values()].find(x => x.id === id); }
+document.getElementById('likedList').addEventListener('pointerdown', ev => {
+  const id = ev.target.closest('[data-share-id]')?.dataset.shareId, a = id && savedArticle(id);
+  if (a) window.WSShareCard?.prepare(a);
 });
 document.getElementById('collTabs').addEventListener('click', ev => {
   const tab = ev.target.closest('.coll-tab'); if (!tab) return;
@@ -1542,7 +1548,15 @@ function deepLinkUrl(a) {
 async function doShare(a) {
   // Share the Worker deep link so messaging apps can render its article preview.
   const shareUrl = a.id ? deepLinkUrl(a) : (a.url || 'https://wikiscroll.com');
+  // With the branded image when it is already drawn: waiting for it would
+  // outlast the tap that browsers require before opening the share sheet.
+  const card = a.id ? window.WSShareCard?.ready(a) : null;
+  if (a.id && a.title) window.WSShareCard?.prepare(a);
   if (navigator.share) {
+    if (card && navigator.canShare?.({files:[card]})) {
+      try { await navigator.share({files:[card], url:shareUrl}); return; }
+      catch (error) { if (error?.name === 'AbortError') return; }
+    }
     try { await navigator.share({url:shareUrl}); return; }
     catch (error) { if (error?.name === 'AbortError') return; }
   }
@@ -2777,7 +2791,7 @@ function markViewed(card) {
   _viewedIds.add(id);
   bumpStat(id.startsWith('v') ? 'how' : 'wiki');
   const a = articles.find(x => x.id === id);
-  if (a) trackHistory(a);
+  if (a) { trackHistory(a); window.WSShareCard?.soon(a); }
 }
 function trackScrollView() {
   const feed = document.getElementById('feed');

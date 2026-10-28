@@ -9,7 +9,7 @@ const classes=()=>{const set=new Set();return {add:n=>set.add(n),remove:n=>set.d
 test('sharing falls back to copy on failure, reports copy failure, and quietly honors cancellation',async()=>{
  const code=app.slice(app.indexOf('async function doShare'),app.indexOf('// ── TOPICS'));
  const messages=[],copies=[];const navigator={share:async()=>{throw Error('Unavailable')},clipboard:{writeText:async url=>copies.push(url)}};
- const c=vm.createContext({navigator,deepLinkUrl:()=> 'https://wikiscroll.com/?a=w1',toast:m=>messages.push(m)});vm.runInContext(code,c);
+ const c=vm.createContext({navigator,window:{},deepLinkUrl:()=> 'https://wikiscroll.com/?a=w1',toast:m=>messages.push(m)});vm.runInContext(code,c);
  await c.doShare({id:'w1'});assert.equal(copies.length,1);assert.equal(messages[0],'Link copied!');
  navigator.share=async()=>{throw Object.assign(Error(),{name:'AbortError'})};await c.doShare({id:'w1'});assert.equal(messages.length,1);assert.equal(copies.length,1);
  delete navigator.share;navigator.clipboard.writeText=async()=>{throw Error('Denied')};await c.doShare({id:'w1'});assert.match(messages[1],/Could not share/);
@@ -81,4 +81,18 @@ test('focus rings hide after a tap or click and return on any key press',()=>{
  listeners.touchstart();listeners.keydown({metaKey:true});assert.ok(root.classList.contains('pointer-input'),'shortcuts do not count as keyboard navigation');
  const css=fs.readFileSync(new URL('../src/styles/discovery.css',import.meta.url),'utf8');
  assert.match(css,/\.pointer-input :focus, \.pointer-input :focus-visible \{ outline: none !important; \}/);
+});
+
+test('share sends the branded image with the link when it is ready, and the link alone otherwise',async()=>{
+ const code=app.slice(app.indexOf('async function doShare'),app.indexOf('// ── TOPICS'));
+ const shared=[],prepared=[],file={name:'Octopus.jpg'};let ready=null;
+ const navigator={share:async data=>{shared.push(data)},canShare:data=>Array.isArray(data.files)};
+ const window={WSShareCard:{ready:()=>ready,prepare:a=>prepared.push(a.id)}};
+ const c=vm.createContext({navigator,window,deepLinkUrl:()=> 'https://wikiscroll.com/?a=w1',toast(){}});vm.runInContext(code,c);
+ await c.doShare({id:'w1',title:'Octopus'});
+ assert.equal(JSON.stringify(shared[0]),'{"url":"https://wikiscroll.com/?a=w1"}','never waits for the image');assert.equal(prepared.join(),'w1');
+ ready=file;await c.doShare({id:'w1',title:'Octopus'});
+ assert.equal(shared[1].files[0],file);assert.equal(shared[1].url,'https://wikiscroll.com/?a=w1');
+ navigator.share=async data=>{if(data.files)throw Object.assign(Error(),{name:'NotAllowedError'});shared.push(data)};
+ await c.doShare({id:'w1',title:'Octopus'});assert.equal(JSON.stringify(shared[2]),'{"url":"https://wikiscroll.com/?a=w1"}','falls back to the link');
 });

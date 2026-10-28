@@ -92,7 +92,7 @@ async function wikiPages(http, ids) {
   }
   return pages;
 }
-async function vitalCards(http, depth, upstream) {
+async function vitalCards(http, depth, upstream, taken) {
   const options = {cache: null, deadline: Date.now() + 3600000};
   const level3 = await vitalTitles(3, upstream, {}, options);
   let pool = level3 || [];
@@ -103,18 +103,21 @@ async function vitalCards(http, depth, upstream) {
     const data = await http.json(api('en.wikipedia.org', {...detail, titles: titles.join('|'), redirects: '1'}));
     for (const page of Object.values(data?.query?.pages || {})) {
       const card = page.ns === 0 && page.thumbnail?.source ? toCard(page, 'wiki') : null;
-      if (validCard(card, 'wiki')) cards.push(card);
+      if (validCard(card, 'wiki') && !taken.has(card.id)) { taken.add(card.id); cards.push(card); }
     }
   }
   return cards;
 }
 const chunks = (values, size) => Array.from({length: Math.ceil(values.length / size)}, (_, i) => values.slice(i * size, (i + 1) * size));
 
-async function randomCards(http, maxRounds = 160) {
+// `taken` holds ids already in a set: the random generator repeats pages across
+// rounds, a page can fit two overlapping bands, and redirects can map a Known
+// title onto a Popular article, so every card belongs to exactly one set.
+async function randomCards(http, taken, maxRounds = 160) {
   const sets = {3: [], 4: [], 5: []};
   for (let round = 0; round < maxRounds && Object.values(sets).some(cards => cards.length < TARGET); round++) {
     const data = await http.json(api('en.wikipedia.org', {generator: 'random', grnnamespace: '0', grnlimit: '50', prop: 'pageimages|pageprops|description', ppprop: 'disambiguation', piprop: 'thumbnail', pilicense: 'any', pithumbsize: '960', pilimit: 'max'}));
-    const candidates = Object.values(data?.query?.pages || {}).filter(p => Number.isSafeInteger(p.pageid) && p.pageid > 0 && p.thumbnail?.source && !BAD_TITLE.test(p.title || '') && !isDisambiguation(p));
+    const candidates = Object.values(data?.query?.pages || {}).filter(p => Number.isSafeInteger(p.pageid) && p.pageid > 0 && p.thumbnail?.source && !BAD_TITLE.test(p.title || '') && !isDisambiguation(p) && !taken.has('w' + p.pageid));
     await completePageviews(candidates, ids => http.json(api('en.wikipedia.org', {prop: 'pageviews', pvipdays: '14', pageids: ids})));
     const lag = lagDays(candidates), wanted = [];
     for (const page of candidates) {
@@ -124,19 +127,19 @@ async function randomCards(http, maxRounds = 160) {
     const detailed = new Map((await wikiPages(http, wanted.map(w => w.page.pageid))).map(p => [p.pageid, p]));
     for (const {page, depth} of wanted) {
       const card = detailed.has(page.pageid) ? toCard(detailed.get(page.pageid), 'wiki') : null;
-      if (validCard(card, 'wiki')) sets[depth].push(card);
+      if (validCard(card, 'wiki') && !taken.has(card.id)) { taken.add(card.id); sets[depth].push(card); }
     }
   }
   return sets;
 }
-async function voyageCards(http, maxRounds = 60) {
+async function voyageCards(http, taken, maxRounds = 60) {
   const cards = [];
   for (let round = 0; round < maxRounds && cards.length < TARGET; round++) {
     const data = await http.json(api('en.wikivoyage.org', {generator: 'random', grnnamespace: '0', grnlimit: '20', ...detail, prop: detail.prop + '|pageprops|categories', ppprop: 'disambiguation', ...phrasebookParams('en')}));
     for (const page of Object.values(data?.query?.pages || {})) {
       if (isPhrasebook(page) || isDisambiguation(page) || /^(?:travel topics?|itineraries)(?:[ :/]|$)/i.test(page.title || '')) continue;
       const card = toCard(page, 'how');
-      if (guideReadable(card.body) && validCard(card, 'how')) cards.push(card);
+      if (guideReadable(card.body) && validCard(card, 'how') && !taken.has(card.id)) { taken.add(card.id); cards.push(card); }
     }
   }
   return cards;
@@ -144,8 +147,9 @@ async function voyageCards(http, maxRounds = 60) {
 
 export async function buildPool(http = client()) {
   const upstream = url => http.json(url);
-  const random = await randomCards(http);
-  const sets = {'wiki-en-1': await vitalCards(http, 1, upstream), 'wiki-en-2': await vitalCards(http, 2, upstream), 'wiki-en-3': random[3], 'wiki-en-4': random[4], 'wiki-en-5': random[5], 'how-en': await voyageCards(http)};
+  const taken = new Set();
+  const popular = await vitalCards(http, 1, upstream, taken), known = await vitalCards(http, 2, upstream, taken), random = await randomCards(http, taken);
+  const sets = {'wiki-en-1': popular, 'wiki-en-2': known, 'wiki-en-3': random[3], 'wiki-en-4': random[4], 'wiki-en-5': random[5], 'how-en': await voyageCards(http, taken)};
   const short = Object.entries(sets).filter(([, cards]) => cards.length < MINIMUM).map(([set, cards]) => `${set}: ${cards.length}`);
   if (short.length) throw Error('Too few cards, keeping the current pool. ' + short.join(', '));
   return {sets, calls: http.calls};

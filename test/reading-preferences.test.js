@@ -23,9 +23,9 @@ test('dimming defaults off and does not change reading size or discovery',()=>{
  h.c.setDimImages(false);assert.ok(!h.classes.has('dim-images'));assert.equal(h.c.readingTextSize,'standard');
 });
 test('reading preferences survive saves of unrelated settings',()=>{
- let saved;const c=vm.createContext({lsSet:(_,v)=>saved=v,readingTextSize:'large',dimImages:true,ambientEnabled:false,swipeEnabled:true,kbBarEnabled:true,helpMode:'only',helpTypes:['images'],lightMode:true,depthLevel:5,curLang:'he'});
+ let saved;const c=vm.createContext({lsSet:(_,v)=>saved=v,readingTextSize:'large',dimImages:true,showMature:true,ambientEnabled:false,swipeEnabled:true,kbBarEnabled:true,helpMode:'only',helpTypes:['images'],lightMode:true,depthLevel:5,curLang:'he'});
  vm.runInContext(slice('function saveSettings(', 'function saveHistory('),c);c.saveSettings();
- assert.equal(saved.readingTextSize,'large');assert.equal(saved.dimImages,true);assert.equal(saved.depth,5);assert.equal(saved.lang,'he');
+ assert.equal(saved.readingTextSize,'large');assert.equal(saved.dimImages,true);assert.equal(saved.mature,true);assert.equal(saved.depth,5);assert.equal(saved.lang,'he');
 });
 test('image inspection ignores drags and long presses, and supports keyboard activation',()=>{
  const handlers={},attrs={},image={dataset:{},setAttribute:(k,v)=>attrs[k]=v,addEventListener:(k,f)=>handlers[k]=f};
@@ -40,7 +40,7 @@ test('image inspection ignores drags and long presses, and supports keyboard act
 });
 test('every interface dictionary covers the new reading and image controls',()=>{
  const files=fs.readdirSync(new URL('../public/translations/',import.meta.url));
- for(const f of files){const c={window:{}};vm.runInNewContext(fs.readFileSync(new URL('../public/translations/'+f,import.meta.url),'utf8'),c);const d=Object.values(c.window.WS_TRANSLATIONS)[0];for(const key of ['Reading text','Standard','Large','Larger','Dim images in dark mode','View image','Close image','View image and credits on the original article'])assert.ok(d[key],f+': '+key);}
+ for(const f of files){const c={window:{}};vm.runInNewContext(fs.readFileSync(new URL('../public/translations/'+f,import.meta.url),'utf8'),c);const d=Object.values(c.window.WS_TRANSLATIONS)[0];for(const key of ['Reading text','Standard','Large','Larger','Dim images in dark mode','Mature topics','Show articles about sex, pornography and graphic abuse.','View image','Close image','View image and credits on the original article'])assert.ok(d[key],f+': '+key);}
 });
 
 test('image inspection refuses unloaded photos and blocked interactions',()=>{

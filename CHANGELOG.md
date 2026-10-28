@@ -13,6 +13,7 @@ Releases of this repository. Each entry describes what changed in the code; [doc
 - Pause a Wikimedia edition after three consecutive 5xx or connection failures without Retry-After (5 s, doubling to 60 s), and answer an uncached feed request during such an outage from complete batches already in the edge cache.
 - When the Worker reports a Wikimedia outage on an empty feed, show the device's exact-settings reserve or the bundled English starter set instead of an empty "Waiting for Wikipedia" screen, and log each upstream failure (host, status, pause) for Workers Observability.
 - Extend the outage fallback to every discovery depth and to depth or filter changes made during the pause: use saved cards from another depth or matching topic in the same language before the starter set, keep language, Help-only and travel filters strict, and never save stand-ins as the new feed's reserve.
+- Replace the fixed 66-card starter set with a weekly-refreshed pool of up to 300 cards per depth and 300 travel guides, split into shards so each reader gets a random slice for their own depth; the service worker keeps one shard per set for offline use.
 
 - Refresh social previews with a two-line serif headline, “Turn doomscrolling into discovery.”, and a new versioned image URL across site and collection previews.
 

@@ -1,9 +1,18 @@
-const CACHE='wikiscroll-atlas-v117';
-const SHELL=['/images/ui-icons.svg?v=3','/discovery.js?v=49','/about/','/about.css?v=51','/about.js?v=48','/images/wordmark-dark.svg','/images/wordmark-light.svg','/images/favicon.ico?v=42','/images/apple-touch-icon.png?v=42','/images/icon-192.png?v=42','/images/icon-512.png?v=42','/lang.js?v=12','/translations/es.js?v=12','/translations/fr.js?v=12','/translations/de.js?v=12','/translations/it.js?v=12','/translations/pt.js?v=12','/translations/ru.js?v=12','/translations/ja.js?v=12','/translations/zh.js?v=12','/translations/ar.js?v=12','/translations/hi.js?v=12','/translations/ko.js?v=12','/translations/nl.js?v=12','/translations/pl.js?v=12','/translations/he.js?v=12','/i18n.js?v=55','/data/starter-en.json','/features.js?v=72','/webmcp.js?v=1','/','/app.js?v=101','/atlas.js?v=57','/manifest.json','/images/icon-192.png','/images/icon-512.png',/* ASTRO_STYLES */];
+const CACHE='wikiscroll-atlas-v118';
+const SHELL=['/images/ui-icons.svg?v=3','/discovery.js?v=49','/about/','/about.css?v=51','/about.js?v=48','/images/wordmark-dark.svg','/images/wordmark-light.svg','/images/favicon.ico?v=42','/images/apple-touch-icon.png?v=42','/images/icon-192.png?v=42','/images/icon-512.png?v=42','/lang.js?v=12','/translations/es.js?v=12','/translations/fr.js?v=12','/translations/de.js?v=12','/translations/it.js?v=12','/translations/pt.js?v=12','/translations/ru.js?v=12','/translations/ja.js?v=12','/translations/zh.js?v=12','/translations/ar.js?v=12','/translations/hi.js?v=12','/translations/ko.js?v=12','/translations/nl.js?v=12','/translations/pl.js?v=12','/translations/he.js?v=12','/i18n.js?v=55','/features.js?v=72','/webmcp.js?v=1','/','/app.js?v=102','/atlas.js?v=57','/manifest.json','/images/icon-192.png','/images/icon-512.png',/* ASTRO_STYLES */];
 // Wikimedia serves article images from both hosts (thumb.wikimedia.org since 2026).
 const IMAGE_HOSTS=new Set(['upload.wikimedia.org','thumb.wikimedia.org']);
+// Offline openings need one shard of each starter set (scripts/build-starter.mjs).
+// Each device keeps its own random shard; a missing pool never blocks install.
+async function cacheStarterPool(cache){
+  try{
+    const response=await fetch('/data/starter/index.json',{cache:'no-store'});if(!response.ok)return;
+    const index=await response.clone().json();await cache.put('/data/starter/index.json',response);
+    await Promise.all(Object.entries(index.sets||{}).filter(([,count])=>count>0).map(([set,count])=>cache.add(`/data/starter/${set}-${String(Math.floor(Math.random()*count)).padStart(3,'0')}.json`).catch(()=>{})));
+  }catch{}
+}
 self.addEventListener('install',event=>{
-  event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(SHELL)).then(()=>self.skipWaiting()));
+  event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(SHELL).then(()=>cacheStarterPool(cache))).then(()=>self.skipWaiting()));
 });
 self.addEventListener('activate',event=>{
   event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k.startsWith('wikiscroll-')&&k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim()));
@@ -27,6 +36,20 @@ self.addEventListener('fetch',event=>{
       const winner=await Promise.race([network.catch(()=>null),new Promise(resolve=>{timer=setTimeout(()=>resolve(null),2500);})]);
       clearTimeout(timer);
       return winner||await cache?.match(key).catch(()=>null)||await network.catch(()=>new Response('Offline — reconnect to load WikiScroll.',{status:503,headers:{'Content-Type':'text/plain'}}));
+    })());
+    return;
+  }
+  // The starter pool is refreshed weekly without a new service worker: network
+  // first, then this device's cached copy, or any cached shard of the same set.
+  if(url.origin===self.location.origin&&url.pathname.startsWith('/data/starter/')){
+    event.respondWith((async()=>{
+      const cache=await caches.open(CACHE).catch(()=>null);
+      try{const response=await fetch(req);if(response.ok){if(cache)event.waitUntil(cache.put(url.pathname,response.clone()).catch(()=>{}));return response;}}catch{}
+      const exact=await cache?.match(url.pathname).catch(()=>null);if(exact)return exact;
+      const set=url.pathname.match(/^\/data\/starter\/(.+)-\d{3}\.json$/)?.[1];
+      const keys=set&&cache?await cache.keys().catch(()=>[]):[];
+      const other=keys.find(key=>new URL(key.url).pathname.startsWith(`/data/starter/${set}-`));
+      return other?await cache.match(other):new Response('',{status:503});
     })());
     return;
   }

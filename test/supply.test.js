@@ -10,10 +10,18 @@ const article = (n, src = 'wiki') => ({id:(src === 'wiki' ? 'w' : 'v') + n, src,
 const batch = (count, start = 1, src = 'wiki') => Array.from({length:count}, (_, i) => article(start + i, src));
 const tick = async () => { for (let i=0; i<8; i++) await Promise.resolve(); };
 
+// A two-shard pool for every set; shard cards carry their set in the id range.
+const SET_BASE={'wiki-en-1':10000,'wiki-en-2':20000,'wiki-en-3':30000,'wiki-en-4':40000,'wiki-en-5':50000,'how-en':60000};
+function starterPool(path,onShard,sets=Object.fromEntries(Object.keys(SET_BASE).map(set=>[set,2]))){
+  if(path==='/data/starter/index.json')return Response.json({v:1,sets});
+  const [,set,shard]=path.match(/^\/data\/starter\/(.+)-(\d{3})\.json$/)||[];
+  if(!set||!(sets[set]>Number(shard)))return new Response('',{status:404});
+  onShard();return Response.json(batch(30,SET_BASE[set]+Number(shard)*100,set==='how-en'?'how':'wiki'));
+}
 function harness() {
   const storage = new Map(), timers = new Map(), requests = [];
   const nodes = [], feed = {querySelectorAll:() => nodes, addEventListener() {}};
-  let timerId=0, selectedIndex=0, directCalls=0, starterRequests=0;
+  let timerId=0, selectedIndex=0, directCalls=0, starterRequests=0;const starterPaths=[];
   const hint={style:{}}, spinner={remove(){}};
   const context = vm.createContext({
     console, Date, URLSearchParams, AbortController, shuffled:items=>[...items],
@@ -29,7 +37,7 @@ function harness() {
     lsSet:(key,value)=>storage.set(key,JSON.stringify(value)),
     getCurrentFeedCard:()=>nodes[selectedIndex]||null,
     renderCard:a=>nodes.push({dataset:{id:a.id}}),
-    fetch:async()=>{starterRequests++;return Response.json({wiki:batch(30),how:batch(30,1,'how')});},
+    fetch:async path=>starterPool(path,()=>{starterRequests++;starterPaths.push(path);}),
     workerRequest:()=>new Promise(resolve=>requests.push(resolve)),
     directRequest:async()=>{directCalls++;return [];},
   });
@@ -45,7 +53,7 @@ function harness() {
   const run = text => vm.runInContext(text, context);
   return {
     context, nodes, requests, storage, run,
-    get directCalls(){return directCalls;}, get starterRequests(){return starterRequests;},
+    get directCalls(){return directCalls;}, get starterRequests(){return starterRequests;}, starterPaths,
     state:()=>JSON.parse(run('JSON.stringify({queue:queue.map(a=>a.id),articles:articles.map(a=>a.id),filling,gen:fillGeneration})')),
     add(items){context.incoming=items;return run('acceptSupply(incoming,fillGeneration)');},
     select(index){selectedIndex=index;},
@@ -133,7 +141,7 @@ test('a cached reserve restores only the exact source, language, and preference 
 });
 
 test('starter fallback never substitutes English random content for explicit filters', async () => {
-  for(const preference of ["curLang='fr';","curTopics.add('science');","depthLevel=1;","curMode='how';travelFilters.place='Japan';"]){
+  for(const preference of ["curLang='fr';","curTopics.add('science');","helpMode='only';","curMode='how';travelFilters.place='Japan';"]){
     const h=harness();h.run(preference);
     await h.run('loadStarterLibrary(fillGeneration)');
     assert.equal(h.starterRequests,0);
@@ -177,11 +185,11 @@ test('a delayed starter response cannot enter a switched feed or replace live ca
   for(const action of ['change','live']){
     const h=harness();let deliver;
     h.context.navigator.onLine=false;
-    h.context.fetch=()=>new Promise(resolve=>{deliver=resolve;});
+    h.context.fetch=path=>path.endsWith('index.json')?starterPool(path,()=>{}):new Promise(resolve=>{deliver=resolve;});
     const fallback=h.run('startStartupFallback(fillGeneration)'),timer=h.fire(0);
     if(action==='change')h.change("curMode='how';");
     h.add(batch(25,1000,action==='change'?'how':'wiki'));h.run('ensureFeedAhead()');
-    deliver(Response.json({wiki:batch(30),how:batch(30,1,'how')}));await timer;await fallback;
+    for(let i=0;i<20&&!deliver;i++)await tick();deliver(Response.json(batch(30,1,action==='change'?'how':'wiki')));await timer;await fallback;
     assert.ok(h.state().articles.every(id=>Number(id.slice(1))>=1000));
     assert.ok(h.state().queue.every(id=>Number(id.slice(1))>=1000));
   }
@@ -303,4 +311,29 @@ test('a short non-outage pause never substitutes cards for a slow opening',async
   await h.run(`noteWorkerCooldown(reply,fillGeneration,workerSourceKey(),{code:'batch_pending'})`);await h.fire(0);
   h.run('restoreWorkerCooldown();');await h.run('liveFetchWorkerBatch(fillGeneration)');await h.fire(0);await tick();
   assert.deepEqual(shown(h),[]);assert.equal(h.starterRequests,0);
+});
+test('starter cards come from the reader’s own depth set and a random shard of it',async()=>{
+  for(const depth of [1,2,3,4,5]){
+    const h=harness();h.run(`depthLevel=${depth};`);h.context.navigator.onLine=false;
+    const fallback=h.run('startStartupFallback(fillGeneration)');await h.fire(0);await fallback;
+    assert.equal(h.starterPaths.length,1);assert.match(h.starterPaths[0],new RegExp(`^/data/starter/wiki-en-${depth}-00[01]\\.json$`));
+    assert.ok(shown(h).every(id=>Math.floor(Number(id.slice(1))/10000)===depth),'only depth '+depth+' cards');
+  }
+  const shards=new Set();
+  for(let i=0;i<40;i++){const h=harness();h.context.navigator.onLine=false;const f=h.run('startStartupFallback(fillGeneration)');await h.fire(0);await f;shards.add(h.starterPaths[0]);}
+  assert.equal(shards.size,2,'visitors draw different shards');
+  const voyage=harness();voyage.run("curMode='how';");voyage.context.navigator.onLine=false;
+  const f=voyage.run('startStartupFallback(fillGeneration)');await voyage.fire(0);await f;
+  assert.match(voyage.starterPaths[0],/^\/data\/starter\/how-en-00[01]\.json$/);
+});
+test('a depth without its own shards borrows Balanced cards only during an outage',async()=>{
+  const sets={'wiki-en-3':1,'how-en':1};
+  const offline=harness();offline.context.fetch=path=>starterPool(path,()=>offline.starterPaths.push(path),sets);
+  offline.run('depthLevel=5;');offline.context.navigator.onLine=false;
+  const f=offline.run('startStartupFallback(fillGeneration)');await offline.fire(0);await f;
+  assert.deepEqual(shown(offline),[],'offline Obscure never shows Balanced cards');
+  const h=harness();h.context.fetch=path=>starterPool(path,()=>h.starterPaths.push(path),sets);h.run('depthLevel=5;');
+  h.context.reply=new Response(null,{status:503,headers:{'Retry-After':'30'}});
+  await h.run(`noteWorkerCooldown(reply,fillGeneration,'x',{code:'upstream_unavailable'})`);await h.fire(0);await tick();await tick();
+  assert.deepEqual([...h.starterPaths],['/data/starter/wiki-en-3-000.json']);assert.ok(shown(h).length>0);
 });

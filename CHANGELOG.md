@@ -4,6 +4,7 @@ Releases of this repository. Each entry describes what changed in the code; [doc
 
 ## Unreleased
 
+- Sample the bundled starter pool from the card library instead of hundreds of live API calls; the API remains the fallback when the library can't be read.
 - Shrink the first-launch gesture coach to one small pill under the header. It shows the scroll tip first and changes in place to the swipe tip after the first scroll, so it no longer covers the card or its Save and Share buttons.
 - Replace the bouncing "Scroll to discover" toast with a gesture coach: animated line-art hands show scrolling and swiping (keyboard wording on desktop). Each row stops appearing once the reader has made that gesture.
 - On phones, Saved Articles, History and Topics open as full pages with the same heading and Done button as Settings, instead of an inset drawer with a visible left edge. Drawers on wider screens share the Settings close button.

@@ -2,6 +2,9 @@
 // Cards keep the feed's {id, src, title, body, img, url, desc} shape and are
 // grouped by source, language and depth, then shuffled and packed into small
 // shards so each visitor loads one random slice instead of one fixed list.
+// Cards come from this week's card library on cards.wikiscroll.com (built
+// from the Wikimedia dumps a few hours earlier); the live API is the fallback
+// when the library can't be read.
 // Run by .github/workflows/starter-pool.yml; it never runs during a deploy.
 //   node scripts/build-starter.mjs [output directory]
 import fs from 'node:fs/promises';
@@ -147,6 +150,31 @@ async function voyageCards(http, taken, maxRounds = 60) {
   return cards;
 }
 
+// Random whole shards of each library set until the set is full. Every card
+// still passes validCard, and `taken` keeps each card in one set.
+export const LIBRARY = 'https://cards.wikiscroll.com/v1/en/';
+async function libraryJSON(url) {
+  try {
+    const response = await fetch(url, {headers: {'User-Agent': 'WikiScroll-starter-pool/1.0 (https://wikiscroll.com; contact@wikiscroll.com)'}, signal: AbortSignal.timeout(20000)});
+    return response.ok ? await response.json() : null;
+  } catch { return null; }
+}
+export async function libraryPool(fetchJSON = libraryJSON, base = LIBRARY) {
+  const manifest = await fetchJSON(base + 'current.json');
+  if (manifest?.v !== 1 || typeof manifest.base !== 'string' || !manifest.sets) return null;
+  const taken = new Set(), sets = {};
+  for (const set of SETS) {
+    const src = set.startsWith('how') ? 'how' : 'wiki', cards = [];
+    for (const shard of shuffle([...Array(Math.max(0, manifest.sets[set] | 0)).keys()])) {
+      if (cards.length >= TARGET) break;
+      const batch = await fetchJSON(`${base}${manifest.base}${set}/${shard}.json`);
+      for (const card of Array.isArray(batch) ? batch : []) if (validCard(card, src) && !taken.has(card.id)) { taken.add(card.id); cards.push(card); }
+    }
+    sets[set] = cards.slice(0, TARGET);
+  }
+  return {sets, build: manifest.build};
+}
+
 export async function buildPool(http = client()) {
   const upstream = url => http.json(url);
   const taken = new Set();
@@ -169,8 +197,11 @@ export async function writePool(dir, sets, fetchedAt = new Date().toISOString())
 if (process.argv[1] && import.meta.url === new URL(process.argv[1], 'file:').href) {
   try {
     const dir = process.argv[2] || new URL('../public/data/starter/', import.meta.url).pathname;
-    const {sets, calls} = await buildPool();
+    const library = await libraryPool();
+    const short = library ? Object.entries(library.sets).filter(([, cards]) => cards.length < MINIMUM).map(([set, cards]) => `${set}: ${cards.length}`) : ['unreadable'];
+    if (short.length) console.error(`Card library unusable (${short.join(', ')}); using the live API.`);
+    const {sets, calls} = short.length ? await buildPool() : {sets: library.sets, calls: 0};
     const index = await writePool(dir, sets);
-    console.log(`Starter pool: ${Object.entries(index).map(([set, n]) => `${set} ${n} shard(s)`).join(', ')}; ${calls} requests.`);
+    console.log(`Starter pool from ${short.length ? 'the live API' : 'library ' + library.build}: ${Object.entries(index).map(([set, n]) => `${set} ${n} shard(s)`).join(', ')}; ${calls} API requests.`);
   } catch (error) { console.error(error.message); process.exitCode = 1; }
 }

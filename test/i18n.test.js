@@ -45,7 +45,7 @@ test('messages shown after an action are translated in every language, including
  const w=harness(),api=w.WSI18n,langs=Object.keys(w.WS_TRANSLATIONS);
  const messages=['Link copied!','✨ Feed refreshed','📎 Opened shared article','Could not share. Open the article to copy its link.','Collection deleted',
   'No articles in this collection yet. Add some from the "All" tab.',"Swipe right or press Save to keep articles here. They'll be available offline too.",
-  'Articles you view will appear here so you can find them again.',"Wikipedia didn't respond.","Wikivoyage didn't respond.",
+  'Articles you view will appear here so you can find them again.','Waiting for Wikipedia','Waiting for Wikivoyage','We’ll retry automatically.','Your saved articles are still available.',
   "You're offline. Reconnect and try again. Your saved articles are still available.",
   '📍 Could not locate this place','Map could not load. Close it and try again.','❌ Map failed to render','Tap a collection below to add this article immediately.',
   '＋ Create new collection','Create a new collection','Create and save','Back','Create your first collection to organize this article.',

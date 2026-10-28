@@ -474,8 +474,10 @@ if (process.argv[1] && import.meta.url === new URL(process.argv[1], 'file:').hre
     if (!level3 || !level4) throw Error('Vital-article lists are unavailable, keeping the current library.');
     log('Reading page properties');
     const props = await readPageProps(sqlLines(option('page-props')));
-    log(`Page properties: ${props.any.size} lead images (${props.free.size} free), ${props.desc.size} descriptions, ${props.disambiguation.size} disambiguation pages`);
-    if (props.any.size < 1e6) throw Error(`Only ${props.any.size} lead images in page_props: the table was misread, keeping the current library.`);
+    // page_image holds only non-free lead images; free ones are page_image_free.
+    const leadImages = props.free.size + props.any.size;
+    log(`Page properties: ${props.free.size} free and ${props.any.size} other lead images, ${props.desc.size} descriptions, ${props.disambiguation.size} disambiguation pages`);
+    if (leadImages < 1e6) throw Error(`Only ${leadImages} lead images in page_props: the table was misread, keeping the current library.`);
     log('Reading the category tree');
     const targets = option('linktarget') ? await readLinkTargets(sqlLines(option('linktarget'))) : null;
     const links = await readCategoryLinks(sqlLines(option('categorylinks')), targets);

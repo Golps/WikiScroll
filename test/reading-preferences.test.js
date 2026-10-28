@@ -40,7 +40,7 @@ test('image inspection ignores drags and long presses, and supports keyboard act
 });
 test('every interface dictionary covers the new reading and image controls',()=>{
  const files=fs.readdirSync(new URL('../public/translations/',import.meta.url));
- for(const f of files){const c={window:{}};vm.runInNewContext(fs.readFileSync(new URL('../public/translations/'+f,import.meta.url),'utf8'),c);const d=Object.values(c.window.WS_TRANSLATIONS)[0];for(const key of ['Reading text','Standard','Large','Larger','Dim images in dark mode','View image','Close image','View image and credits on the original article'])assert.ok(d[key],f+': '+key);}
+ for(const f of files){const c={window:{}};vm.runInNewContext(fs.readFileSync(new URL('../public/translations/'+f,import.meta.url),'utf8'),c);const d=Object.values(c.window.WS_TRANSLATIONS)[0];for(const key of ['Reading text','Standard','Large','Larger','Dim images in dark mode','Mature topics','Show articles about sex, pornography and graphic abuse.','View image','Close image','View image and credits on the original article'])assert.ok(d[key],f+': '+key);}
 });
 
 test('image inspection refuses unloaded photos and blocked interactions',()=>{

@@ -205,3 +205,25 @@ test('a pause after Wikimedia rate-limits the browser does not stop filtered tra
   const pending=h.run('fillQueue()');h.requests[0]([]);await pending;
   assert.equal(h.directCalls,1,'direct Wikimedia calls still wait out the pause');
 });
+
+test('a Wikimedia outage on an online opening shows the reserve, then the starter set, instead of an empty feed',async()=>{
+  for(const reserve of [true,false]){
+    const h=harness();
+    if(reserve){h.add(batch(25,500));h.run('ensureFeedAhead()');h.persist();}
+    h.change('');
+    h.context.reply=new Response(null,{status:503,headers:{'Retry-After':'30'}});const reported=h.run(`noteWorkerCooldown(reply,fillGeneration,'wiki|en',{code:'upstream_unavailable'})`);
+    await reported;await h.fire(0);await tick();
+    const shown=[...h.state().articles,...h.state().queue];
+    assert.ok(shown.length>0,'cards are shown during the outage');
+    assert.equal(h.starterRequests,reserve?0:1,'the device reserve is preferred over the starter set');
+    if(reserve)assert.ok(shown.every(id=>Number(id.slice(1))>=500));
+  }
+});
+test('an outage report never replaces live cards or fires for non-upstream pauses',async()=>{
+  const h=harness();h.add(batch(20,1000));h.run('ensureFeedAhead()');
+  h.context.reply=new Response(null,{status:503});await h.run(`noteWorkerCooldown(reply,fillGeneration,'wiki|en',{code:'upstream_unavailable'})`);await h.fire(0);
+  assert.equal(h.starterRequests,0);
+  const fresh=harness();
+  fresh.context.reply=new Response(null,{status:429});await fresh.run(`noteWorkerCooldown(reply,fillGeneration,'wiki|en',{code:'work_rate_limited'})`);await fresh.fire(0);
+  assert.equal(fresh.starterRequests,0);assert.equal(fresh.nodes.length,0);
+});

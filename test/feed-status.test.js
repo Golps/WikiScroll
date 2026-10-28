@@ -33,7 +33,7 @@ test('changing feed clears the notice, and offline mode does not blame Wikimedia
 });
 test('a normal unfinished batch and stale reply do not create an upstream outage notice',async()=>{
  const start=source.indexOf('function retryAfterMillis('),end=source.indexOf('async function fetchWorkerBatch(',start);let waits=0;
- const c=vm.createContext({Date,curMode:'wiki',curLang:'en',fillGeneration:2,workerCooldownUntil:0,pendingWorkerBatch:null,WSFeedStatus:{waiting(){waits++;}}});
+ const c=vm.createContext({Date,curMode:'wiki',curLang:'en',fillGeneration:2,workerCooldownUntil:0,pendingWorkerBatch:null,articles:[{id:'w1'}],queue:[],WSFeedStatus:{waiting(){waits++;}}});
  vm.runInContext(source.slice(start,end),c);
  const response=code=>({status:503,headers:new Headers({'Retry-After':'2'}),json:async()=>({code})});
  await c.noteWorkerCooldown(response('batch_pending'),2,'wiki|en');assert.equal(waits,0);

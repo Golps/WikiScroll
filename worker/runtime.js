@@ -86,10 +86,12 @@ export function createNetwork(cooldowns = new Map(), strikes = new Map()) {
             if (response.status === 429 || response.status === 503 && response.headers.has('Retry-After')) {
               const ms = retryDelay(response.headers.get('Retry-After'));
               cooldowns.set(host, Date.now() + ms); work.fail('upstream_rate_limited', ms);
+              console.warn('Upstream paused', host, response.status, Math.round(ms / 1000) + 's');
               await response.body?.cancel().catch(() => {}); return null;
             }
             if (!response.ok) {
               const pause = response.status >= 500 ? strike(host) : 0;
+              console.warn('Upstream failed', host, response.status, pause ? 'paused ' + pause / 1000 + 's' : '');
               work.fail('upstream_unavailable', pause || 5000); await response.body?.cancel().catch(() => {}); return null;
             }
             const data = await response.json();
@@ -104,6 +106,7 @@ export function createNetwork(cooldowns = new Map(), strikes = new Map()) {
         } catch {
           // A refused connection counts toward the breaker; our own timeout does not.
           const pause = controller.signal.aborted ? 0 : strike(host);
+          if (!controller.signal.aborted) console.warn('Upstream unreachable', host, pause ? 'paused ' + pause / 1000 + 's' : '');
           work.fail('upstream_unavailable', pause || 5000); return null;
         }
         finally { clearTimeout(timer); }

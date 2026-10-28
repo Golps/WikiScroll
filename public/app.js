@@ -733,10 +733,12 @@ function loadStarterLibrary(gen) {
     return (data[mode]||[]).filter(validReserveArticle);
   });
 }
-function startStartupFallback(gen) {
+function startStartupFallback(gen,outage=false) {
   // Online visits wait for their own fresh draw. A quick shared starter or
   // restored batch would give different readers the same small opening pool.
-  if(navigator.onLine!==false)return Promise.resolve();
+  // Only a Wikimedia outage reported by the Worker opens it online: then a
+  // known reserve beats an empty feed, and live cards follow on recovery.
+  if(!outage&&navigator.onLine!==false)return Promise.resolve();
   return new Promise(resolve=>setTimeout(async()=>{
     try {
       if(gen!==fillGeneration||articles.length)return;
@@ -769,6 +771,7 @@ async function noteWorkerCooldown(response,gen,key,payload){
  try{code=(payload||await response.json()).code||'';}catch{}
  if(gen!==fillGeneration)return null;
  if(code.startsWith('upstream_'))globalThis.WSFeedStatus?.waiting();
+ if(code.startsWith('upstream_')&&!articles.length&&!queue.length)startStartupFallback(gen,true);
  const until=Date.now()+delay;
  if(response.status===429||code==='work_rate_limited')workerGlobalCooldownUntil=Math.max(workerGlobalCooldownUntil,until);
  else workerSourceCooldowns.set(key,Math.max(workerSourceCooldowns.get(key)||0,until));

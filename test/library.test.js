@@ -41,13 +41,14 @@ test('only the card-relevant page properties are kept',async()=>{
 });
 
 test('the category tree and photo requests are read on both categorylinks schemas',async()=>{
- const pages=table('page',['page_id','page_namespace','page_title'],[[100,14,'Lakes_of_Lithuania'],[101,14,'Lakes'],[200,1,'Lake_Example'],[300,0,'Lake_Example']]);
+ const pages=table('page',['page_id','page_namespace','page_title'],[[100,14,'Lakes_of_Lithuania'],[101,14,'Lakes'],[200,1,'Lake_Example'],[300,0,'Lake_Example'],[400,6,'Local_File.jpg']]);
  const old=await readCategoryLinks(table('categorylinks',['cl_from','cl_to','cl_type'],[[100,'Lakes','subcat'],[101,'Landforms','subcat'],[200,'Wikipedia_requested_photographs','page'],[300,'Lakes','page']]));
  const targets=await readLinkTargets(table('linktarget',['lt_id','lt_namespace','lt_title'],[[1,14,'Lakes'],[2,14,'Landforms'],[3,14,'Wikipedia_requested_photographs'],[4,10,'Infobox']]));
  assert.equal(targets.size,3,'only category targets are kept');
  const fresh=await readCategoryLinks(table('categorylinks',['cl_from','cl_type','cl_target_id'],[[100,'subcat',1],[101,'subcat',2],[200,'page',3],[300,'page',1]]),targets);
  for(const links of [old,fresh]){
-  const {children,photoTitles}=await readPages(pages,links);
+  const {children,photoTitles,localFiles}=await readPages(pages,links);
+  assert.deepEqual([...localFiles],['Local_File.jpg']);
   assert.deepEqual(children.get('Lakes'),['Lakes of Lithuania']);assert.deepEqual(children.get('Landforms'),['Lakes']);
   assert.deepEqual([...photoTitles],['Lake Example']);
  }
@@ -78,6 +79,9 @@ test('cards keep the Worker’s answer shape and refuse disambiguation, lists an
  assert.equal(card.id,'w5');assert.equal(card.url,'https://en.wikipedia.org/wiki/Lake_Example');assert.match(card.img,/\/wikipedia\/commons\/thumb\/.+\/960px-/);
  assert.ok(card.body.length<=BODY_CHARS+1&&card.body.length>600,'introductions keep the live feed’s length');
  assert.match(libraryCard(6,{namespace:0,title:'Film',opening_text:text},p).img,/\/wikipedia\/en\/thumb\//,'non-free lead images are local to English Wikipedia');
+ p.local=new Set(['Lake_Example.jpg']);
+ assert.match(libraryCard(5,{namespace:0,title:'Lake Example',opening_text:text},p).img,/\/wikipedia\/en\/thumb\//,'a free image uploaded to English Wikipedia itself is local');
+ assert.match(libraryCard(6,{namespace:0,title:'Film',opening_text:text},p).img,/\/wikipedia\/commons\/thumb\//,'with the file pages known, any other image is on Commons');
  assert.equal(libraryCard(7,{namespace:0,title:'No image',opening_text:text},p).img,'','an image is optional on the card itself');
  p.disambiguation.add(8);
  assert.equal(libraryCard(8,{namespace:0,title:'Mercury',opening_text:text},p),null);

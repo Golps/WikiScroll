@@ -192,15 +192,17 @@ export async function readCategoryLinks(lines, targets = null) {
   if (!('cl_to' in columns)) { need(columns, 'cl_target_id'); if (!targets) throw Error('categorylinks uses cl_target_id: pass --linktarget.'); }
   return {edges, photoTalk};
 }
-// Category page titles for the edges' children, and article titles for the photo requests.
+// Category page titles for the edges' children, article titles for the photo
+// requests, and the files uploaded to this wiki itself rather than Commons.
 export async function readPages(lines, {edges, photoTalk}) {
   const wanted = new Set();
   for (let i = 0; i < edges.length; i += 2) wanted.add(edges[i]);
-  const categories = new Map(), photoTitles = new Set();
+  const categories = new Map(), photoTitles = new Set(), localFiles = new Set();
   const columns = await readTable(lines, (row, c) => {
     const id = row[c.page_id], ns = row[c.page_namespace];
     if (ns === 14 && wanted.has(id)) categories.set(id, row[c.page_title]);
     else if (ns === 1 && photoTalk.has(id)) photoTitles.add(fromTitle(row[c.page_title]));
+    else if (ns === 6) localFiles.add(row[c.page_title]);
   });
   need(columns, 'page_id', 'page_namespace', 'page_title');
   const children = new Map();
@@ -210,7 +212,7 @@ export async function readPages(lines, {edges, photoTalk}) {
     const parent = fromTitle(edges[i + 1]), list = children.get(parent);
     if (list) list.push(fromTitle(child)); else children.set(parent, [fromTitle(child)]);
   }
-  return {children, photoTitles};
+  return {children, photoTitles, localFiles};
 }
 
 // Category title → [[topic, level]]: every category within three levels of a
@@ -264,7 +266,10 @@ export function libraryCard(pageid, doc, props, src = 'wiki', host = `${LANG}.wi
   if (isDisambiguation(page)) return null;
   const body = shorten(strip(doc.opening_text));
   if (src === 'how' ? !guideReadable(body) : body.length < 80) return null;
-  const img = imageURL(thumbURL(file, free ? 'commons' : (src === 'how' ? 'wikivoyage/' : 'wikipedia/') + LANG));
+  // A free image can still be a local upload, so the wiki's own file pages
+  // decide where it lives when they are known.
+  const local = props.local ? props.local.has(String(file).replace(/ /g, '_')) : !free;
+  const img = imageURL(thumbURL(file, local ? (src === 'how' ? 'wikivoyage/' : 'wikipedia/') + LANG : 'commons'));
   return {id: (src === 'how' ? 'v' : 'w') + pageid, src, title: doc.title, body, img, url: `https://${host}/wiki/${encodeURIComponent(doc.title.replace(/ /g, '_'))}`, ...(desc ? {desc} : {})};
 }
 
@@ -452,12 +457,24 @@ async function vitalLists() {
 async function checkImages(dir, manifest, sample = 100) {
   const set = 'wiki-en-3', shard = Math.floor(Math.random() * manifest.sets[set]);
   const cards = JSON.parse(zlib.gunzipSync(await fsp.readFile(path.join(dir, manifest.base, set, shard + '.json'))));
-  let ok = 0;
+  // Thumbnail servers rate-limit a datacenter IP (429) long before a reader's
+  // browser, so a 429 is retried once and then reported apart from failures.
+  const statuses = {}, broken = [];
   for (const card of cards.slice(0, sample)) {
-    try { if ((await fetch(card.img, {method: 'HEAD', headers: {'User-Agent': UA}, signal: AbortSignal.timeout(15000)})).ok) ok++; } catch {}
-    await new Promise(r => setTimeout(r, 200));
+    let status = 'error';
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const response = await fetch(card.img, {method: 'HEAD', headers: {'User-Agent': UA}, signal: AbortSignal.timeout(15000)});
+        status = response.status;
+        if (status !== 429) break;
+        await new Promise(r => setTimeout(r, Math.min(30, Number(response.headers.get('Retry-After')) || 5) * 1000));
+      } catch {}
+    }
+    statuses[status] = (statuses[status] || 0) + 1;
+    if (status !== 200 && status !== 429 && broken.length < 3) broken.push(`${status} ${card.img}`);
+    await new Promise(r => setTimeout(r, 1000));
   }
-  return {ok, checked: Math.min(sample, cards.length)};
+  return {ok: statuses[200] || 0, checked: Math.min(sample, cards.length), statuses, broken};
 }
 
 const option = name => { const i = process.argv.indexOf('--' + name); return i > 0 ? process.argv[i + 1] : undefined; };
@@ -484,11 +501,12 @@ if (process.argv[1] && import.meta.url === new URL(process.argv[1], 'file:').hre
     const links = await readCategoryLinks(sqlLines(option('categorylinks')), targets);
     log(`Category targets: ${targets ? targets.size : 'none (cl_to)'}; subcategory edges: ${links.edges.length / 2}; photo-request talk pages: ${links.photoTalk.size}`);
     targets?.clear();
-    const {children, photoTitles} = await readPages(sqlLines(option('page')), links);
+    const {children, photoTitles, localFiles} = await readPages(sqlLines(option('page')), links);
+    props.local = localFiles;
     const edgeCount = links.edges.length / 2;
     links.edges.length = 0;
     const reach = topicCategories(children);
-    log(`Categories with subcategories: ${children.size} of ${edgeCount} edges resolved; topic categories: ${reach.size}; photo requests: ${photoTitles.size}`);
+    log(`Categories with subcategories: ${children.size} of ${edgeCount} edges resolved; topic categories: ${reach.size}; photo requests: ${photoTitles.size}; local files: ${localFiles.size}`);
     children.clear();
     if (reach.size < MIN_TOPIC_CATEGORIES) throw Error(`Only ${reach.size} topic categories: the category tree was misread, keeping the current library.`);
     if (!photoTitles.size) log('Warning: no talk-page photo requests found; the Photos Help sets will be empty.');
@@ -505,6 +523,6 @@ if (process.argv[1] && import.meta.url === new URL(process.argv[1], 'file:').hre
     console.log(`Card library ${build}: ${result.pages} pages read, ${result.cards} articles in at least one set (${result.unknown} without readership), ${result.guides} travel guides.`);
     console.log(`${result.files} shards, ${(result.bytes / 1e9).toFixed(2)} GB: depth sets ${per(starts('wiki-'))}, topic sets ${per(s => s.startsWith('topic-') && !s.includes('-help-'))}, topic Help sets ${per(s => s.includes('-help-'))}, Help sets ${per(starts('help-'))}, travel ${per(starts('how-'))} shards.`);
     console.log('Cards per set: ' + SETS.map(set => `${set} ${result.counts[set]}`).join(', ') + `. Average daily views used: ${Math.round(dailyTotal)}.`);
-    console.log(`Image check: ${images.ok} of ${images.checked} sampled images loaded.`);
+    console.log(`Image check: ${images.ok} of ${images.checked} sampled images loaded (status counts ${JSON.stringify(images.statuses)}).` + (images.broken.length ? ' Broken: ' + images.broken.join(', ') : ''));
   } catch (error) { console.error(error.message); process.exitCode = 1; }
 }

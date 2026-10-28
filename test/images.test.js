@@ -36,6 +36,21 @@ test('visible image retries once, preserves fallback, and ignores detached eleme
  const detached=new h.Image();Object.assign(detached,{dataset:{fallback:'remove'},isConnected:false,getAttribute:()=> 'https://image/gone',remove:()=>removed++});
  h.handlers.get('error')({target:detached});h.tick(1500);assert.equal(detached.src,undefined);
 });
+test('a 960px thumbnail that keeps failing tries the 500px standard width, then the other upload folder, before the fallback',()=>{
+ const h=harness(),img=new h.Image();let removed=0,src='https://upload.wikimedia.org/wikipedia/commons/thumb/a/ab/Lake.jpg/960px-Lake.jpg';
+ Object.assign(img,{dataset:{fallback:'remove'},isConnected:true,getAttribute:()=>src,remove:()=>removed++});
+ Object.defineProperty(img,'src',{set(v){src=v;},get(){return src;}});
+ h.handlers.get('error')({target:img});h.tick(1500);
+ h.handlers.get('error')({target:img});assert.equal(removed,0);assert.equal(src,'https://upload.wikimedia.org/wikipedia/commons/thumb/a/ab/Lake.jpg/500px-Lake.jpg');
+ h.handlers.get('error')({target:img});assert.equal(removed,0);assert.equal(src,'https://upload.wikimedia.org/wikipedia/en/thumb/a/ab/Lake.jpg/500px-Lake.jpg','then the wiki’s own upload folder');
+ h.handlers.get('error')({target:img});assert.equal(removed,1,'then the card falls back to text');
+});
+test('a library image linked to the wrong upload folder tries the other one',()=>{
+ const h=harness(),img=new h.Image();let src='https://upload.wikimedia.org/wikipedia/en/thumb/2/2d/Chameleon.jpg/960px-Chameleon.jpg';
+ Object.assign(img,{dataset:{fallback:'remove',imageRetried:'1',imageSmaller:'1'},isConnected:true,getAttribute:()=>src,remove(){}});
+ Object.defineProperty(img,'src',{set(v){src=v;},get(){return src;}});
+ h.handlers.get('error')({target:img});assert.equal(src,'https://upload.wikimedia.org/wikipedia/commons/thumb/2/2d/Chameleon.jpg/960px-Chameleon.jpg');
+});
 test('a hung image releases its background slot after the deadline',()=>{
  const h=harness();h.run('preloadQueueImages()');h.tick(15000);
  assert.equal(h.run('imageLoads'),4);assert.equal(h.started.length,8);

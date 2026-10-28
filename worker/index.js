@@ -14,6 +14,7 @@ import {todayResponse} from './today.js';
 import {LANGS} from './languages.js';
 import {wantsMarkdown,htmlToMarkdown,markdownResponse} from './markdown.js';
 import {parsePlaces,parseCursor,formatCursor,namesPlace,interleave,fold,isPhrasebook,phrasebookParams,isDisambiguation,TRAVEL_STYLES,travelTerms,createPlaceResolver} from './travel.js';
+import {isMature} from './mature.js';
 /** WikiScroll Worker: explicit routing, static assets and article unfurls.
  * Handles article requests and social previews.
  * No GitHub integration, Pages runtime, KV or framework is required.
@@ -55,7 +56,7 @@ function apiURL(lang,mode,params) {
 function article(p,lang,mode) {
   // The short description ("species of beetle") labels the card's category.
   const desc=typeof p.description==='string'?strip(p.description).slice(0,160):'';
-  return {id:(mode==='how'?'v':'w')+p.pageid,src:mode,title:p.title,body:strip(p.extract),img:imageURL(p.thumbnail?.source),url:p.fullurl||`https://${lang}.${mode==='how'?'wikivoyage':'wikipedia'}.org/wiki/${encodeURIComponent(p.title.replace(/ /g,'_'))}`,...(desc?{desc}:{}),...(mode==='wiki'&&p.needs?.length?{needs:p.needs}:{})};
+  return {id:(mode==='how'?'v':'w')+p.pageid,src:mode,title:p.title,body:strip(p.extract),img:imageURL(p.thumbnail?.source),url:p.fullurl||`https://${lang}.${mode==='how'?'wikivoyage':'wikipedia'}.org/wiki/${encodeURIComponent(p.title.replace(/ /g,'_'))}`,...(desc?{desc}:{}),...(mode==='wiki'&&p.needs?.length?{needs:p.needs}:{}),...(mode==='wiki'&&isMature({title:p.title,description:desc,categories:p.categories})?{mature:1}:{})};
 }
 
 function shuffle(values) {

@@ -6,7 +6,9 @@ name: Card library
 on:
   schedule:
     # The search-index dump is published on Sundays around 12:00 UTC.
-    - cron: '41 5 * * 2'
+    - cron: '41 1 * * 1'
+    # Catch-up run for a late dump; it stops at once if that dump is already live.
+    - cron: '41 1 * * 2'
   workflow_dispatch:
     inputs:
       upload:
@@ -38,10 +40,14 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 345
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
           node-version-file: .nvmrc
+          # pnpm is installed in a later step.
+          package-manager-cache: false
       - name: Install parallel bzip2
         run: sudo apt-get install -y -qq lbzip2
       - name: Find the newest complete English dump
@@ -53,6 +59,9 @@ jobs:
             files=$(curl -fsSL -A "$UA" "$base/$date/index_name=enwiki_content/" | grep -oE 'href="[^"]+\.json\.bz2"' | sed -E 's/^href="(.*)"$/\1/' | sed -E 's#^.*/##' | sort -V || true)
             if [ -n "$files" ]; then
               echo "date=$date" >> "$GITHUB_OUTPUT"
+              # A forced rebuild of a live dump gets its own folder: shards are cached
+              # for a year, so changed cards must never reuse a published path.
+              if [ "${{ inputs.force }}" = "true" ]; then echo "build=$date-${{ github.run_number }}" >> "$GITHUB_OUTPUT"; else echo "build=$date" >> "$GITHUB_OUTPUT"; fi
               printf '%s\n' $files > "$RUNNER_TEMP/files.txt"
               echo "Dump $date: $(wc -l < "$RUNNER_TEMP/files.txt") files."
               exit 0
@@ -63,28 +72,68 @@ jobs:
         id: live
         run: |
           set -euo pipefail
-          if [ -n "$R2_ENDPOINT" ] && [ "${{ inputs.force }}" != "true" ]; then
-            live=$(aws s3 cp "s3://$R2_BUCKET/v1/en/current.json" - --endpoint-url "$R2_ENDPOINT" 2>/dev/null | gunzip | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{console.log(JSON.parse(s).build)}catch{}})' || true)
+          if [ -z "$R2_ENDPOINT" ]; then echo "No R2 secrets: the build will run without uploading."; exit 0; fi
+          # Fails the job on a wrong key or bucket before hours of building.
+          aws s3api head-bucket --bucket "$R2_BUCKET" --endpoint-url "$R2_ENDPOINT"
+          echo "R2 access confirmed."
+          if [ "${{ inputs.force }}" != "true" ] && aws s3api head-object --bucket "$R2_BUCKET" --key v1/en/current.json --endpoint-url "$R2_ENDPOINT" > /dev/null 2>&1; then
+            live=$(aws s3 cp "s3://$R2_BUCKET/v1/en/current.json" - --endpoint-url "$R2_ENDPOINT" | gunzip | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{const m=JSON.parse(s);console.log(m.source?.cirrus||m.build)}catch{}})')
             if [ "$live" = "${{ steps.dump.outputs.date }}" ]; then echo "skip=true" >> "$GITHUB_OUTPUT"; echo "Dump ${{ steps.dump.outputs.date }} is already live."; fi
           fi
-      - name: Download page properties
+      - name: Make room on the runner
         if: steps.live.outputs.skip != 'true'
-        run: curl -fsSL --retry 5 -A "$UA" -o "$RUNNER_TEMP/page_props.sql.gz" "$DUMPS/enwiki/latest/enwiki-latest-page_props.sql.gz"
+        # Preinstalled toolchains this job never uses; the dumps and buckets need the space.
+        run: sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL && df -h "$RUNNER_TEMP" | tail -n 1
+      - name: Download page tables and Wikivoyage
+        if: steps.live.outputs.skip != 'true'
+        run: |
+          set -euo pipefail
+          get() { curl -fsSL --retry 8 --retry-all-errors --retry-delay 10 -C - -A "$UA" -o "$2" "$1"; }
+          for table in page_props page categorylinks; do get "$DUMPS/enwiki/latest/enwiki-latest-$table.sql.gz" "$RUNNER_TEMP/$table.sql.gz"; done
+          # The image table names files uploaded to English Wikipedia itself (optional).
+          if curl -fsIL -A "$UA" "$DUMPS/enwiki/latest/enwiki-latest-image.sql.gz" > /dev/null; then get "$DUMPS/enwiki/latest/enwiki-latest-image.sql.gz" "$RUNNER_TEMP/image.sql.gz"; fi
+          # Newer dumps name category targets through linktarget instead of cl_to.
+          if curl -fsIL -A "$UA" "$DUMPS/enwiki/latest/enwiki-latest-linktarget.sql.gz" > /dev/null; then get "$DUMPS/enwiki/latest/enwiki-latest-linktarget.sql.gz" "$RUNNER_TEMP/linktarget.sql.gz"; fi
+          get "$DUMPS/enwikivoyage/latest/enwikivoyage-latest-page_props.sql.gz" "$RUNNER_TEMP/voyage_props.sql.gz"
+          base="$DUMPS/other/cirrus_search_index/${{ steps.dump.outputs.date }}/index_name=enwikivoyage_content"
+          : > "$RUNNER_TEMP/voyage.ndjson"
+          for file in $(curl -fsSL -A "$UA" "$base/" | grep -oE 'href="[^"]+\.json\.bz2"' | sed -E 's/^href="(.*)"$/\1/' | sed -E 's#^.*/##' | sort -V); do
+            get "$base/$file" "$RUNNER_TEMP/voyage-part.json.bz2"; lbzip2 -dc "$RUNNER_TEMP/voyage-part.json.bz2" >> "$RUNNER_TEMP/voyage.ndjson"; rm -f "$RUNNER_TEMP/voyage-part.json.bz2"
+          done
+          ls -la "$RUNNER_TEMP"/*.sql.gz "$RUNNER_TEMP/voyage.ndjson"
       - name: Build the library
         if: steps.live.outputs.skip != 'true'
         run: |
           set -euo pipefail
           base="$DUMPS/other/cirrus_search_index/${{ steps.dump.outputs.date }}/index_name=enwiki_content"
           mkdir -p "$RUNNER_TEMP/library"
-          while read -r file; do curl -fsSL --retry 5 -A "$UA" "$base/$file" | lbzip2 -dc; done < "$RUNNER_TEMP/files.txt" \
-            | node --max-old-space-size=12288 scripts/build-library.mjs --build "${{ steps.dump.outputs.date }}" \
-                --page-props "$RUNNER_TEMP/page_props.sql.gz" --out "$RUNNER_TEMP/library" --tmp "$RUNNER_TEMP" \
+          linktarget=(); if [ -f "$RUNNER_TEMP/linktarget.sql.gz" ]; then linktarget=(--linktarget "$RUNNER_TEMP/linktarget.sql.gz"); fi
+          images=(); if [ -f "$RUNNER_TEMP/image.sql.gz" ]; then images=(--images "$RUNNER_TEMP/image.sql.gz"); fi
+          # Each part is downloaded in full (resuming after a dropped connection)
+          # before it is decompressed: the dump servers close streams that wait
+          # on a slow reader. The next part downloads while this one is read,
+          # so at most two parts are on disk at a time.
+          get() { curl -fsSL --retry 8 --retry-all-errors --retry-delay 10 -C - -A "$UA" -o "$2" "$1" >&2; }
+          mapfile -t files < "$RUNNER_TEMP/files.txt"
+          {
+            get "$base/${files[0]}" "$RUNNER_TEMP/part-0.json.bz2"
+            for i in "${!files[@]}"; do
+              next=$((i + 1)); fetch=""
+              if [ "$next" -lt "${#files[@]}" ]; then get "$base/${files[$next]}" "$RUNNER_TEMP/part-$next.json.bz2" & fetch=$!; fi
+              lbzip2 -dc "$RUNNER_TEMP/part-$i.json.bz2"; rm -f "$RUNNER_TEMP/part-$i.json.bz2"
+              if [ -n "$fetch" ]; then wait "$fetch"; fi
+            done
+          } \
+            | node --max-old-space-size=12288 scripts/build-library.mjs --build "${{ steps.dump.outputs.build }}" \
+                --page-props "$RUNNER_TEMP/page_props.sql.gz" --page "$RUNNER_TEMP/page.sql.gz" --categorylinks "$RUNNER_TEMP/categorylinks.sql.gz" "${linktarget[@]}" "${images[@]}" \
+                --voyage "$RUNNER_TEMP/voyage.ndjson" --voyage-props "$RUNNER_TEMP/voyage_props.sql.gz" \
+                --out "$RUNNER_TEMP/library" --tmp "$RUNNER_TEMP" \
             | tee -a "$GITHUB_STEP_SUMMARY"
       - name: Upload, then switch the site to the new build
         if: steps.live.outputs.skip != 'true' && env.R2_ENDPOINT != '' && inputs.upload != false
         run: |
           set -euo pipefail
-          build="${{ steps.dump.outputs.date }}"
+          build="${{ steps.dump.outputs.build }}"
           aws configure set default.s3.max_concurrent_requests 32
           # Shards never change once uploaded; the manifest is re-read every few minutes.
           aws s3 sync "$RUNNER_TEMP/library/$build" "s3://$R2_BUCKET/v1/en/$build" --endpoint-url "$R2_ENDPOINT" --only-show-errors \

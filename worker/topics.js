@@ -22,7 +22,7 @@ const shuffle=a=>{a=[...a];for(let i=a.length-1;i>0;i--){const j=Math.floor(Math
 const lists=new Map(),pending=new Map(),translatedRoots=new Map(),progress=new Map();
 const openingCache=createOpeningCache();
 const FRESH_MS=120_000,RETAIN_SECONDS=86_400,CATEGORY_MS=15*60_000;
-const bands={1:[300,Infinity],2:[100,500],3:[10,300],4:[5,60],5:[0,10]};
+export const bands={1:[300,Infinity],2:[100,500],3:[10,300],4:[5,60],5:[0,10]};
 function readyArticles(chosen,topic,lang){
  return chosen.filter(p=>!p.extractMissing&&typeof p.extract==='string'&&p.extract.length>=80).map(p=>({id:'w'+p.pageid,src:'wiki',...(topic==='help'?{}:{topic}),...(p.needs?.length?{needs:p.needs}:{}),title:p.title,body:p.extract,img:imageURL(p.thumbnail?.source),url:p.fullurl||`https://${lang}.wikipedia.org/wiki/${encodeURIComponent(p.title.replace(/ /g,'_'))}`}));
 }

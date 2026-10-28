@@ -935,53 +935,6 @@ dialog.privacy-dialog::backdrop {
   }
 }
 
-.hint {
-  z-index: 100;
-  left: 50%;
-  bottom: max(26px,calc(env(safe-area-inset-bottom) + 12px));
-  pointer-events: none;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  animation: .4s .3s both hshow, 2s .7s infinite hbounce;
-  display: none;
-  position: fixed;
-}
-
-@keyframes hshow {
-  0% {
-    opacity: 0;
-  }
-
-  to {
-    opacity: 1;
-  }
-}
-
-@keyframes hbounce {
-  0%, to {
-    transform: translate(-50%) translateY(0);
-  }
-
-  50% {
-    transform: translate(-50%) translateY(-8px);
-  }
-}
-
-.hint-txt {
-  color: var(--dim);
-  letter-spacing: .4px;
-  font-size: 11px;
-}
-
-.hint-arr {
-  border-right: 2px solid var(--dim);
-  border-bottom: 2px solid var(--dim);
-  width: 16px;
-  height: 16px;
-  transform: rotate(45deg);
-}
-
 .ptr-indicator {
   z-index: 150;
   -webkit-backdrop-filter: blur(12px);
@@ -1884,11 +1837,6 @@ body.light .badge {
   background: #667eea;
 }
 
-body.light .hint-txt, .light .hint-arr {
-  color: #00000059;
-  border-color: #00000059;
-}
-
 body.light .spin-lbl {
   color: #0006;
 }
@@ -2699,7 +2647,7 @@ body.light .map-pin-ring {
 .week-day-cell {
   aspect-ratio: 1;
   background: #ffffff0d;
-  border-radius: 5px;
+  border-radius: 6px;
   width: 100%;
   transition: background .3s;
 }

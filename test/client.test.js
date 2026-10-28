@@ -147,3 +147,32 @@ test('an existing feed may still scan cache-only reserves before the upstream pa
  let delay;const c=vm.createContext({Date:{now:()=>100000},setTimeout:(_,d)=>{delay=d;return 1;},navigator:{onLine:true},document:{hidden:false},curMode:'wiki',fillGeneration:0,workerCooldownUntil:134000,pendingWorkerBatch:{cacheRecovery:true,cachedScan:0},articles:[{id:'w1'}],queue:[],QUEUE_MIN:72});
  vm.runInContext(source.slice(start,end)+'\nscheduleRefill();',c);assert.equal(delay,700);
 });
+
+
+test('startup explains an upstream failure during cooldown while preserving automatic recovery',async()=>{
+ const boot=source.slice(source.indexOf('async function boot()'),source.indexOf('function resetFeed()',source.indexOf('async function boot()')));
+ for(const mode of ['wiki','how']){
+  let removed=0,errors=0,retries=0;
+  const c=vm.createContext({URLSearchParams,Promise,Date,location:{search:''},console,
+   document:{getElementById:()=>({remove(){removed++;}})},
+   startStartupFallback:async()=>{},fillQueue:async()=>{},ensureFeedAhead(){},
+   showError(){errors++;},scheduleRefill(){retries++;}});
+  vm.runInContext(`let fillGeneration=1,articles=[],curMode='${mode}',workerCooldownUntil=Date.now()+180000;${boot}`,c);
+  await c.boot();
+  assert.equal(removed,1,mode+' stops the indefinite spinner');
+  assert.equal(errors,1,mode+' explains why no cards arrived');
+  assert.equal(retries,1,mode+' keeps automatic recovery scheduled');
+  assert.ok(vm.runInContext('workerCooldownUntil>Date.now()',c),'the upstream cooldown is preserved');
+ }
+});
+
+test('a startup response from an old feed cannot replace the new feed with an error',async()=>{
+ const boot=source.slice(source.indexOf('async function boot()'),source.indexOf('function resetFeed()',source.indexOf('async function boot()')));
+ let resolve,errors=0;const pending=new Promise(r=>{resolve=r;});
+ const c=vm.createContext({URLSearchParams,Promise,Date,location:{search:''},console,
+  document:{getElementById(){throw Error('Old startup must not remove the new spinner');}},
+  startStartupFallback:async()=>{},fillQueue:()=>pending,ensureFeedAhead(){throw Error('Stale response');},
+  showError(){errors++;},scheduleRefill(){throw Error('Stale retry');}});
+ vm.runInContext(`let fillGeneration=1,articles=[],workerCooldownUntil=Date.now()+180000;${boot}`,c);
+ const first=c.boot();vm.runInContext('fillGeneration++',c);resolve();await first;assert.equal(errors,0);
+});

@@ -13,7 +13,7 @@ concurrency:
 jobs:
   refresh:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -31,5 +31,14 @@ jobs:
         run: |
           git add public/data/starter
           if git diff --cached --quiet; then echo "Pool unchanged."; exit 0; fi
-          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'Refresh starter pool'
-          git push
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'Refresh starter pool'
+          # The build takes about half an hour, so main often moves meanwhile.
+          # Replay the pool on top of it and test again before each push.
+          for attempt in 1 2 3; do
+            git push && exit 0
+            git pull --rebase origin main
+            pnpm test
+          done
+          exit 1

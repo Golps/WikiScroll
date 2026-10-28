@@ -72,7 +72,7 @@ html.i18n-pending body { visibility: hidden; }
 .travel-info { position: relative; display: inline-grid; place-items: center; width: 18px; height: 18px; padding: 0; border: 1px solid currentColor; border-radius: 50%; background: none; color: var(--muted); font: italic 600 11px/1 var(--serif); cursor: pointer; }
 .travel-info::after { content: ''; position: absolute; inset: -13px; }
 .travel-info[aria-expanded="true"] { background: var(--accent-solid); border-color: var(--accent-solid); color: #fff; }
-.travel-help { margin: 6px 0 8px; padding: 10px 12px; border: 1px solid var(--rule); border-radius: 2px; background: var(--surface); }
+.travel-help { margin: 6px 0 8px; padding: 10px 12px; border: 1px solid var(--rule); border-radius: 12px; background: var(--surface); }
 .travel-filters .travel-help p { margin: 0 0 6px; }
 .travel-filters .travel-help p:last-child { margin-bottom: 0; }
 /* End of a travel filter's results: one action per line. */
@@ -95,7 +95,7 @@ html.i18n-pending body { visibility: hidden; }
 
 /* A failed feed request should explain the wait without covering the reader. */
 .feed-waiting .err { background: none; border-color: transparent; }
-.feed-waiting .err-ttl { text-wrap: balance; font-size: clamp(24px, 5.8vw, 30px); line-height: 1.2; }
+.feed-waiting .err-ttl, body.light .feed-waiting .err-ttl { text-wrap: balance; font-size: clamp(24px, 5.8vw, 30px); line-height: 1.2; }
 .feed-waiting-saved { margin: 20px 0 0; color: var(--muted); font-size: 12px; line-height: 1.6; }
 .feed-service-status { position: fixed; z-index: 6; left: 50%; top: 128px; transform: translate(-50%, -6px); width: max-content; max-width: min(420px, calc(100% - 32px)); display: flex; flex-wrap: wrap; justify-content: center; gap: 2px 10px; padding: 8px 14px; border: 1px solid var(--rule); border-radius: 12px; background: color-mix(in srgb, var(--surface) 92%, transparent); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); box-shadow: 0 6px 20px #0004; color: var(--muted); text-align: center; font: 400 12px/1.5 var(--sans); opacity: 0; visibility: hidden; pointer-events: none; transition: opacity .22s ease, transform .22s ease, visibility .22s ease; }
 .feed-service-status.visible { transform: translate(-50%, 0); opacity: 1; visibility: visible; }

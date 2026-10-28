@@ -61,7 +61,7 @@ button.hi{display:block;width:100%;font:inherit;color:inherit;text-align:start;c
 .topic-sheet-header{display:flex;align-items:center;justify-content:space-between;gap:20px}
 .topic-close{display:none}
 @media(min-width:768px){
- #topicSheet,body.light #topicSheet{box-sizing:border-box;top:0;right:0;bottom:auto;left:auto;width:min(480px,100vw);height:var(--vh);max-height:none;padding:max(38px,env(safe-area-inset-top)) 30px max(32px,env(safe-area-inset-bottom));border:0;border-left:1px solid var(--rule);border-radius:0;overflow-y:auto;opacity:0;visibility:hidden;pointer-events:none;transform:translate3d(102%,0,0);transition:transform .24s cubic-bezier(.22,.68,0,1),opacity .18s ease,visibility 0s .24s}
+ #topicSheet,body.light #topicSheet{box-sizing:border-box;top:0;right:0;bottom:auto;left:auto;width:min(480px,100vw);height:var(--vh);max-height:none;padding:max(38px,env(safe-area-inset-top)) 30px max(32px,env(safe-area-inset-bottom));border:0;border-left:1px solid var(--rule);border-radius:20px 0 0 20px;overflow-y:auto;opacity:0;visibility:hidden;pointer-events:none;transform:translate3d(102%,0,0);transition:transform .24s cubic-bezier(.22,.68,0,1),opacity .18s ease,visibility 0s .24s}
  #topicSheet.open,body.light #topicSheet.open{bottom:auto;opacity:1;visibility:visible;pointer-events:auto;transform:translate3d(0,0,0);transition:transform .28s cubic-bezier(.22,.68,0,1),opacity .22s ease,visibility 0s}
  #topicSheet .sheet-handle{display:none}
  #topicSheet .topic-sheet-header{border-bottom:1px solid var(--rule);margin-bottom:18px;padding-bottom:20px;min-height:44px}
@@ -69,9 +69,7 @@ button.hi{display:block;width:100%;font:inherit;color:inherit;text-align:start;c
  #topicSheet .sheet-sub{margin-bottom:22px}
  #topicSheet .topic-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
  #topicSheet .topic-chip{justify-content:flex-start;width:100%}
- #topicSheet .sheet-reset{width:100%;min-height:44px;margin-top:22px}
- #topicSheet .topic-close{display:grid;place-items:center;flex:none;width:44px;height:44px;padding:0;border:1px solid var(--rule);border-radius:2px;background:transparent;color:var(--muted);font-size:18px;cursor:pointer}
- #topicSheet .topic-close:hover{color:var(--ink);background:var(--surface-alt)}
+ #topicSheet .sheet-reset{width:100%;min-height:44px;margin-top:22px;border-radius:12px}
 }
 
 @media(prefers-reduced-motion:reduce){#lp,#hp,#topicSheet,.sheet-overlay,.sp-backdrop{animation:none!important;transition:none!important}}
@@ -118,9 +116,6 @@ button.hi{display:block;width:100%;font:inherit;color:inherit;text-align:start;c
  #settingsPanel .sp-history-action strong{font-size:14px;line-height:1.4}
  #settingsPanel .sp-history-action small{font-size:12px;line-height:1.4}
  #settingsPanel .sp-history-arrow{border:0;width:20px;height:24px;font-size:24px}
- #settingsPanel .toggle-sw{width:44px;height:26px;border-radius:999px;flex-shrink:0}
- #settingsPanel .toggle-sw:after{width:20px;height:20px;top:3px;left:3px;border-radius:50%;background:#fff}
- #settingsPanel .toggle-sw.on:after{transform:translateX(18px)}
  #settingsPanel .sp-x{display:grid;place-items:center;width:40px;height:40px;border-radius:12px;background:var(--surface-alt)}
  #settingsPanel .sp-about{padding:18px;border-radius:12px}
 }
@@ -214,7 +209,7 @@ body.light #likedList .li-btn[data-unlike]{border-color:#c23b3b;color:#c23b3b}
  .lp-x .panel-done,.hp-x .panel-done,.topic-close .panel-done{display:inline}
  #topicSheet .topic-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
  #topicSheet .topic-chip{justify-content:flex-start;width:100%}
- #topicSheet .sheet-reset{width:100%;min-height:44px;margin-top:22px;border-radius:12px}
+ #topicSheet .sheet-reset{width:100%;min-height:44px;margin-top:22px}
 }
 
 /* Saved actions: icon above label on one centre line, so all four read as a matched set. */
@@ -242,4 +237,4 @@ body.how,body.light.how{--accent:var(--voyage);--accent-solid:var(--voyage-solid
 body.light #likedList .li-btn[data-uncollect]{border-color:#c23b3b;color:#c23b3b}
 #likedList .li-btn[data-uncollect]:hover{background:color-mix(in srgb,#e87070,transparent 90%)}
 /* Wider screens: every drawer closes with the same rounded button as Settings. */
-@media(min-width:768px){body #lp .lp-x,body #hp .hp-x,body #topicSheet .topic-close{display:grid;place-items:center;width:40px;height:40px;padding:0;border:1px solid var(--rule);border-radius:12px;background:var(--surface-alt);color:var(--muted)}body #lp .lp-x:hover,body #hp .hp-x:hover,body #topicSheet .topic-close:hover{color:var(--ink);border-color:var(--accent)}}
+@media(min-width:768px){body #lp .lp-x,body #hp .hp-x,body #topicSheet .topic-close{display:grid;place-items:center;width:40px;height:40px;padding:0;border:1px solid var(--rule);border-radius:12px;background:var(--surface-alt);color:var(--muted);font-size:18px;cursor:pointer}body #lp .lp-x:hover,body #hp .hp-x:hover,body #topicSheet .topic-close:hover{color:var(--ink);border-color:var(--accent)}}

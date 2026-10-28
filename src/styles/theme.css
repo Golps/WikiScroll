@@ -933,11 +933,11 @@ body.light, body.light.how {
   box-shadow: 0 18px 70px #0004;
 }
 
-.sp-row-label, .burger-row-label {
+.sp-row-label, .burger-row-label, body.light .sp-row-label, body.light .burger-row-label {
   font: 600 16px/1.5 var(--sans);
 }
 
-.sp-row-sub, .burger-row-sub, .sp-about-body {
+.sp-row-sub, .burger-row-sub, .sp-about-body, body.light .sp-row-sub, body.light .burger-row-sub, body.light .sp-about-body {
   font: 400 14px/1.6 var(--sans);
 }
 

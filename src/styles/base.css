@@ -2647,7 +2647,7 @@ body.light .map-pin-ring {
 .week-day-cell {
   aspect-ratio: 1;
   background: #ffffff0d;
-  border-radius: 5px;
+  border-radius: 6px;
   width: 100%;
   transition: background .3s;
 }

@@ -32,7 +32,7 @@ const QUEUE_MIN = 60, QUEUE_TARGET = 100, CARDS_AHEAD = 16;
 - **Rendering is bounded.** At most 16 cards are rendered ahead of the current one. Images for the next 24 queued articles are preloaded into an in-memory cache of 100 images.
 - **Refills are bounded.** A refill makes at most 5 requests and stops at 100 queued articles. Concurrent refill calls share the same task instead of starting new ones.
 - **Retries back off.** When the queue falls below 60, a refill is scheduled with exponential backoff (700 ms × 1.6ⁿ, capped at 10 s). Retries pause while the tab is hidden or offline, and restart when the connection returns.
-- **Independent online openings, cached offline openings.** Online starts wait for their own fresh draw. A slow response never substitutes a shared starter pool or a previously restored batch; only a Wikimedia failure or pause lets the Worker answer from retained shared batches (see *Outage answers* in section 5). Offline starts immediately use an exact-settings reserve (up to 7 days old) or the eligible bundled English starter set. Offline content is reshuffled with recently unviewed cards first; a late fallback never replaces live cards or enters a switched feed. Explicit filters are never replaced by generic English content.
+- **Independent online openings, cached offline openings.** Online starts wait for their own fresh draw. A slow response never substitutes a shared starter pool or a previously restored batch; only a Wikimedia failure or pause lets the Worker answer from retained shared batches (see *Outage answers* in section 5). If the Worker reports such an outage (`upstream_*`) and the feed is still empty, the browser shows the exact-settings reserve or the eligible starter set, as it does offline; live cards follow once the pause ends. Offline starts immediately use an exact-settings reserve (up to 7 days old) or the eligible bundled English starter set. Offline content is reshuffled with recently unviewed cards first; a late fallback never replaces live cards or enters a switched feed. Explicit filters are never replaced by generic English content.
 
 ## 2. Random discovery without repeats
 
@@ -125,7 +125,7 @@ if (valid && age < RETAIN_SECONDS*1000) {
 }
 ```
 
-During a Wikimedia outage, readers keep getting the last good batch while refresh attempts continue in the background. Empty results are never cached.
+During a Wikimedia outage, readers keep getting the last good batch while refresh attempts continue in the background. Empty results are never cached. Each upstream failure or pause is logged with only its host, status and pause length, so Workers Observability shows why a feed was empty.
 
 ## 5. Deadlines, rate limits and retries
 

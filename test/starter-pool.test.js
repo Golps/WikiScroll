@@ -60,21 +60,23 @@ test('a thin week fails the build instead of shipping a small pool',async()=>{
  assert.ok(MINIMUM>=100);
 });
 test('a full build against a fake Wikimedia fills every set and packs valid shards',async()=>{
- let next=1;const views=[1,5,15,500],pages=new Map();
+ // Random draws repeat pages across rounds, and some Known titles redirect to
+ // Popular articles, as on the real wikis; no card may land in two sets.
+ let next=1,draw=0;const views=[1,5,15,500],pages=new Map(),titleIds=new Map();
  const page=(id,title)=>({pageid:id,ns:0,title,extract:`${title} is a subject with a readable introduction. `.repeat(6),description:'a subject',thumbnail:{source:`https://upload.wikimedia.org/wikipedia/commons/thumb/a/a${id}/F.jpg/320px-F.jpg`},fullurl:'https://en.wikipedia.org/wiki/'+encodeURIComponent(title.replace(/ /g,'_'))});
  const http={calls:0,async json(url){
   this.calls++;const u=new URL(url),q=Object.fromEntries(u.searchParams);
   if(q.prop==='links'){const level=q.titles.includes('Level 3')?3:4,n=level===3?600:300;return {query:{pages:{1:{links:Array.from({length:n},(_,i)=>({title:`L${level} ${q.titles.split('/').pop()} ${i}`}))}}}};}
   if(q.generator==='random'&&u.hostname==='en.wikivoyage.org')return {query:{pages:Object.fromEntries(Array.from({length:20},()=>{const id=next++;return [id,{...page(id,'Town '+id),fullurl:'https://en.wikivoyage.org/wiki/Town_'+id}];}))}};
-  if(q.generator==='random')return {query:{pages:Object.fromEntries(Array.from({length:50},()=>{const id=next++,p=page(id,'Random '+id);pages.set(id,p);return [id,{pageid:id,title:p.title,thumbnail:p.thumbnail}];}))}};
+  if(q.generator==='random')return {query:{pages:Object.fromEntries(Array.from({length:50},()=>{const id=100000+(draw++*7919)%3000,p=page(id,'Random '+id);pages.set(id,p);return [id,{pageid:id,title:p.title,thumbnail:p.thumbnail}];}))}};
   if(q.prop==='pageviews')return {query:{pages:Object.fromEntries(q.pageids.split('|').map(id=>[id,{pageviews:{'2026-10-26':views[id%4],'2026-10-27':views[id%4]}}]))}};
   if(q.pageids)return {query:{pages:Object.fromEntries(q.pageids.split('|').map(id=>[id,pages.get(Number(id))]))}};
-  if(q.titles)return {query:{pages:Object.fromEntries(q.titles.split('|').map(t=>{const id=next++;return [id,page(id,t)];}))}};
+  if(q.titles)return {query:{pages:Object.fromEntries(q.titles.split('|').map(t=>{const key=t.startsWith('L4')&&t.endsWith('7')?t.replace(/^L4 \S+/,'L3 Level 3'):t;if(!titleIds.has(key))titleIds.set(key,next++);const id=titleIds.get(key);return [id,page(id,key)];}))}};
   return null;
  }};
  const {sets}=await buildPool(http);
  for(const set of SETS){assert.ok(sets[set].length>=MINIMUM,set+' '+sets[set].length);assert.ok(sets[set].every(c=>validCard(c,set.startsWith('how')?'how':'wiki')));}
- const level3=new Set(sets['wiki-en-1'].map(c=>c.title));assert.ok(sets['wiki-en-2'].every(c=>!level3.has(c.title)),'Known excludes Popular');
+ const ids=Object.values(sets).flat().map(c=>c.id);assert.equal(new Set(ids).size,ids.length,'every card belongs to exactly one set');
  const {files,index}=pack(sets);
  assert.ok(Object.values(index).every(n=>n===TARGET/SHARD_SIZE));
  assert.ok(Object.values(files).every(cards=>cards.length===SHARD_SIZE));

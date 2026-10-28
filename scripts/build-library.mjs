@@ -64,6 +64,8 @@ export const MAX_FILES = 190_000, MAX_BYTES = 4.5e9;
 // The category walk reaches hundreds of thousands of categories; far fewer
 // means the tree was misread, so the build stops before reading articles.
 export const MIN_TOPIC_CATEGORIES = 5000;
+// Share of answered image links that may fail in the sample before a build is refused.
+export const MAX_BROKEN_IMAGES = 0.05;
 const UA = 'WikiScroll-card-library/1.0 (https://wikiscroll.com; contact@wikiscroll.com)';
 const IMAGE = /\.(jpe?g|png|gif|svg|webp)$/i;
 const BAD_TITLE = /^(list of|lists of|index of|outline of|timeline of|glossary of|comparison of)\b/i;
@@ -524,5 +526,9 @@ if (process.argv[1] && import.meta.url === new URL(process.argv[1], 'file:').hre
     console.log(`${result.files} shards, ${(result.bytes / 1e9).toFixed(2)} GB: depth sets ${per(starts('wiki-'))}, topic sets ${per(s => s.startsWith('topic-') && !s.includes('-help-'))}, topic Help sets ${per(s => s.includes('-help-'))}, Help sets ${per(starts('help-'))}, travel ${per(starts('how-'))} shards.`);
     console.log('Cards per set: ' + SETS.map(set => `${set} ${result.counts[set]}`).join(', ') + `. Average daily views used: ${Math.round(dailyTotal)}.`);
     console.log(`Image check: ${images.ok} of ${images.checked} sampled images loaded (status counts ${JSON.stringify(images.statuses)}).` + (images.broken.length ? ' Broken: ' + images.broken.join(', ') : ''));
+    // Rate-limited or unreachable checks prove nothing either way; links that
+    // answered must almost all load, or a systematic link bug stops the upload.
+    const answered = images.checked - (images.statuses[429] || 0) - (images.statuses.error || 0), broken = answered - images.ok;
+    if (answered >= 20 && broken > answered * MAX_BROKEN_IMAGES) throw Error(`${broken} of ${answered} sampled image links are broken, keeping the current library.`);
   } catch (error) { console.error(error.message); process.exitCode = 1; }
 }

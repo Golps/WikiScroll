@@ -17,7 +17,7 @@ The card library is a prebuilt set of English Wikipedia and Wikivoyage cards sto
    - Every set is shuffled across all of its cards and packed into gzipped shards of 100. Topic and Help sets keep a random sample of up to `SLICE_CAP` (40,000) cards each and topic-with-Help sets up to `COMBO_CAP` (10,000); the depth and travel sets keep every card.
 4. Uploads the shards under `v1/en/<dump date>/<set>/<n>.json`, then writes `v1/en/current.json`, which points readers at the new build. After that, it deletes the previous build.
 
-A thin build (fewer cards than `MINIMUM`), a failed download or a missing upstream list fails the job before anything is uploaded, and the current library keeps serving.
+A thin build (fewer cards than `MINIMUM`), a misread table, a failed download, a missing upstream list, or more than 5% broken links among the sampled images that answered (rate-limited checks are ignored) fails the job before anything is uploaded, and the current library keeps serving.
 
 ## How the site reads it
 

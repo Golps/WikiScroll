@@ -19,6 +19,10 @@ on:
         description: Rebuild even if this dump is already live
         type: boolean
         default: false
+      probe_images:
+        description: Only check how built image links load (temporary diagnostic)
+        type: boolean
+        default: false
 permissions:
   contents: read
 concurrency:
@@ -44,6 +48,25 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version-file: .nvmrc
+      - name: Probe image links
+        if: inputs.probe_images == true
+        run: |
+          cat > "$RUNNER_TEMP/probe.mjs" <<'JS'
+          import {thumbURL} from './scripts/build-library.mjs';
+          import {imageURL} from './worker/supply.js';
+          const UA = process.env.UA, api = 'https://en.wikipedia.org/w/api.php?format=json&formatversion=2&action=query&generator=random&grnnamespace=0&grnlimit=40&prop=pageimages|pageprops&piprop=thumbnail|original|name&pithumbsize=960&ppprop=page_image_free|page_image';
+          const data = await (await fetch(api, {headers: {'User-Agent': UA}})).json();
+          const status = async (url, method) => { try { const r = await fetch(url, {method, headers: {'User-Agent': UA}, redirect: 'manual', signal: AbortSignal.timeout(15000)}); return r.status; } catch (e) { return 'error ' + e.name; } };
+          for (const p of data.query.pages) {
+            const free = p.pageprops?.page_image_free, file = free || p.pageprops?.page_image;
+            if (!file) continue;
+            const built = imageURL(thumbURL(file, free ? 'commons' : 'wikipedia/en'));
+            console.log(JSON.stringify({file, original: p.original?.width, api: p.thumbnail?.source, built, head: await status(built, 'HEAD'), get: await status(built, 'GET'), apiGet: p.thumbnail ? await status(p.thumbnail.source, 'GET') : null}));
+            await new Promise(r => setTimeout(r, 300));
+          }
+          JS
+          cp "$RUNNER_TEMP/probe.mjs" ./probe.mjs && node probe.mjs
+          exit 1
       - name: Install parallel bzip2
         run: sudo apt-get install -y -qq lbzip2
       - name: Find the newest complete English dump

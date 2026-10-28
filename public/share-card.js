@@ -96,11 +96,10 @@
     y += 34;
     ctx.fillStyle = MUTED;ctx.font = bodyFont;
     for (const line of bodyLines) { if (y + 50 > H - 190) break;y += 50;ctx.fillText(line, x, y); }
-    // Footer: one rule, the wordmark, the address.
+    // Footer: one rule and the wordmark.
     ctx.direction = 'ltr';
     ctx.fillStyle = RULE;ctx.fillRect(PAD, H - 150, W - PAD * 2, 2);
     if (wordmark) { const h = 44, w = h * (wordmark.naturalWidth / wordmark.naturalHeight || 6.4);ctx.drawImage(wordmark, PAD, H - 104, w, h); }
-    ctx.fillStyle = MUTED;ctx.font = `400 30px ${SANS}`;ctx.textAlign = 'right';ctx.fillText('wikiscroll.com', W - PAD, H - 70);
     const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.9));
     if (!blob) throw Error('Canvas export failed');
     const name = (a.title || 'wikiscroll').replace(/[^\p{L}\p{N}]+/gu, '-').replace(/^-|-$/g, '').slice(0, 60) || 'wikiscroll';

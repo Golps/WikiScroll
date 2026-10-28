@@ -673,3 +673,59 @@ test('filtered Wikivoyage shares the banner recovery and keeps image failures us
   assert.equal(response.status,200);assert.equal(body.articles.length,1);assert.equal(body.articles[0].title,'Filtered banner guide');assert.equal(body.articles[0].img,'');assert.equal(commons,1);
  });
 });
+
+test('a request that joins a rate-limited batch receives the shared job’s full Retry-After',async()=>{
+  let release;const gate=new Promise(resolve=>{release=resolve;});
+  await mocked(async()=>{await gate;return new Response('',{status:429,headers:{'Retry-After':'180'}});},async(api,jobs)=>{
+    const owner=api.fetch(request('batch=40'),env,jobs);
+    await new Promise(setImmediate);
+    const joiner=api.fetch(request('batch=40'),env,jobs);
+    await new Promise(setImmediate);release();
+    for(const response of await Promise.all([owner,joiner])){
+      assert.equal(response.status,503);
+      assert.ok(Number(response.headers.get('Retry-After'))>=175,'got Retry-After '+response.headers.get('Retry-After'));
+      assert.equal((await response.json()).code,'upstream_rate_limited');
+    }
+  });
+});
+test('optional maintenance tags never hold back cards whose text and image are ready; the cached batch carries them',async()=>{
+  const cache=edgeCache();let next=0,release;const tags=new Promise(resolve=>{release=resolve;});
+  await mocked(async url=>{
+    const p=new URL(url).searchParams;
+    if(p.has('clcategories')){
+      await tags;
+      return data(p.get('pageids').split('|').map(id=>({ns:0,pageid:Number(id),categories:[{title:'Category:All articles needing additional references'}]})));
+    }
+    if(p.has('generator'))return data([page(++next),page(++next)]);
+    return data([]);
+  },async(api,jobs)=>{
+    const timeout=new Promise(resolve=>setTimeout(()=>resolve('waited for tags'),300));
+    const response=await Promise.race([api.fetch(request('batch=41'),env,jobs),timeout]);
+    assert.notEqual(response,'waited for tags');
+    assert.equal(response.status,200);
+    const body=await response.json();assert.ok(body.articles.length);assert.ok(body.articles.every(a=>!a.needs));
+    release();await jobs.done();
+    const stored=await (await cache.match(new Request('https://wikiscroll.com/api/articles?version=8&mode=wiki&lang=en&depth=3&batch=41'))).json();
+    assert.ok(stored.articles.length);assert.ok(stored.articles.every(a=>a.needs?.includes('citations')));
+  },cache);
+});
+test('repeated Wikimedia 5xx failures without Retry-After pause the host instead of hammering it',async()=>{
+  let calls=0;
+  await mocked(async()=>{calls++;return new Response('',{status:503});},async(api,jobs)=>{
+    for(const batch of [42,43])assert.equal((await api.fetch(request('batch='+batch),env,jobs)).status,503);
+    await jobs.done();const tripped=calls;assert.ok(tripped<=4);
+    const paused=await api.fetch(request('batch=44'),env,jobs);
+    assert.equal(paused.status,503);assert.equal(calls,tripped,'the paused host is not called again');
+    assert.equal((await paused.json()).code,'upstream_rate_limited');assert.ok(Number(paused.headers.get('Retry-After'))>=4);
+  });
+});
+test('during a Wikimedia outage an uncached opening is answered from retained complete batches',async()=>{
+  const cache=edgeCache();
+  await cache.put(new Request('https://wikiscroll.com/api/articles?version=8&mode=wiki&lang=en&depth=3&batch=45'),Response.json({articles:[{id:'w7',title:'Retained'}],cached_at:new Date(Date.now()-3600000).toISOString()}));
+  await mocked(async()=>new Response('',{status:503}),async(api,jobs)=>{
+    const response=await api.fetch(request('batch=44&draw='+'d'.repeat(32)),env,jobs);
+    assert.equal(response.status,200);assert.equal(response.headers.get('X-Cache'),'RECOVERY');
+    const body=await response.json();assert.deepEqual(body.articles.map(a=>a.id),['w7']);assert.equal(body.cached_only,true);
+    assert.equal(body.code,'upstream_unavailable');
+  },cache);
+});

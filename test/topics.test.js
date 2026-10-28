@@ -333,3 +333,38 @@ test('topic thumbnails include the selected article photo when the free-only def
  },{state});
  assert.equal(cards.length,1);assert.match(cards[0].img,/Ralph_Patt\.jpg/);
 });
+
+test('a topic request that joins a rate-limited job receives that job’s full Retry-After',async()=>{
+ const {createWork}=await import('../worker/runtime.js');
+ await withTopics(null,async(api,jobs)=>{
+  let release;const gate=new Promise(resolve=>{release=resolve;});const owner=createWork({},jobs),joiner=createWork({},jobs);
+  const fixture=async()=>{await gate;owner.fail('upstream_rate_limited',180000);return null;};
+  const url=new URL('https://wikiscroll.com/api/topics?topic=tech&depth=3&batch=50');
+  const first=api.topicResponse(url,{},jobs,{...options(fixture),work:owner});
+  await new Promise(setImmediate);
+  const second=api.topicResponse(url,{},jobs,{...options(fixture),work:joiner});
+  await new Promise(setImmediate);release();
+  for(const response of await Promise.all([first,second])){
+   assert.equal(response.status,503);assert.ok(Number(response.headers.get('Retry-After'))>=175,'got '+response.headers.get('Retry-After'));
+  }
+ });
+});
+test('optional topic tags never hold back ready cards; the cached batch carries them',async()=>{
+ const cache=edgeCache();
+ await withTopics(cache,async(api,jobs)=>{
+  let release;const tags=new Promise(resolve=>{release=resolve;});const base=topicFixture();
+  const fixture=async address=>{
+   const p=new URL(address).searchParams;
+   if(p.get('prop')==='categories'){await tags;return {query:{pages:Object.fromEntries(p.get('pageids').split('|').map(id=>[id,{pageid:Number(id),ns:0,categories:[{title:'Category:All articles needing additional references'}]}]))}};}
+   return base(address);
+  };
+  const url=new URL('https://wikiscroll.com/api/topics?topic=tech&depth=3&batch=51');
+  const timeout=new Promise(resolve=>setTimeout(()=>resolve('waited for tags'),300));
+  const response=await Promise.race([api.topicResponse(url,{},jobs,options(fixture)),timeout]);
+  assert.notEqual(response,'waited for tags');
+  const body=await response.json();assert.equal(response.status,200);assert.ok(body.articles.length);assert.equal(body.partial,undefined);
+  release();await jobs.done();
+  const stored=[...cache.entries.values()][0];assert.ok(stored);
+  assert.ok((await stored.clone().json()).articles.every(a=>a.needs?.includes('citations')));
+ });
+});

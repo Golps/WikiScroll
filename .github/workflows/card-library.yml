@@ -7,6 +7,8 @@ on:
   schedule:
     # The search-index dump is published on Sundays around 12:00 UTC.
     - cron: '41 1 * * 1'
+    # Catch-up run for a late dump; it stops at once if that dump is already live.
+    - cron: '41 1 * * 2'
   workflow_dispatch:
     inputs:
       upload:
@@ -71,15 +73,32 @@ jobs:
             live=$(aws s3 cp "s3://$R2_BUCKET/v1/en/current.json" - --endpoint-url "$R2_ENDPOINT" | gunzip | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{console.log(JSON.parse(s).build)}catch{}})')
             if [ "$live" = "${{ steps.dump.outputs.date }}" ]; then echo "skip=true" >> "$GITHUB_OUTPUT"; echo "Dump ${{ steps.dump.outputs.date }} is already live."; fi
           fi
-      - name: Download page properties
+      - name: Make room on the runner
         if: steps.live.outputs.skip != 'true'
-        run: curl -fsSL --retry 5 -A "$UA" -o "$RUNNER_TEMP/page_props.sql.gz" "$DUMPS/enwiki/latest/enwiki-latest-page_props.sql.gz"
+        # Preinstalled toolchains this job never uses; the dumps and buckets need the space.
+        run: sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL && df -h "$RUNNER_TEMP" | tail -n 1
+      - name: Download page tables and Wikivoyage
+        if: steps.live.outputs.skip != 'true'
+        run: |
+          set -euo pipefail
+          get() { curl -fsSL --retry 8 --retry-all-errors --retry-delay 10 -C - -A "$UA" -o "$2" "$1"; }
+          for table in page_props page categorylinks; do get "$DUMPS/enwiki/latest/enwiki-latest-$table.sql.gz" "$RUNNER_TEMP/$table.sql.gz"; done
+          # Newer dumps name category targets through linktarget instead of cl_to.
+          if curl -fsIL -A "$UA" "$DUMPS/enwiki/latest/enwiki-latest-linktarget.sql.gz" > /dev/null; then get "$DUMPS/enwiki/latest/enwiki-latest-linktarget.sql.gz" "$RUNNER_TEMP/linktarget.sql.gz"; fi
+          get "$DUMPS/enwikivoyage/latest/enwikivoyage-latest-page_props.sql.gz" "$RUNNER_TEMP/voyage_props.sql.gz"
+          base="$DUMPS/other/cirrus_search_index/${{ steps.dump.outputs.date }}/index_name=enwikivoyage_content"
+          : > "$RUNNER_TEMP/voyage.ndjson"
+          for file in $(curl -fsSL -A "$UA" "$base/" | grep -oE 'href="[^"]+\.json\.bz2"' | sed -E 's/^href="(.*)"$/\1/' | sed -E 's#^.*/##' | sort -V); do
+            get "$base/$file" "$RUNNER_TEMP/voyage-part.json.bz2"; lbzip2 -dc "$RUNNER_TEMP/voyage-part.json.bz2" >> "$RUNNER_TEMP/voyage.ndjson"; rm -f "$RUNNER_TEMP/voyage-part.json.bz2"
+          done
+          ls -la "$RUNNER_TEMP"/*.sql.gz "$RUNNER_TEMP/voyage.ndjson"
       - name: Build the library
         if: steps.live.outputs.skip != 'true'
         run: |
           set -euo pipefail
           base="$DUMPS/other/cirrus_search_index/${{ steps.dump.outputs.date }}/index_name=enwiki_content"
           mkdir -p "$RUNNER_TEMP/library"
+          linktarget=(); if [ -f "$RUNNER_TEMP/linktarget.sql.gz" ]; then linktarget=(--linktarget "$RUNNER_TEMP/linktarget.sql.gz"); fi
           # Each part is downloaded in full (resuming after a dropped connection)
           # before it is decompressed: the dump servers close streams that wait
           # on a slow reader. Only one part is on disk at a time.
@@ -89,7 +108,9 @@ jobs:
             lbzip2 -dc "$part"; rm -f "$part"
           done < "$RUNNER_TEMP/files.txt" \
             | node --max-old-space-size=12288 scripts/build-library.mjs --build "${{ steps.dump.outputs.date }}" \
-                --page-props "$RUNNER_TEMP/page_props.sql.gz" --out "$RUNNER_TEMP/library" --tmp "$RUNNER_TEMP" \
+                --page-props "$RUNNER_TEMP/page_props.sql.gz" --page "$RUNNER_TEMP/page.sql.gz" --categorylinks "$RUNNER_TEMP/categorylinks.sql.gz" "${linktarget[@]}" \
+                --voyage "$RUNNER_TEMP/voyage.ndjson" --voyage-props "$RUNNER_TEMP/voyage_props.sql.gz" \
+                --out "$RUNNER_TEMP/library" --tmp "$RUNNER_TEMP" \
             | tee -a "$GITHUB_STEP_SUMMARY"
       - name: Upload, then switch the site to the new build
         if: steps.live.outputs.skip != 'true' && env.R2_ENDPOINT != '' && inputs.upload != false

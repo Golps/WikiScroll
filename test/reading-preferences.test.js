@@ -23,9 +23,9 @@ test('dimming defaults off and does not change reading size or discovery',()=>{
  h.c.setDimImages(false);assert.ok(!h.classes.has('dim-images'));assert.equal(h.c.readingTextSize,'standard');
 });
 test('reading preferences survive saves of unrelated settings',()=>{
- let saved;const c=vm.createContext({lsSet:(_,v)=>saved=v,readingTextSize:'large',dimImages:true,ambientEnabled:false,swipeEnabled:true,kbBarEnabled:true,helpMode:'only',helpTypes:['images'],lightMode:true,depthLevel:5,curLang:'he'});
+ let saved;const c=vm.createContext({lsSet:(_,v)=>saved=v,readingTextSize:'large',dimImages:true,showMature:true,ambientEnabled:false,swipeEnabled:true,kbBarEnabled:true,helpMode:'only',helpTypes:['images'],lightMode:true,depthLevel:5,curLang:'he'});
  vm.runInContext(slice('function saveSettings(', 'function saveHistory('),c);c.saveSettings();
- assert.equal(saved.readingTextSize,'large');assert.equal(saved.dimImages,true);assert.equal(saved.depth,5);assert.equal(saved.lang,'he');
+ assert.equal(saved.readingTextSize,'large');assert.equal(saved.dimImages,true);assert.equal(saved.mature,true);assert.equal(saved.depth,5);assert.equal(saved.lang,'he');
 });
 test('image inspection ignores drags and long presses, and supports keyboard activation',()=>{
  const handlers={},attrs={},image={dataset:{},setAttribute:(k,v)=>attrs[k]=v,addEventListener:(k,f)=>handlers[k]=f};

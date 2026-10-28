@@ -50,7 +50,7 @@ function harness({librarySets=undefined}={}) {
     workerRequest:()=>new Promise(resolve=>requests.push(resolve)),
     directRequest:async()=>{directCalls++;return [];},
   });
-  vm.runInContext(`let curMode='wiki',curLang='en',depthLevel=3,curTopics=new Set(),travelFilters={place:'',style:''},helpMode='off';
+  vm.runInContext(`let curMode='wiki',curLang='en',depthLevel=3,curTopics=new Set(),travelFilters={place:'',style:''},helpMode='off',showMature=false;
     let queue=[],articles=[],filling=false,hinted=false,fillGeneration=0,fillBudget=null,apiCooldownUntil=0,travelExhausted=false,travelContinuing=false;
     const helpTypeQuery=()=>'',matchesHelpTypes=a=>Array.isArray(a.needs)&&a.needs.some(n=>['sources','citations','unsourced','copyedit','clarify','images','outdated','incomplete','stub'].includes(n));
     const fetchWiki=()=>directRequest(),fetchWikiByTopic=()=>directRequest(),fetchVoyage=()=>directRequest();
@@ -121,6 +121,14 @@ test('duplicates are rejected across queued and already-rendered articles', () =
   const state=h.state();
   assert.equal(state.articles.length+state.queue.length,21);
   assert.equal(new Set([...state.articles,...state.queue]).size,21);
+});
+
+test('mature topics stay out of the feed unless the reader turns them on', () => {
+  const cards=()=>[{...article(1),mature:1},{...article(2),title:'Anal sex'},{...article(3),desc:'American pornographic actress'},article(4)];
+  const h=harness();
+  assert.equal(h.add(cards()),1,'flagged cards and cards that only match by text are both hidden');
+  const shown=harness();shown.run('showMature=true;');
+  assert.equal(shown.add(cards()),4);
 });
 
 test('Only these articles rejects untagged supply while Off and Show tags leave the feed unchanged',()=>{

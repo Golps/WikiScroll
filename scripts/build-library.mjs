@@ -35,6 +35,7 @@ import {isDisambiguation, isPhrasebook} from '../worker/travel.js';
 import {imageURL} from '../worker/supply.js';
 import {guideReadable} from '../worker/extracts.js';
 import {roots, bands as TOPIC_BANDS} from '../worker/topics.js';
+import {isMature} from '../worker/mature.js';
 import {NEED_CATEGORIES, TALK_NEED_CATEGORIES, HELP_TYPES, NEED_ORDER, availableHelpTypes} from '../worker/needs.js';
 
 const LANG = 'en';
@@ -272,7 +273,8 @@ export function libraryCard(pageid, doc, props, src = 'wiki', host = `${LANG}.wi
   // decide where it lives when they are known.
   const local = props.local ? props.local.has(String(file).replace(/ /g, '_')) : !free;
   const img = imageURL(thumbURL(file, local ? (src === 'how' ? 'wikivoyage/' : 'wikipedia/') + LANG : 'commons'));
-  return {id: (src === 'how' ? 'v' : 'w') + pageid, src, title: doc.title, body, img, url: `https://${host}/wiki/${encodeURIComponent(doc.title.replace(/ /g, '_'))}`, ...(desc ? {desc} : {})};
+  return {id: (src === 'how' ? 'v' : 'w') + pageid, src, title: doc.title, body, img, url: `https://${host}/wiki/${encodeURIComponent(doc.title.replace(/ /g, '_'))}`, ...(desc ? {desc} : {}),
+    ...(src === 'wiki' && isMature({title: doc.title, description: desc, categories: doc.category}) ? {mature: 1} : {})};
 }
 
 // popularity_score is the page's share of the wiki's weekly views; unknown

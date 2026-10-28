@@ -2,7 +2,7 @@ const atlasIcon = {"bookmark": "<svg class=\"atlas-icon\" viewBox=\"0 0 24 24\" 
 // Icons reference one same-origin SVG sheet, cached with the offline shell.
 function uiIcon(name) {
   const key = /^[a-z-]+$/.test(name) ? name : 'discovery';
-  return `<svg class="ws-icon" data-ui-icon="${key}" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="/images/ui-icons.svg?v=3#${key}"></use></svg>`;
+  return `<svg class="ws-icon" data-ui-icon="${key}" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="/images/ui-icons.svg?v=4#${key}"></use></svg>`;
 }
 'use strict';
 
@@ -88,6 +88,7 @@ function helpOnly() { return helpMode === 'only' && helpAvailable(); }
 function voyageLang(lang = curLang) { return VOYAGE_LANGS.has(lang) ? lang : 'en'; }
 const BAD_TITLE_RE  = /^(list of|lists of|timeline|history of|geography of|demographics|economy of|culture of|politics of|education in|deaths in|events of|index of|outline of|glossary|bibliography|filmography|discography|category:|talk:|wikipedia:)/i;
 
+
 // The server's category groups and language support are embedded by Astro.
 const HELP_TYPE_CONFIG = JSON.parse(document.querySelector('[data-help-config]').dataset.helpConfig);
 const HELP_TYPE_IDS = Object.keys(HELP_TYPE_CONFIG);
@@ -110,7 +111,7 @@ let travelOffset=0, travelExhausted=false, travelSuggestion='', travelContinuing
 let ambientEnabled = true;
 let readingTextSize = 'standard', dimImages = false;
 const READING_TEXT_SIZES = ['standard', 'large', 'larger'];
-let swipeEnabled = true, kbBarEnabled = true, helpMode = 'off';
+let swipeEnabled = true, kbBarEnabled = true, helpMode = 'off', showMature = false;
 let helpTypes = [...HELP_TYPE_IDS];
 let lightMode = false, depthLevel = 3;
 let history = [];
@@ -191,6 +192,7 @@ function loadPersistedState() {
   ambientEnabled = settings.ambient !== false;
   readingTextSize = READING_TEXT_SIZES.includes(settings.readingTextSize) ? settings.readingTextSize : 'standard';
   dimImages = settings.dimImages === true;
+  showMature = settings.mature === true;
   kbBarEnabled = settings.kbBar !== false;
   helpMode = helpTopic ? 'only' : HELP_MODES.includes(settings.helpMode) ? settings.helpMode : settings.help === true ? 'tags' : 'off';
   const savedHelpTypes = Array.isArray(settings.helpTypes) ? HELP_TYPE_IDS.filter(id => settings.helpTypes.includes(id)) : [];
@@ -212,7 +214,7 @@ function loadPersistedState() {
 }
 function saveLiked()    { lsSet('ws_liked',    [...liked.values()]); }
 function saveTopics()   { lsSet('ws_topics',   [...curTopics]); }
-function saveSettings() { lsSet('ws_settings', { readingTextSize, dimImages, ambient: ambientEnabled, swipe: swipeEnabled, kbBar: kbBarEnabled, helpMode: helpMode, helpTypes, lightMode: lightMode, depth: depthLevel, lang: curLang }); }
+function saveSettings() { lsSet('ws_settings', { readingTextSize, dimImages, mature: showMature, ambient: ambientEnabled, swipe: swipeEnabled, kbBar: kbBarEnabled, helpMode: helpMode, helpTypes, lightMode: lightMode, depth: depthLevel, lang: curLang }); }
 function saveHistory()     { lsSet('ws_history', history.slice(0, 50)); }
 function saveCollections() { lsSet('ws_collections', collections); }
 
@@ -632,6 +634,11 @@ async function fetchVoyage() {
 }
 
 // ── PREFETCH QUEUE ─────────────────────────────────────────────────────────
+// Mature topics stay hidden unless the reader turns them on. Cards carry the
+// Worker's and library's flag; this is the same title and description check
+// (worker/mature.js) for cards that arrived without one.
+const MATURE_TEXT_RE = /\b(?:porn(?:o|ography|ographic|s|stars?)?|erotic (?:actor|actress|model|film|video|art|literature)|adult (?:film|video|model|entertain\w*)|sex (?:act|position|toy|worker|industry)s?|sexual (?:acts?|positions?|practices?|fetish\w*)|glamour model|playboy playmate|penthouse pet|striptease|camgirl|onlyfans|masturbat\w*|orgasm|bdsm|fellatio|cunnilingus|anal sex|oral sex|hentai)\b/i;
+function hiddenMature(a) { return !showMature && (a?.mature === 1 || MATURE_TEXT_RE.test(a?.title || '') || MATURE_TEXT_RE.test(a?.desc || '')); }
 // Data reserve is deliberately much larger than the rendered window.
 const QUEUE_MIN = 60, QUEUE_TARGET = 100, CARDS_AHEAD = 16;
 let supplyTask = null, reserveTimer = null, pendingDeepGeneration = -1;
@@ -735,7 +742,7 @@ function acceptSupply(batch,gen,randomize=true) {
   if(gen!==fillGeneration)return 0;
   let added=0;
   for(const a of randomize?shuffled(batch||[]):batch||[]) {
-    if(!validReserveArticle(a)||feedSeen.has(a.id))continue;
+    if(!validReserveArticle(a)||feedSeen.has(a.id)||hiddenMature(a))continue;
     if(curMode==='wiki'&&helpOnly()&&!matchesHelpTypes(a))continue;
     feedSeen.add(a.id);queue.push(a);added++;
   }
@@ -1890,6 +1897,8 @@ function syncAllToggles() {
   setSw('ambientToggle', ambientEnabled);
   setSw('dkAmbientToggle', ambientEnabled);
   setSw('dimImagesToggle', dimImages);
+  setSw('matureToggle', showMature);
+  setSw('dkMatureToggle', showMature);
   setSw('dkDimImagesToggle', dimImages);
   document.querySelectorAll('[data-reading-size]').forEach(button => {
     const selected = button.dataset.readingSize === readingTextSize;
@@ -1919,6 +1928,8 @@ function setReadingTextSize(size) {
 function setDimImages(value) {
   dimImages = value === true; saveSettings(); syncAllToggles(); applyReadingPreferences();
 }
+// Turning mature topics off also clears them from the cards waiting in line.
+function setMature(value) { showMature = value === true; if (!showMature) queue = queue.filter(a => !hiddenMature(a)); saveSettings(); syncAllToggles(); }
 function setAmbient(val) { ambientEnabled=val; if(!val)closeAmbient(); window.dispatchEvent(new Event('ambient-preference-change')); saveSettings(); syncAllToggles(); }
 function setSwipe(val) { swipeEnabled=val; saveSettings(); syncAllToggles(); }
 
@@ -1955,6 +1966,7 @@ document.querySelectorAll('[data-reading-size]').forEach(button => {
 });
 ['dimImagesToggle','dkDimImagesToggle'].forEach(id => document.getElementById(id).addEventListener('click', () => setDimImages(!dimImages)));
 
+['matureToggle','dkMatureToggle'].forEach(id=>document.getElementById(id).addEventListener('click',()=>setMature(!showMature)));
 ['ambientToggle','dkAmbientToggle'].forEach(id=>document.getElementById(id).addEventListener('click',()=>setAmbient(!ambientEnabled)));
 
 // Mobile toggles
@@ -2816,7 +2828,7 @@ function loadToday() {
   todayLoading = key;
   fetch(`/api/today?lang=${lang}&md=${md}`).then(r => r.ok ? r.json() : null).then(data => {
     if (!data || typeof data.matches !== 'object' || !Array.isArray(data.seeds) || lang !== curLang || md !== monthDay()) return;
-    todayInfo = {md, lang, matches: data.matches, seeds: data.seeds.filter(validReserveArticle)};
+    todayInfo = {md, lang, matches: data.matches, seeds: data.seeds.filter(a => validReserveArticle(a) && !hiddenMature(a))};
     document.querySelectorAll('#feed .card[data-id]').forEach(decorateToday);
   }).catch(() => {}).finally(() => {
     // After a failure, allow one retry a minute later.

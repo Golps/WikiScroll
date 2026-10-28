@@ -10,6 +10,7 @@ import {averageViews,lagDays,completePageviews,DEPTH_BANDS} from '../worker/page
 import {vitalTitles} from '../worker/vital.js';
 import {imageURL} from '../worker/supply.js';
 import {guideReadable} from '../worker/extracts.js';
+import {isMature} from '../worker/mature.js';
 import {isPhrasebook,isDisambiguation,phrasebookParams} from '../worker/travel.js';
 
 export const SHARD_SIZE = 60, SHARDS_PER_SET = 5, TARGET = SHARD_SIZE * SHARDS_PER_SET;
@@ -31,7 +32,8 @@ export function toCard(page, src) {
   const host = src === 'how' ? 'en.wikivoyage.org' : 'en.wikipedia.org';
   const desc = typeof page.description === 'string' ? strip(page.description).slice(0, 160) : '';
   return {id: (src === 'how' ? 'v' : 'w') + page.pageid, src, title: page.title, body: shorten(strip(page.extract)), img: imageURL(page.thumbnail?.source),
-    url: page.fullurl || `https://${host}/wiki/${encodeURIComponent(page.title.replace(/ /g, '_'))}`, ...(desc ? {desc} : {})};
+    url: page.fullurl || `https://${host}/wiki/${encodeURIComponent(page.title.replace(/ /g, '_'))}`, ...(desc ? {desc} : {}),
+    ...(src === 'wiki' && isMature({title: page.title, description: desc}) ? {mature: 1} : {})};
 }
 export function validCard(card, src) {
   return !!card && new RegExp(`^${src === 'how' ? 'v' : 'w'}[1-9]\\d{0,11}$`).test(card.id) && card.src === src && typeof card.title === 'string' && card.title.length > 0 && !BAD_TITLE.test(card.title)

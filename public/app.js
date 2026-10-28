@@ -272,6 +272,14 @@ document.addEventListener('error', event => {
     img.src = smaller;
     return;
   }
+  // The library picks Commons or the wiki's own upload folder from the dumps;
+  // the thumbnail path is the same in both, so a link that still fails tries the other one.
+  const moved = img.getAttribute('src')?.replace(/^(https:\/\/upload\.wikimedia\.org\/)(?:wikipedia\/commons|(wikipedia|wikivoyage)\/en)\/thumb\//, (_, host, local) => host + (local ? 'wikipedia/commons' : 'wikipedia/en') + '/thumb/');
+  if (!img.dataset.imageMoved && navigator.onLine && moved && moved !== img.getAttribute('src')) {
+    img.dataset.imageMoved = '1';
+    img.src = moved;
+    return;
+  }
   finishImageFallback(img);
 }, true);
 

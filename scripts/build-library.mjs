@@ -17,6 +17,8 @@
 //   {"index":{"_id":…}} line, then the page document with its categories,
 //   hidden maintenance categories included).
 // - page_props: each page's lead image, short description and disambiguation flag.
+// - image (optional): files uploaded to this wiki itself, so image links pick
+//   the right upload folder (File: pages are the fallback).
 // - page + categorylinks (+ linktarget on the newer schema): the category tree
 //   for topics, and talk-page photo requests for Help Wikipedia.
 // - Two small live lookups: the vital-article lists (Popular, Known) and
@@ -195,6 +197,14 @@ export async function readCategoryLinks(lines, targets = null) {
   if (!('cl_to' in columns)) { need(columns, 'cl_target_id'); if (!targets) throw Error('categorylinks uses cl_target_id: pass --linktarget.'); }
   return {edges, photoTalk};
 }
+// Files actually uploaded to this wiki. A local File: page alone doesn't mean
+// that: many describe a Commons file (featured pictures, local notes).
+export async function readLocalFiles(lines) {
+  const names = new Set();
+  need(await readTable(lines, (row, c) => { names.add(row[c.img_name]); }), 'img_name');
+  return names;
+}
+export const MIN_LOCAL_FILES = 100_000;
 // Category page titles for the edges' children, article titles for the photo
 // requests, and the files uploaded to this wiki itself rather than Commons.
 export async function readPages(lines, {edges, photoTalk}) {
@@ -506,11 +516,15 @@ if (process.argv[1] && import.meta.url === new URL(process.argv[1], 'file:').hre
     log(`Category targets: ${targets ? targets.size : 'none (cl_to)'}; subcategory edges: ${links.edges.length / 2}; photo-request talk pages: ${links.photoTalk.size}`);
     targets?.clear();
     const {children, photoTitles, localFiles} = await readPages(sqlLines(option('page')), links);
-    props.local = localFiles;
+    // The image table names real uploads; File: pages are the fallback.
+    const uploads = option('images') ? await readLocalFiles(sqlLines(option('images'))) : null;
+    if (uploads && uploads.size < MIN_LOCAL_FILES) log(`Warning: the image table lists only ${uploads.size} files; using File: pages instead.`);
+    props.local = uploads && uploads.size >= MIN_LOCAL_FILES ? uploads : localFiles;
+    if (props.local === uploads) localFiles.clear();
     const edgeCount = links.edges.length / 2;
     links.edges.length = 0;
     const reach = topicCategories(children);
-    log(`Categories with subcategories: ${children.size} of ${edgeCount} edges resolved; topic categories: ${reach.size}; photo requests: ${photoTitles.size}; local files: ${localFiles.size}`);
+    log(`Categories with subcategories: ${children.size} of ${edgeCount} edges resolved; topic categories: ${reach.size}; photo requests: ${photoTitles.size}; local files: ${props.local.size}${props.local === uploads ? ' (image table)' : ' (File: pages)'}`);
     children.clear();
     if (reach.size < MIN_TOPIC_CATEGORIES) throw Error(`Only ${reach.size} topic categories: the category tree was misread, keeping the current library.`);
     if (!photoTitles.size) log('Warning: no talk-page photo requests found; the Photos Help sets will be empty.');

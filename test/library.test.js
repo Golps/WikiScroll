@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import zlib from 'node:zlib';
 import crypto from 'node:crypto';
-import {thumbURL,sqlRows,readTable,readPageProps,readLinkTargets,readCategoryLinks,readPages,topicCategories,cirrusReader,libraryCard,voyageCard,cardNeeds,cardSets,dailyViews,vitalLevels,buildLibrary,averageDailyViews,emptyProps,shorten,SETS,TOPICS,HELP,SHARD_SIZE,MINIMUM,MAX_FILES,MAX_BYTES,SLICE_CAP,BODY_CHARS} from '../scripts/build-library.mjs';
+import {readLocalFiles,MIN_LOCAL_FILES,thumbURL,sqlRows,readTable,readPageProps,readLinkTargets,readCategoryLinks,readPages,topicCategories,cirrusReader,libraryCard,voyageCard,cardNeeds,cardSets,dailyViews,vitalLevels,buildLibrary,averageDailyViews,emptyProps,shorten,SETS,TOPICS,HELP,SHARD_SIZE,MINIMUM,MAX_FILES,MAX_BYTES,SLICE_CAP,BODY_CHARS} from '../scripts/build-library.mjs';
 import {roots,bands} from '../worker/topics.js';
 import {availableHelpTypes} from '../worker/needs.js';
 
@@ -190,4 +190,12 @@ test('daily views average the last week of English Wikipedia totals',async()=>{
  const avg=await averageDailyViews(async url=>{asked=url;return {items:[1,2,3,4,5,6,7].map(n=>({views:n*1e6}))};},Date.UTC(2026,9,28));
  assert.equal(avg,4e6);assert.match(asked,/aggregate\/en\.wikipedia\/all-access\/user\/daily\/2026102000\/2026102600$/);
  assert.equal(await averageDailyViews(async()=>null),null);
+});
+
+test('the image table names real local uploads, not File: pages that describe Commons files',async()=>{
+ const names=await readLocalFiles(table('image',['img_name','img_size'],[['Film_poster.jpg',100],['Local_photo.png',200]]));
+ assert.deepEqual([...names].sort(),['Film_poster.jpg','Local_photo.png']);
+ const p=props();p.free.set(5,'Panther_chameleon.jpg');p.local=names;
+ assert.match(libraryCard(5,{namespace:0,title:'Panther chameleon',opening_text:text},p).img,/\/wikipedia\/commons\/thumb\//,'a free image with only a local description page stays on Commons');
+ assert.ok(MIN_LOCAL_FILES>=100000);
 });

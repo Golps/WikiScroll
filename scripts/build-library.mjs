@@ -499,7 +499,7 @@ if (process.argv[1] && import.meta.url === new URL(process.argv[1], 'file:').hre
   try {
     const outDir = option('out') || 'library', build = option('build');
     for (const name of ['page-props', 'page', 'categorylinks']) if (!option(name)) throw Error(`Missing --${name}.`);
-    if (!/^\d{8}$/.test(build || '')) throw Error('Use --build YYYYMMDD.');
+    if (!/^\d{8}(-\d+)?$/.test(build || '')) throw Error('Use --build YYYYMMDD, or YYYYMMDD-N for a rebuild.');
     const dailyTotal = await averageDailyViews();
     if (!dailyTotal) throw Error('English Wikipedia pageview totals are unavailable, keeping the current library.');
     const [level3, level4] = await vitalLists();
@@ -534,7 +534,7 @@ if (process.argv[1] && import.meta.url === new URL(process.argv[1], 'file:').hre
     const tmpDir = await fsp.mkdtemp(path.join(option('tmp') || outDir, '.buckets-'));
     log('Reading articles');
     const result = await buildLibrary({lines: readline.createInterface({input: process.stdin, crlfDelay: Infinity}), props, dailyTotal, levels: vitalLevels(level3, level4),
-      reach, photoTitles, voyage, outDir, tmpDir, build, source: {cirrus: build}});
+      reach, photoTitles, voyage, outDir, tmpDir, build, source: {cirrus: build.slice(0, 8)}});
     await fsp.rm(tmpDir, {recursive: true, force: true});
     const images = await checkImages(outDir, result.manifest);
     const per = test => SETS.filter(test).reduce((sum, s) => sum + result.manifest.sets[s], 0), starts = prefix => s => s.startsWith(prefix);

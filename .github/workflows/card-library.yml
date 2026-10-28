@@ -59,6 +59,9 @@ jobs:
             files=$(curl -fsSL -A "$UA" "$base/$date/index_name=enwiki_content/" | grep -oE 'href="[^"]+\.json\.bz2"' | sed -E 's/^href="(.*)"$/\1/' | sed -E 's#^.*/##' | sort -V || true)
             if [ -n "$files" ]; then
               echo "date=$date" >> "$GITHUB_OUTPUT"
+              # A forced rebuild of a live dump gets its own folder: shards are cached
+              # for a year, so changed cards must never reuse a published path.
+              if [ "${{ inputs.force }}" = "true" ]; then echo "build=$date-${{ github.run_number }}" >> "$GITHUB_OUTPUT"; else echo "build=$date" >> "$GITHUB_OUTPUT"; fi
               printf '%s\n' $files > "$RUNNER_TEMP/files.txt"
               echo "Dump $date: $(wc -l < "$RUNNER_TEMP/files.txt") files."
               exit 0
@@ -74,7 +77,7 @@ jobs:
           aws s3api head-bucket --bucket "$R2_BUCKET" --endpoint-url "$R2_ENDPOINT"
           echo "R2 access confirmed."
           if [ "${{ inputs.force }}" != "true" ] && aws s3api head-object --bucket "$R2_BUCKET" --key v1/en/current.json --endpoint-url "$R2_ENDPOINT" > /dev/null 2>&1; then
-            live=$(aws s3 cp "s3://$R2_BUCKET/v1/en/current.json" - --endpoint-url "$R2_ENDPOINT" | gunzip | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{console.log(JSON.parse(s).build)}catch{}})')
+            live=$(aws s3 cp "s3://$R2_BUCKET/v1/en/current.json" - --endpoint-url "$R2_ENDPOINT" | gunzip | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{const m=JSON.parse(s);console.log(m.source?.cirrus||m.build)}catch{}})')
             if [ "$live" = "${{ steps.dump.outputs.date }}" ]; then echo "skip=true" >> "$GITHUB_OUTPUT"; echo "Dump ${{ steps.dump.outputs.date }} is already live."; fi
           fi
       - name: Make room on the runner
@@ -121,7 +124,7 @@ jobs:
               if [ -n "$fetch" ]; then wait "$fetch"; fi
             done
           } \
-            | node --max-old-space-size=12288 scripts/build-library.mjs --build "${{ steps.dump.outputs.date }}" \
+            | node --max-old-space-size=12288 scripts/build-library.mjs --build "${{ steps.dump.outputs.build }}" \
                 --page-props "$RUNNER_TEMP/page_props.sql.gz" --page "$RUNNER_TEMP/page.sql.gz" --categorylinks "$RUNNER_TEMP/categorylinks.sql.gz" "${linktarget[@]}" "${images[@]}" \
                 --voyage "$RUNNER_TEMP/voyage.ndjson" --voyage-props "$RUNNER_TEMP/voyage_props.sql.gz" \
                 --out "$RUNNER_TEMP/library" --tmp "$RUNNER_TEMP" \
@@ -130,7 +133,7 @@ jobs:
         if: steps.live.outputs.skip != 'true' && env.R2_ENDPOINT != '' && inputs.upload != false
         run: |
           set -euo pipefail
-          build="${{ steps.dump.outputs.date }}"
+          build="${{ steps.dump.outputs.build }}"
           aws configure set default.s3.max_concurrent_requests 32
           # Shards never change once uploaded; the manifest is re-read every few minutes.
           aws s3 sync "$RUNNER_TEMP/library/$build" "s3://$R2_BUCKET/v1/en/$build" --endpoint-url "$R2_ENDPOINT" --only-show-errors \

@@ -18,10 +18,19 @@ function starterPool(path,onShard,sets=Object.fromEntries(Object.keys(SET_BASE).
   if(!set||!(sets[set]>Number(shard)))return new Response('',{status:404});
   onShard();return Response.json(batch(30,SET_BASE[set]+Number(shard)*100,set==='how-en'?'how':'wiki'));
 }
-function harness() {
+// The card library on cards.wikiscroll.com: `sets` maps each set to its shard count.
+function cardLibrary(url,sets,log){
+  if(url==='https://cards.wikiscroll.com/v1/en/current.json')return sets?Response.json({v:1,build:'20261025',base:'20261025/',sets}):new Response('',{status:503});
+  const [,set,shard]=url.match(/^https:\/\/cards\.wikiscroll\.com\/v1\/en\/20261025\/(.+)\/(\d+)\.json$/)||[];
+  if(!set||!(sets?.[set]>Number(shard)))return new Response('',{status:404});
+  log.push(set+'/'+shard);
+  const how=set==='how-en',base=10000*(1+Object.keys(sets).indexOf(set))+Number(shard)*100;
+  return Response.json(batch(100,base,how?'how':'wiki').map(a=>set.includes('help')?{...a,needs:['citations']}:a));
+}
+function harness({librarySets=undefined}={}) {
   const storage = new Map(), timers = new Map(), requests = [];
   const nodes = [], feed = {querySelectorAll:() => nodes, addEventListener() {}};
-  let timerId=0, selectedIndex=0, directCalls=0, starterRequests=0;const starterPaths=[];
+  let timerId=0, selectedIndex=0, directCalls=0, starterRequests=0;const starterPaths=[],shards=[];
   const hint={style:{}}, spinner={remove(){}};
   const context = vm.createContext({
     console, Date, URLSearchParams, AbortController, shuffled:items=>[...items],
@@ -37,7 +46,7 @@ function harness() {
     lsSet:(key,value)=>storage.set(key,JSON.stringify(value)),
     getCurrentFeedCard:()=>nodes[selectedIndex]||null,
     renderCard:a=>nodes.push({dataset:{id:a.id}}),
-    fetch:async path=>starterPool(path,()=>{starterRequests++;starterPaths.push(path);}),
+    fetch:async path=>path.startsWith('https://')?cardLibrary(path,librarySets,shards):starterPool(path,()=>{starterRequests++;starterPaths.push(path);}),
     workerRequest:()=>new Promise(resolve=>requests.push(resolve)),
     directRequest:async()=>{directCalls++;return [];},
   });
@@ -47,13 +56,16 @@ function harness() {
     const fetchWiki=()=>directRequest(),fetchWikiByTopic=()=>directRequest(),fetchVoyage=()=>directRequest();
     ${voyage}
     ${supply}
+    // Card-library tests switch it on; these tests cover the Worker path.
+    library.failedUntil=${librarySets===undefined?'Infinity':'0'};
+    let helpTypes=['sources'];const activeHelpTypes=()=>helpTypes;
     const liveFetchWorkerBatch=fetchWorkerBatch;
     fetchWorkerBatch=()=>workerRequest();
     function withTodaySurprises(batch){return batch;}`, context);
   const run = text => vm.runInContext(text, context);
   return {
     context, nodes, requests, storage, run,
-    get directCalls(){return directCalls;}, get starterRequests(){return starterRequests;}, starterPaths,
+    shards,get directCalls(){return directCalls;}, get starterRequests(){return starterRequests;}, starterPaths,
     state:()=>JSON.parse(run('JSON.stringify({queue:queue.map(a=>a.id),articles:articles.map(a=>a.id),filling,gen:fillGeneration})')),
     add(items){context.incoming=items;return run('acceptSupply(incoming,fillGeneration)');},
     select(index){selectedIndex=index;},
@@ -336,4 +348,62 @@ test('a depth without its own shards borrows Balanced cards only during an outag
   h.context.reply=new Response(null,{status:503,headers:{'Retry-After':'30'}});
   await h.run(`noteWorkerCooldown(reply,fillGeneration,'x',{code:'upstream_unavailable'})`);await h.fire(0);await tick();await tick();
   assert.deepEqual([...h.starterPaths],['/data/starter/wiki-en-3-000.json']);assert.ok(shown(h).length>0);
+});
+
+// ── Card library ─────────────────────────────────────────────────────────────
+const LIBRARY_SETS={'wiki-en-1':2,'wiki-en-2':2,'wiki-en-3':3,'wiki-en-4':2,'wiki-en-5':2,'how-en':2,
+  'topic-en-geo-3':2,'help-en-sources-1':0,'help-en-sources-2':1,'help-en-sources-3':1,'help-en-sources-4':0,'help-en-sources-5':0,
+  'help-en-images-3':1,'topic-en-geo-help-sources-3':1,'topic-en-geo-help-images-3':1};
+const settle = async () => { for (let i=0; i<6; i++) { await new Promise(resolve => setImmediate(resolve)); await tick(); } };
+
+test('the card library fills the feed without asking the Worker or Wikipedia', async () => {
+  const h=harness({librarySets:LIBRARY_SETS});
+  const filling=h.run('fillQueue()');await settle();await filling;
+  assert.equal(h.requests.length,0);assert.equal(h.directCalls,0);
+  assert.ok(h.state().queue.length+h.state().articles.length>=100);
+  assert.ok(h.shards.every(s=>/^wiki-en-3\/[0-2]$/.test(s)),h.shards.join());
+});
+
+test('each library draw is a shard this visit has not drawn', async () => {
+  const h=harness({librarySets:LIBRARY_SETS});
+  for(let i=0;i<3;i++){h.change('');const filling=h.run('fillQueue()');await settle();await filling;}
+  const depth3=h.shards.filter(s=>s.startsWith('wiki-en-3/'));
+  assert.equal(new Set(depth3).size,3,'all three Balanced shards before any repeat');
+});
+
+test('topic, Help and their combination read their own prebuilt sets', async () => {
+  const h=harness({librarySets:LIBRARY_SETS});
+  h.change("curTopics=new Set(['geo']);");let filling=h.run('fillQueue()');await settle();await filling;
+  assert.ok(h.shards.every(s=>s.startsWith('topic-en-geo-')&&!s.includes('help')));
+  h.shards.length=0;h.change("helpMode='only';helpTypes=['sources','images'];");filling=h.run('fillQueue()');await settle();await filling;
+  assert.ok(h.shards.length>=1&&h.shards.every(s=>/^topic-en-geo-help-(sources|images)-3\//.test(s)),h.shards.join());
+  h.shards.length=0;h.change("curTopics=new Set();helpTypes=['sources'];");filling=h.run('fillQueue()');await settle();await filling;
+  assert.equal(h.shards[0],'help-en-sources-3/0');
+  assert.equal(h.requests.length,0);
+});
+
+test('a thin library setting borrows the nearest depth instead of the live API', async () => {
+  const h=harness({librarySets:LIBRARY_SETS});
+  h.change("depthLevel=1;helpMode='only';helpTypes=['sources'];");
+  const filling=h.run('fillQueue()');await settle();await filling;
+  assert.deepEqual(h.shards.slice(0,2),['help-en-sources-2/0','help-en-sources-3/0']);
+  assert.equal(h.requests.length,0);assert.equal(h.directCalls,0);
+});
+
+test('a used-up library setting ends without falling back to the live feed', async () => {
+  const h=harness({librarySets:LIBRARY_SETS});
+  h.change("curTopics=new Set(['geo']);helpMode='only';helpTypes=['images'];");
+  const filling=h.run('fillQueue()');await settle();await filling;
+  assert.deepEqual(h.shards,['topic-en-geo-help-images-3/0']);
+  assert.equal(h.run('libraryExhausted'),true);
+  assert.equal(h.requests.length,0);assert.equal(h.directCalls,0);
+  h.run('scheduleRefill()');assert.equal(h.run('refillTimer'),null,'no refills after the end');
+});
+
+test('the Worker serves when the library is unreachable or lacks the language', async () => {
+  let h=harness({librarySets:null});
+  let filling=h.run('fillQueue()');await settle();
+  assert.equal(h.requests.length,1,'manifest failure falls back');h.requests[0]([]);await filling;
+  h=harness({librarySets:LIBRARY_SETS});h.change("curLang='fr';");
+  filling=h.run('fillQueue()');assert.equal(h.requests.length,1);assert.equal(h.shards.length,0);h.requests[0]([]);await filling;
 });

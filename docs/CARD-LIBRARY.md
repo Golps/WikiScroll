@@ -1,6 +1,6 @@
 # Card library
 
-The card library is a prebuilt set of English Wikipedia and Wikivoyage cards stored in Cloudflare R2 and served from `cards.wikiscroll.com`. It lets the feed draw from millions of ready cards without calling the Wikimedia API. This page covers how it is built and how to set it up. The browser does not read it yet; that is a separate change.
+The card library is a prebuilt set of English Wikipedia and Wikivoyage cards stored in Cloudflare R2 and served from `cards.wikiscroll.com`. It lets the feed draw from millions of ready cards without calling the Wikimedia API. This page covers how it is built, how the site reads it, and how to set it up.
 
 ## How a build works
 
@@ -12,11 +12,22 @@ The card library is a prebuilt set of English Wikipedia and Wikivoyage cards sto
    - **Depth (`wiki-en-1` … `wiki-en-5`):** cards with an image, like the live random feed. Each page's `popularity_score` (its share of the week's views) times English Wikipedia's average daily views gives its readership, grouped with the Worker's `DEPTH_BANDS`; pages with unknown readership never count as Obscure. Popular and Known are the vital articles (Level 3, and Level 4 minus Level 3), matched through redirects.
    - **Topics (`topic-en-<topic>-<depth>`):** pages in a topic's root categories (`roots` in `worker/topics.js`) or up to two levels below them (three for Niche and Obscure), as the live category walk reaches, with the topic feeds' own readership bands.
    - **Help Wikipedia (`help-en-<type>-<depth>`):** pages whose hidden maintenance categories (`NEED_CATEGORIES`) or talk-page photo requests match a Help type. Every card in every set carries its maintenance tags (`needs`), in the live order.
+   - **A topic with Help on (`topic-en-<topic>-help-<type>-<depth>`):** the topic cards that need that type of help, so the browser never sifts through topic cards for the few that match.
    - **Wikivoyage (`how-en`):** travel guides with a readable introduction, image optional, without phrasebooks or travel-topic pages.
-   - Every set is shuffled across all of its cards and packed into gzipped shards of 100. Topic and Help sets keep a random sample of up to `SLICE_CAP` (40,000) cards each; the depth and travel sets keep every card.
+   - Every set is shuffled across all of its cards and packed into gzipped shards of 100. Topic and Help sets keep a random sample of up to `SLICE_CAP` (40,000) cards each and topic-with-Help sets up to `COMBO_CAP` (10,000); the depth and travel sets keep every card.
 4. Uploads the shards under `v1/en/<dump date>/<set>/<n>.json`, then writes `v1/en/current.json`, which points readers at the new build. After that, it deletes the previous build.
 
 A thin build (fewer cards than `MINIMUM`), a failed download or a missing upstream list fails the job before anything is uploaded, and the current library keeps serving.
+
+## How the site reads it
+
+`public/app.js` (`fetchLibraryBatch`) reads `v1/en/current.json`, then one random shard of the set that matches the reader's settings, straight from `cards.wikiscroll.com`. These downloads never pass through the Worker, so they don't count against its daily request limit. Every English Wikipedia setting and Wikivoyage browsing come from the library:
+
+- Several topics or Help types: each draw picks one of the matching sets at random, so the feed mixes them.
+- Each visit draws a shard only once. When the reader's own depth has no shards left, or never had any (Popular articles rarely need work), the next draw comes from the nearest depth in the library, not from the live API.
+- When every depth of a setting is drawn, the feed ends on a "You're all caught up" card with *Start over* and *Change settings*.
+
+The Worker and the live API serve only what the library can't: other languages, travel search, On this day, an older library without the reader's set, or a failed download (the library is retried a minute later). The offline starter pool stays the last resort.
 
 ## Staying inside the free tier
 

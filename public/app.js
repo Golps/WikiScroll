@@ -761,6 +761,98 @@ function loadStarterLibrary(gen,outage=false) {
     return cards.filter(a=>a?.src===src&&validReserveArticle(a));
   });
 }
+// ── CARD LIBRARY ─────────────────────────────────────────────────────────────
+// Prebuilt English cards on cards.wikiscroll.com (scripts/build-library.mjs,
+// docs/CARD-LIBRARY.md) serve every feed except filtered travel. Each draw is
+// one random shard of 100 cards that this visit has not drawn. A thin setting
+// borrows the nearest depth from the library, never the live API; a setting
+// whose every depth is drawn ends on a card that says so. The Worker and the
+// live API serve only when the library can't (other languages, a failure).
+const LIBRARY_BASE='https://cards.wikiscroll.com/v1/en/';
+const library={manifest:null,loadedAt:0,task:null,failedUntil:0,drawn:new Map(),gen:-1,draws:0};
+let libraryExhausted=false;
+async function libraryJSON(url,ms){
+  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),ms);
+  try {const response=await fetch(url,{signal:controller.signal,mode:'cors',credentials:'omit'});return response.ok?await response.json():{missing:response.status===404};}
+  catch {return null;} finally {clearTimeout(timer);}
+}
+function libraryManifest(){
+  if(library.manifest&&Date.now()-library.loadedAt<30*6e4)return Promise.resolve(library.manifest);
+  library.task??=libraryJSON(LIBRARY_BASE+'current.json',4000).then(data=>{
+    library.task=null;
+    if(data?.v!==1||!data.sets||typeof data.base!=='string')return null;
+    if(library.manifest?.build!==data.build)library.drawn.clear();
+    library.manifest=data;library.loadedAt=Date.now();return data;
+  });
+  return library.task;
+}
+// Each family is one feed choice across depths: a topic, a Help type, or both.
+function libraryFamilies(){
+  if(curMode==='how')return voyageLang()==='en'&&!travelFilters.place&&!travelFilters.style?[()=>'how-en']:null;
+  if(curLang!=='en')return null;
+  const topics=[...curTopics],types=helpOnly()?activeHelpTypes():[];
+  if(topics.length&&types.length)return topics.flatMap(t=>types.map(type=>d=>`topic-en-${t}-help-${type}-${d}`));
+  if(topics.length)return topics.map(t=>d=>`topic-en-${t}-${d}`);
+  if(types.length)return types.map(type=>d=>`help-en-${type}-${d}`);
+  return [d=>'wiki-en-'+d];
+}
+function libraryShard(set,count){
+  let drawn=library.drawn.get(set);if(!drawn)library.drawn.set(set,drawn=new Set());
+  if(drawn.size>=count)return -1;
+  let shard=Math.floor(Math.random()*count);
+  for(let tries=0;drawn.has(shard)&&tries<20;tries++)shard=Math.floor(Math.random()*count);
+  while(drawn.has(shard))shard=(shard+1)%count;
+  drawn.add(shard);return shard;
+}
+// Returns cards, [] when this setting has no undrawn shard left, or null when
+// the library can't serve and the Worker should.
+async function fetchLibraryBatch(gen){
+  const families=libraryFamilies();
+  if(!families||Date.now()<library.failedUntil)return null;
+  const manifest=await libraryManifest();
+  if(gen!==fillGeneration)return [];
+  if(!manifest){library.failedUntil=Date.now()+6e4;return null;}
+  // A build without this feed's sets (an older library) leaves it to the Worker.
+  if(!families.every(f=>Object.hasOwn(manifest.sets,f(depthLevel))))return null;
+  if(library.gen!==gen){library.gen=gen;library.draws=0;}
+  const depths=curMode==='how'?[3]:[1,2,3,4,5].sort((a,b)=>Math.abs(a-depthLevel)-Math.abs(b-depthLevel)||b-a);
+  const pick=()=>{
+    for(const d of depths){
+      const open=families.map(f=>f(d)).filter(set=>(manifest.sets[set]||0)>(library.drawn.get(set)?.size||0));
+      if(open.length){const set=open[Math.floor(Math.random()*open.length)];return [set,libraryShard(set,manifest.sets[set])];}
+    }
+    return null;
+  };
+  let choice=pick();
+  // A reader returning to a setting this visit already used up starts it again.
+  if(!choice&&!library.draws){for(const f of families)for(const d of depths)library.drawn.delete(f(d));choice=pick();}
+  if(!choice){if(library.draws)libraryExhausted=true;return library.draws?[]:null;}
+  const [set,shard]=choice;
+  const cards=await libraryJSON(`${LIBRARY_BASE}${manifest.base}${set}/${shard}.json`,6000);
+  if(gen!==fillGeneration)return [];
+  if(!Array.isArray(cards)){
+    library.drawn.get(set)?.delete(shard);
+    // A missing shard means the build changed: read the manifest again.
+    if(cards?.missing){library.manifest=null;return null;}
+    library.failedUntil=Date.now()+6e4;return null;
+  }
+  library.draws++;
+  const src=curMode;
+  return cards.filter(a=>a?.src===src);
+}
+// The library has no more cards for these settings: say so and offer a next step.
+function showLibraryEnd(){
+  const feed=document.getElementById('feed');
+  if(feed.querySelector('.library-end'))return;
+  const card=document.createElement('div');card.className='card library-end';
+  // Every depth is drawn by now, so name the setting, not the depth.
+  const what=curMode==='how'?'travel guide':helpOnly()&&curTopics.size?'article in these topics that needs this help':helpOnly()?'article that needs this help':curTopics.size?'article in these topics':'article';
+  card.innerHTML=`<div class="cbg"><div class="cveil"></div></div><div class="err"><div class="err-ico">${uiIcon('discovery')}</div><h2 class="err-ttl">You’re all caught up</h2><div class="err-msg">You’ve seen every ${what} in this week’s library.</div><div class="travel-end-actions"></div></div>`;
+  const actions=card.querySelector('.travel-end-actions'),add=(label,run)=>{const b=document.createElement('button');b.type='button';b.className='err-btn';b.textContent=label;b.onclick=run;actions.append(b);};
+  add('Start over',()=>{library.drawn.clear();resetFeed();});
+  if(curMode==='wiki')add('Change settings',()=>{const desktop=document.getElementById('settingsBtn')?.offsetParent!==null;if(desktop)openSettings();else openBurger();});
+  feed.appendChild(card);
+}
 function startStartupFallback(gen,outage=false) {
   // Online visits wait for their own fresh draw. A quick shared starter or
   // restored batch would give different readers the same small opening pool.
@@ -932,6 +1024,13 @@ function fillQueue() {
     try {
       while(gen===fillGeneration&&queue.length<QUEUE_TARGET&&requests++<5){
         let added=0;
+        const shelf=libraryExhausted?[]:libraryFamilies()&&Date.now()>=library.failedUntil?await fetchLibraryBatch(gen):null;
+        if(gen!==fillGeneration)return;
+        if(shelf){
+          added=acceptSupply(shelf,gen);ensureFeedAhead();
+          if(libraryExhausted)break;
+          continue;
+        }
         if(useWorker)added=acceptSupply(await fetchWorkerBatch(gen),gen);
         if(gen!==fillGeneration)return;
         // Filtered travel is served by WikiScroll's own /api/travel, so a pause
@@ -955,6 +1054,7 @@ function fillQueue() {
 
 let refillTimer=null,refillAttempts=0;
 function scheduleRefill() {
+  if(libraryExhausted)return;
   if(curMode==='how'&&(travelFilters.place||travelFilters.style)&&travelExhausted)return;
   if(refillTimer||!navigator.onLine||document.hidden)return;
   const gen=fillGeneration;
@@ -998,6 +1098,7 @@ function ensureFeedAhead() {
 // A filtered travel feed that has run out ends on a card (features.js). Once
 // the reader chooses to continue, the card goes away when new guides arrive.
 function syncTravelEnd() {
+  if(libraryExhausted&&!queue.length&&articles.length)showLibraryEnd();
   const ended=curMode==='how'&&(travelFilters.place||travelFilters.style)&&travelExhausted&&!queue.length&&!supplyTask&&articles.length;
   if(!ended&&!travelContinuing)return;
   const end=document.querySelector('#feed .travel-end');
@@ -1169,7 +1270,7 @@ async function boot() {
 }
 function resetFeed() {
   window.dispatchEvent(new Event('feed-reset'));
-  travelOffset=0;travelExhausted=false;travelSuggestion='';travelContinuing=false;travelRetries=0;sentinel?.disconnect();
+  travelOffset=0;travelExhausted=false;travelSuggestion='';travelContinuing=false;travelRetries=0;libraryExhausted=false;sentinel?.disconnect();
   fillGeneration++;pendingDeepGeneration=-1;
   supplyControllers.forEach(controller=>controller.abort());
   articles=[];queue=[];feedSeen.clear();filling=false;supplyTask=null;

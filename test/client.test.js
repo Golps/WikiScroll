@@ -87,7 +87,7 @@ test('late random supply retains its opening draw without blocking the next fres
 test('topic and Help fills keep requesting their partial batch rather than stopping after the first cards',async()=>{
  for(const help of [false,true]){
   const start=source.indexOf('function fillQueue()'),end=source.indexOf('let refillTimer=',start);let calls=0;const urls=[];
-  const c=vm.createContext({Promise,Date,URLSearchParams,fillGeneration:0,queue:[],QUEUE_MIN:60,QUEUE_TARGET:100,curMode:'wiki',curTopics:new Set(help?[]:['tech']),helpOnly:()=>help,travelFilters:{},apiCooldownUntil:0,workerCooldownUntil:0,scheduleRefill(){},syncTravelEnd(){},ensureFeedAhead(){},fetchWiki:()=>{throw Error('a filtered feed must not request unfiltered fallback');},fetchVoyage:()=>{},fetchWorkerBatch:async()=>{calls++;urls.push(calls);return [{id:'w'+calls}];},acceptSupply(batch){c.queue.push(...batch);return batch.length;}});
+  const c=vm.createContext({Promise,Date,URLSearchParams,fillGeneration:0,queue:[],QUEUE_MIN:60,QUEUE_TARGET:100,curMode:'wiki',curTopics:new Set(help?[]:['tech']),helpOnly:()=>help,travelFilters:{},apiCooldownUntil:0,workerCooldownUntil:0,scheduleRefill(){},syncTravelEnd(){},ensureFeedAhead(){},libraryExhausted:false,libraryFamilies:()=>null,library:{failedUntil:0},fetchWiki:()=>{throw Error('a filtered feed must not request unfiltered fallback');},fetchVoyage:()=>{},fetchWorkerBatch:async()=>{calls++;urls.push(calls);return [{id:'w'+calls}];},acceptSupply(batch){c.queue.push(...batch);return batch.length;}});
   vm.runInContext(`let supplyTask=null,filling=false,fillBudget=null,pendingWorkerBatch={params:new URLSearchParams({topic:'tech'})};${source.slice(start,end)}`,c);
   await c.fillQueue();assert.equal(calls,5);assert.equal(c.queue.length,5);
  }
@@ -139,12 +139,12 @@ test('repeated partial topic supply releases the foreground after bounded retrie
 
 test('cold startup retries at the server pause deadline rather than another exponential backoff tick',()=>{
  const start=source.indexOf('let refillTimer=null'),end=source.indexOf("window.addEventListener('online'",start);
- let delay;const c=vm.createContext({Date:{now:()=>100000},setTimeout:(_,d)=>{delay=d;return 1;},navigator:{onLine:true},document:{hidden:false},curMode:'wiki',fillGeneration:0,workerCooldownUntil:134000,pendingWorkerBatch:{cacheRecovery:true,cachedScan:0},articles:[],queue:[],QUEUE_MIN:72});
+ let delay;const c=vm.createContext({Date:{now:()=>100000},setTimeout:(_,d)=>{delay=d;return 1;},navigator:{onLine:true},document:{hidden:false},curMode:'wiki',fillGeneration:0,workerCooldownUntil:134000,pendingWorkerBatch:{cacheRecovery:true,cachedScan:0},articles:[],queue:[],QUEUE_MIN:72,libraryExhausted:false});
  vm.runInContext(source.slice(start,end)+'\nrefillAttempts=50;scheduleRefill();',c);assert.equal(delay,34050);
 });
 test('an existing feed may still scan cache-only reserves before the upstream pause ends',()=>{
  const start=source.indexOf('let refillTimer=null'),end=source.indexOf("window.addEventListener('online'",start);
- let delay;const c=vm.createContext({Date:{now:()=>100000},setTimeout:(_,d)=>{delay=d;return 1;},navigator:{onLine:true},document:{hidden:false},curMode:'wiki',fillGeneration:0,workerCooldownUntil:134000,pendingWorkerBatch:{cacheRecovery:true,cachedScan:0},articles:[{id:'w1'}],queue:[],QUEUE_MIN:72});
+ let delay;const c=vm.createContext({Date:{now:()=>100000},setTimeout:(_,d)=>{delay=d;return 1;},navigator:{onLine:true},document:{hidden:false},curMode:'wiki',fillGeneration:0,workerCooldownUntil:134000,pendingWorkerBatch:{cacheRecovery:true,cachedScan:0},articles:[{id:'w1'}],queue:[],QUEUE_MIN:72,libraryExhausted:false});
  vm.runInContext(source.slice(start,end)+'\nscheduleRefill();',c);assert.equal(delay,700);
 });
 

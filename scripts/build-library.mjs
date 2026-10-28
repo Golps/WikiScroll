@@ -43,6 +43,8 @@ export const SETS = [
   ...DEPTHS.map(d => `wiki-${LANG}-${d}`),
   ...TOPICS.flatMap(topic => DEPTHS.map(d => `topic-${LANG}-${topic}-${d}`)),
   ...HELP.flatMap(type => DEPTHS.map(d => `help-${LANG}-${type}-${d}`)),
+  // A topic feed filtered to one Help type, so the browser never sifts topic cards.
+  ...TOPICS.flatMap(topic => HELP.flatMap(type => DEPTHS.map(d => `topic-${LANG}-${topic}-help-${type}-${d}`))),
   `how-${LANG}`,
 ];
 export const SHARD_SIZE = 100, BUCKETS = 64;
@@ -52,7 +54,7 @@ export const BODY_CHARS = 1000;
 export const topicLevels = depth => depth >= 4 ? 3 : 2;
 // Topic and Help sets are slices of the same pool, so each keeps a generous
 // random sample instead of every match; the depth sets keep every card.
-export const SLICE_CAP = 40_000;
+export const SLICE_CAP = 40_000, COMBO_CAP = 10_000;
 // A set below this many cards fails the build, so a bad week keeps last week's library.
 export const MINIMUM = {'wiki-en-1': 500, 'wiki-en-2': 3000, 'wiki-en-3': 50000, 'wiki-en-4': 50000, 'wiki-en-5': 50000, 'how-en': 10000};
 // R2's free tier allows 1M writes and 10 GB a month. Five weekly builds must
@@ -291,7 +293,10 @@ export function cardSets(doc, card, views, {levels, reach = new Map(), photoTitl
   }
   for (const [topic, level] of pageTopics(doc, reach)) {
     const topical = {...tagged, topic};
-    for (const depth of DEPTHS) if (level <= topicLevels(depth) && inBand(views, TOPIC_BANDS[depth])) sets.push([`topic-${LANG}-${topic}-${depth}`, topical]);
+    for (const depth of DEPTHS) if (level <= topicLevels(depth) && inBand(views, TOPIC_BANDS[depth])) {
+      sets.push([`topic-${LANG}-${topic}-${depth}`, topical]);
+      for (const type of HELP) if (HELP_TYPES[type].some(code => needs.includes(code))) sets.push([`topic-${LANG}-${topic}-help-${type}-${depth}`, topical]);
+    }
   }
   if (needs.length) {
     const help = {...card, needs};
@@ -310,13 +315,17 @@ export function voyageCard(pageid, doc, props) {
 
 // An external shuffle: every card goes to a random gzipped bucket file, then
 // each bucket is shuffled in memory. Millions of cards never sit in memory at once.
+// Capped sets keep a sample, so fewer buckets do; that keeps open files and
+// compressor memory bounded across hundreds of sets.
+const capFor = set => /-help-/.test(set) ? COMBO_CAP : set.startsWith('topic-') || set.startsWith('help-') ? SLICE_CAP : Infinity;
+export const bucketsFor = set => capFor(set) === Infinity ? BUCKETS : 16;
 export function createBuckets(dir) {
   const streams = new Map(), counts = Object.fromEntries(SETS.map(set => [set, 0]));
   const open = (set, bucket) => {
     const key = set + '/' + bucket;
     if (!streams.has(key)) {
       fs.mkdirSync(path.join(dir, set), {recursive: true});
-      const gzip = zlib.createGzip({level: 1}), file = fs.createWriteStream(path.join(dir, set, bucket + '.ndjson.gz'));
+      const gzip = zlib.createGzip({level: 1, windowBits: 12, memLevel: 6}), file = fs.createWriteStream(path.join(dir, set, bucket + '.ndjson.gz'));
       gzip.pipe(file);
       streams.set(key, {gzip, file});
     }
@@ -326,7 +335,7 @@ export function createBuckets(dir) {
     counts,
     async add(set, card) {
       counts[set]++;
-      const stream = open(set, Math.floor(Math.random() * BUCKETS));
+      const stream = open(set, Math.floor(Math.random() * bucketsFor(set)));
       if (!stream.write(JSON.stringify(card) + '\n')) await once(stream, 'drain');
     },
     async close() {
@@ -354,7 +363,7 @@ export async function packSet(bucketDir, set, outDir, shardSize = SHARD_SIZE, ca
     await fsp.writeFile(path.join(outDir, set, count + '.json'), body);
     count++; bytes += body.length; cards += list.length;
   };
-  for (let bucket = 0; bucket < BUCKETS && cards + shardSize <= cap; bucket++) {
+  for (let bucket = 0, total = bucketsFor(set); bucket < total && cards + shardSize <= cap; bucket++) {
     const mixed = shuffle([...carry, ...await readBucket(path.join(bucketDir, set, bucket + '.ndjson.gz'))]);
     let i = 0;
     for (; i + shardSize <= mixed.length && cards + shardSize <= cap; i += shardSize) await write(mixed.slice(i, i + shardSize));
@@ -363,7 +372,6 @@ export async function packSet(bucketDir, set, outDir, shardSize = SHARD_SIZE, ca
   if (!count && carry.length) await write(carry.slice(0, Math.min(cap, carry.length)));
   return {count, bytes, cards};
 }
-const capFor = set => set.startsWith('topic-') || set.startsWith('help-') ? SLICE_CAP : Infinity;
 
 export async function buildLibrary({lines, props, dailyTotal, levels, reach = new Map(), photoTitles = new Set(), voyage = null, outDir, tmpDir, build, source = {}}) {
   const buckets = createBuckets(tmpDir), stats = {pages: 0, cards: 0, unknown: 0, guides: 0};
@@ -472,9 +480,9 @@ if (process.argv[1] && import.meta.url === new URL(process.argv[1], 'file:').hre
       reach, photoTitles, voyage, outDir, tmpDir, build, source: {cirrus: build}});
     await fsp.rm(tmpDir, {recursive: true, force: true});
     const images = await checkImages(outDir, result.manifest);
-    const per = prefix => SETS.filter(s => s.startsWith(prefix)).reduce((sum, s) => sum + result.manifest.sets[s], 0);
+    const per = test => SETS.filter(test).reduce((sum, s) => sum + result.manifest.sets[s], 0), starts = prefix => s => s.startsWith(prefix);
     console.log(`Card library ${build}: ${result.pages} pages read, ${result.cards} articles in at least one set (${result.unknown} without readership), ${result.guides} travel guides.`);
-    console.log(`${result.files} shards, ${(result.bytes / 1e9).toFixed(2)} GB: depth sets ${per('wiki-')}, topic sets ${per('topic-')}, Help sets ${per('help-')}, travel ${per('how-')} shards.`);
+    console.log(`${result.files} shards, ${(result.bytes / 1e9).toFixed(2)} GB: depth sets ${per(starts('wiki-'))}, topic sets ${per(s => s.startsWith('topic-') && !s.includes('-help-'))}, topic Help sets ${per(s => s.includes('-help-'))}, Help sets ${per(starts('help-'))}, travel ${per(starts('how-'))} shards.`);
     console.log('Cards per set: ' + SETS.map(set => `${set} ${result.counts[set]}`).join(', ') + `. Average daily views used: ${Math.round(dailyTotal)}.`);
     console.log(`Image check: ${images.ok} of ${images.checked} sampled images loaded.`);
   } catch (error) { console.error(error.message); process.exitCode = 1; }

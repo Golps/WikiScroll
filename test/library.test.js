@@ -106,6 +106,9 @@ test('each page joins the depth, topic and Help sets the live feeds would draw i
  const tagged=cardSets({title:'Danube',category:['Rivers of Europe','All stub articles']},card,40,{levels,reach});
  assert.deepEqual(tagged.find(([s])=>s==='wiki-en-3')[1].needs,['stub'],'ordinary cards carry their maintenance tag');
  assert.equal(tagged.find(([s])=>s==='topic-en-geo-3')[1].topic,'geo');
+ const combo=tagged.find(([s])=>s==='topic-en-geo-help-detail-3');
+ assert.ok(combo,'a tagged topic card joins its topic and Help type set');assert.equal(combo[1].topic,'geo');assert.deepEqual(combo[1].needs,['stub']);
+ assert.ok(!tagged.some(([s])=>s==='topic-en-geo-help-sources-3'),'only the Help types it needs');
 });
 
 test('travel guides skip phrasebooks and travel topics and need no image',()=>{
@@ -120,7 +123,7 @@ test('travel guides skip phrasebooks and travel topics and need no image',()=>{
 
 test('the set list covers every feed the site offers',()=>{
  assert.deepEqual(TOPICS,Object.keys(roots));assert.deepEqual(HELP,availableHelpTypes('en'));
- assert.equal(SETS.length,5+TOPICS.length*5+HELP.length*5+1);
+ assert.equal(SETS.length,5+TOPICS.length*5+HELP.length*5+TOPICS.length*HELP.length*5+1);
  assert.equal(new Set(SETS).size,SETS.length);
 });
 

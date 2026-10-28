@@ -1,35 +1,45 @@
-/* First-launch gesture coach: an animated hand for scrolling and one for
-   swiping. Each row retires once the reader has made that gesture; the coach
-   stops appearing when both are learned. Navigation remains in app.js. */
+/* First-launch gesture coach: one small pill under the header with an
+   animated hand. It teaches scrolling first, then changes in place to swiping
+   once the reader scrolls, and retires each gesture once the reader has made
+   it. Navigation remains in app.js. */
 (() => {
   const coach = document.getElementById('coach'), feed = document.getElementById('feed');
   const KEY = 'ws_coach';
-  let timer = 0, visible = false, learned = {};
+  let timer = 0, current = '', swipeOn = true, learned = {};
   try { learned = JSON.parse(localStorage.getItem(KEY)) || {}; } catch {}
   const rows = gesture => coach.querySelector(`[data-gesture="${gesture}"]`);
+  const next = () => !learned.scroll ? 'scroll' : swipeOn && !learned.swipe ? 'swipe' : '';
   function hide() {
-    clearTimeout(timer); visible = false;
+    clearTimeout(timer); current = '';
     coach.classList.remove('is-visible'); coach.setAttribute('aria-hidden', 'true');
   }
+  function show(gesture) {
+    if (!gesture) return hide();
+    current = gesture;
+    rows('scroll').hidden = gesture !== 'scroll'; rows('swipe').hidden = gesture !== 'swipe';
+    const header = document.querySelector?.('.hdr');
+    if (header) coach.style.top = Math.round(header.getBoundingClientRect().bottom + 10) + 'px';
+    coach.classList.add('is-visible'); coach.removeAttribute('aria-hidden');
+    clearTimeout(timer); timer = setTimeout(hide, 9000);
+  }
   function learn(gesture) {
-    if (learned[gesture]) return;
-    learned[gesture] = 1;
-    try { localStorage.setItem(KEY, JSON.stringify(learned)); } catch {}
+    if (!learned[gesture]) {
+      learned[gesture] = 1;
+      try { localStorage.setItem(KEY, JSON.stringify(learned)); } catch {}
+    }
+    if (current === gesture) show(next());
   }
   window.WSDiscoveryHint = {
     show({swipe = true} = {}) {
+      swipeOn = swipe;
       if (feed.scrollTop > 36) return;
-      const showScroll = !learned.scroll, showSwipe = swipe && !learned.swipe;
-      if (!showScroll && !showSwipe) return;
-      rows('scroll').hidden = !showScroll; rows('swipe').hidden = !showSwipe;
-      visible = true; coach.classList.add('is-visible'); coach.removeAttribute('aria-hidden');
-      clearTimeout(timer); timer = setTimeout(hide, 9000);
+      show(next());
     },
     hide,
-    learned(gesture) { learn(gesture); if (visible) hide(); },
+    learned: learn,
   };
   coach.addEventListener('click', hide);
-  feed.addEventListener('scroll', () => { if (feed.scrollTop > 36) { learn('scroll'); if (visible) hide(); } }, {passive:true});
+  feed.addEventListener('scroll', () => { if (feed.scrollTop > 36) learn('scroll'); }, {passive:true});
   window.addEventListener('feed-reset', hide);
   document.addEventListener('visibilitychange', () => { if (document.hidden) hide(); });
 })();

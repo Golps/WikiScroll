@@ -4,7 +4,7 @@ The card library is a prebuilt set of English Wikipedia cards stored in Cloudfla
 
 ## How a build works
 
-`.github/workflows/card-library.yml` runs every Tuesday (and on demand) on GitHub Actions:
+`.github/workflows/card-library.yml` runs on GitHub Actions early every Monday, the day after Wikimedia publishes its weekly dump, and on demand:
 
 1. Finds the newest weekly CirrusSearch index dump for `enwiki_content` on dumps.wikimedia.org. If that dump is already live, the run stops, so a rerun never repeats uploads.
 2. Downloads the `page_props` dump (lead images, short descriptions, disambiguation flags).

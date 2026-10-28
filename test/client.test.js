@@ -104,7 +104,7 @@ test('an upstream cooldown can use cache-only cards without restarting a Wikimed
 
 test('upstream pauses follow one edition while genuine Worker limits remain global',async()=>{
  const start=source.indexOf('function retryAfterMillis('),end=source.indexOf('async function fetchWorkerBatch(',start);let now=100000;
- const c=vm.createContext({Date:{now:()=>now,parse:Date.parse},curMode:'wiki',curLang:'en',voyageLang:()=>c.curLang,fillGeneration:0,workerCooldownUntil:0,pendingWorkerBatch:null});vm.runInContext(source.slice(start,end),c);
+ const c=vm.createContext({Date:{now:()=>now,parse:Date.parse},curMode:'wiki',curLang:'en',voyageLang:()=>c.curLang,fillGeneration:0,workerCooldownUntil:0,pendingWorkerBatch:null,articles:[{id:'w1'}],queue:[]});vm.runInContext(source.slice(start,end),c);
  const pause=()=>Response.json({code:'upstream_rate_limited'},{status:503,headers:{'Retry-After':'28'}});
  await c.noteWorkerCooldown(pause(),0,'wiki|en');assert.equal(c.workerCooldownUntil,128000);
  c.curMode='how';c.restoreWorkerCooldown();assert.equal(c.workerCooldownUntil,0);
@@ -115,7 +115,7 @@ test('upstream pauses follow one edition while genuine Worker limits remain glob
 });
 test('an old generation’s delayed error body cannot pause the new feed',async()=>{
  const start=source.indexOf('function retryAfterMillis('),end=source.indexOf('async function fetchWorkerBatch(',start);let release;const body=new Promise(r=>{release=r;});
- const c=vm.createContext({Date,curMode:'wiki',curLang:'en',voyageLang:()=>c.curLang,fillGeneration:0,workerCooldownUntil:0,pendingWorkerBatch:null});vm.runInContext(source.slice(start,end),c);
+ const c=vm.createContext({Date,curMode:'wiki',curLang:'en',voyageLang:()=>c.curLang,fillGeneration:0,workerCooldownUntil:0,pendingWorkerBatch:null,articles:[{id:'w1'}],queue:[]});vm.runInContext(source.slice(start,end),c);
  const pending=c.noteWorkerCooldown({status:503,headers:new Headers({'Retry-After':'180'}),json:()=>body},0,'wiki|en');c.fillGeneration++;c.curMode='how';release({code:'upstream_rate_limited'});await pending;
  assert.equal(c.workerCooldownUntil,0);c.curMode='wiki';c.restoreWorkerCooldown();assert.equal(c.workerCooldownUntil,0);
 });

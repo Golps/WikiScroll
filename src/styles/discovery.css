@@ -141,3 +141,7 @@ body.light .coach { box-shadow: 0 12px 36px #0002; }
   .coach { transition: opacity .2s ease, visibility 0s .2s; transform: translate(-50%, 0); }
   .coach.is-visible .coach-move, .coach.is-visible .coach-track { animation: none !important; }
 }
+
+/* After a tap or click, nothing stays outlined; keyboard focus keeps its ring (see discovery.js). */
+.pointer-input :focus, .pointer-input :focus-visible { outline: none !important; }
+.pointer-input .act:focus-visible { box-shadow: none; }

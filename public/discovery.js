@@ -33,3 +33,14 @@
   window.addEventListener('feed-reset', hide);
   document.addEventListener('visibilitychange', () => { if (document.hidden) hide(); });
 })();
+
+/* Focus rings are for keyboard users. After a tap or click, a panel that moves
+   focus to its first control (close button, About links) must not leave a lit
+   square behind; any key press brings the rings back. */
+(() => {
+  const root = document.documentElement;
+  const pointer = () => root.classList.add('pointer-input');
+  addEventListener('pointerdown', pointer, {capture:true, passive:true});
+  addEventListener('touchstart', pointer, {capture:true, passive:true});
+  addEventListener('keydown', event => { if (!event.metaKey && !event.ctrlKey && !event.altKey) root.classList.remove('pointer-input'); }, true);
+})();

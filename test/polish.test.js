@@ -21,7 +21,7 @@ test('gesture coach teaches scroll and swipe until each is learned, and hides on
  const coach={classList:classes(),setAttribute:(k,v)=>attrs[k]=v,removeAttribute:k=>delete attrs[k],addEventListener:(e,f)=>events[e]=f,querySelector:q=>rows[q.match(/"(\w+)"/)[1]]};
  const feed={scrollTop:0,addEventListener:(e,f)=>events['feed'+e]=f};
  const localStorage={getItem:k=>store[k]??null,setItem:(k,v)=>store[k]=v};
- const load=()=>{const window={addEventListener(){}};vm.runInNewContext(read('discovery.js'),{document:{getElementById:id=>id==='coach'?coach:feed,addEventListener(){}},window,localStorage,setTimeout:f=>{timer=f;return 1},clearTimeout(){}});return window.WSDiscoveryHint;};
+ const load=()=>{const window={addEventListener(){}};vm.runInNewContext(read('discovery.js'),{document:{getElementById:id=>id==='coach'?coach:feed,addEventListener(){},documentElement:{classList:classes()}},window,localStorage,addEventListener(){},setTimeout:f=>{timer=f;return 1},clearTimeout(){}});return window.WSDiscoveryHint;};
  let coachApi=load();
  coachApi.show({swipe:true});assert.ok(coach.classList.contains('is-visible'));assert.equal(rows.scroll.hidden,false);assert.equal(rows.swipe.hidden,false);
  timer();assert.equal(attrs['aria-hidden'],'true');
@@ -71,4 +71,14 @@ test('cloned dialog shells scope root ARIA references and input labels per insta
  assert.equal(first.attrs['aria-describedby'],'external '+first.children.title.id);
  assert.equal(first.children.label.attrs.for,first.children.input.id);
  assert.notEqual(first.children.input.id,second.children.input.id);
+});
+
+test('focus rings hide after a tap or click and return on any key press',()=>{
+ const listeners={},root={classList:classes()};
+ vm.runInNewContext(read('discovery.js').slice(read('discovery.js').indexOf('/* Focus rings')),{document:{documentElement:root},addEventListener:(e,f)=>listeners[e]=f});
+ listeners.pointerdown();assert.ok(root.classList.contains('pointer-input'));
+ listeners.keydown({metaKey:false,ctrlKey:false,altKey:false});assert.ok(!root.classList.contains('pointer-input'));
+ listeners.touchstart();listeners.keydown({metaKey:true});assert.ok(root.classList.contains('pointer-input'),'shortcuts do not count as keyboard navigation');
+ const css=fs.readFileSync(new URL('../src/styles/discovery.css',import.meta.url),'utf8');
+ assert.match(css,/\.pointer-input :focus, \.pointer-input :focus-visible \{ outline: none !important; \}/);
 });

@@ -40,13 +40,13 @@ export function diverseDepth(pages,depth,lang='en'){
 }
 // topic 'help' samples Wikipedia's maintenance lists; help:true narrows any
 // other topic to articles that need work (needs.js).
-export async function topicPages(topic,lang,depth,upstream,{help=false,helpTypes=null,supply=null,state={}}={}){
+export async function topicPages(topic,lang,depth,upstream,{help=false,helpTypes=null,supply=null,state={},early=null}={}){
  const needy=topic==='help'||help;
  const allowedNeeds=needy?selectedHelpNeeds(lang,helpTypes):null;
  let sourceFailed=false;
- const query=async(language,params)=>{
-  let data;try{data=await upstream(`https://${language}.wikipedia.org/w/api.php?`+new URLSearchParams({action:'query',format:'json',...params}));}catch{}
-  if(!data||data.error){sourceFailed=true;return null;}return data;
+ const query=async(language,params,options)=>{
+  let data;try{data=await upstream(`https://${language}.wikipedia.org/w/api.php?`+new URLSearchParams({action:'query',format:'json',...params}),options);}catch{}
+  if(!data||data.error){if(!options?.optional)sourceFailed=true;return null;}return data;
  };
  async function members(title){
   const key=lang+'|'+title,entry=lists.get(key);
@@ -129,14 +129,16 @@ export async function topicPages(topic,lang,depth,upstream,{help=false,helpTypes
   chosen=chosen.concat(pages.filter(p=>!taken.has(p.pageid)&&averageViews(p,lag)!==null).sort((a,b)=>distance(a)-distance(b)).slice(0,8-chosen.length));
  }
  state.chosen=chosen;
- // Independent enrichment shares the same bounded upstream scheduler.
- await Promise.all([
-  !needy&&HELP_LANGS.has(lang)?completeNeeds(lang,chosen,params=>query(lang,params)):Promise.resolve(),
-  completeExtracts(chosen,ids=>query(lang,extractParams(ids)))
- ]);
- supply?.remember(pages,lang);
+ // Optional tags on an ordinary topic feed take the scheduler's low-priority
+ // lane. Cards are offered through `early` as soon as their text is ready;
+ // the returned (and cached) batch waits for the tags.
+ const tags=!needy&&HELP_LANGS.has(lang)?completeNeeds(lang,chosen,params=>query(lang,params,{optional:true})):null;
+ await completeExtracts(chosen,ids=>query(lang,extractParams(ids)));
  if(chosen.some(p=>p.extractMissing))sourceFailed=true;
  state.incomplete=chosen.some(p=>p.extractMissing)||(needy&&sourceFailed);
+ if(tags&&!state.incomplete){const ready=readyArticles(chosen,topic,lang);if(ready.length)early?.(ready);}
+ if(tags)await tags;
+ supply?.remember(pages,lang);
  const articles=readyArticles(chosen,topic,lang);
  if(!articles.length&&sourceFailed)throw Error('Topic source temporarily unavailable');
  return articles;
@@ -167,17 +169,18 @@ export async function topicResponse(url,env,ctx,{langs,permit,limited,upstream,w
  const age=Array.isArray(stored?.articles)&&stored.articles.length?Date.now()-Date.parse(stored.cached_at):Infinity;
  function refresh(){
   if(pending.has(key.url))return pending.get(key.url);
-  const metered=request=>suppliedWork?upstream(request):work.request(upstream,request);
+  const metered=(request,options)=>suppliedWork?upstream(request,options):work.request(upstream,request,options);
   let state=progress.get(key.url);
   if(!state||Date.now()-state.at>300000){state={at:Date.now()};progress.delete(key.url);if(progress.size>=128)progress.delete(progress.keys().next().value);progress.set(key.url,state);}
-  const task=topicPages(topic,lang,depth,metered,{help:help&&topic!=='help',helpTypes,supply,state}).then(async articles=>{
+  let offer;const early=new Promise(resolve=>{offer=articles=>resolve({articles,cached_at:new Date().toISOString()});});
+  const task=topicPages(topic,lang,depth,metered,{help:help&&topic!=='help',helpTypes,supply,state,early:offer}).then(async articles=>{
    const payload={articles,cached_at:new Date().toISOString(),...(state.incomplete?{partial:true}:{})};
    if(!state.incomplete){
     if(articles.length&&cache)await cache.put(key,Response.json(payload,{headers:{'Cache-Control':`public, max-age=${RETAIN_SECONDS}`}})).catch(()=>{});
     progress.delete(key.url);
    }
    return payload;
-  }).finally(()=>{if(pending.get(key.url)===task)pending.delete(key.url);});task.deadline=Date.now()+work.timeLeft();pending.set(key.url,task);ctx.waitUntil(task.catch(()=>{}));
+  }).finally(()=>{if(pending.get(key.url)===task)pending.delete(key.url);});task.deadline=Date.now()+work.timeLeft();task.work=work;task.early=early;pending.set(key.url,task);ctx.waitUntil(task.catch(()=>{}));
   return task;
  }
  if(Number.isFinite(age)&&age>=0&&age<RETAIN_SECONDS*1000){
@@ -189,7 +192,8 @@ export async function topicResponse(url,env,ctx,{langs,permit,limited,upstream,w
  let timer;
  try{
   const task=refresh();
-  const answer=await Promise.race([task,new Promise(resolve=>{timer=setTimeout(()=>resolve(null),9000);})]);
+  const answer=await Promise.race([task,task.early,new Promise(resolve=>{timer=setTimeout(()=>resolve(null),9000);})].filter(Boolean)).catch(error=>{work.absorb(task.work);throw error;});
+  work.absorb(task.work);
   if(answer)return respond(answer,draw?'FRESH':'MISS');
   const articles=readyArticles(progress.get(key.url)?.chosen||[],topic,lang);
   if(articles.length)return respond({articles,partial:true},draw?'FRESH':'MISS');

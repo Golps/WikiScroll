@@ -30,12 +30,13 @@ const BAD_TITLE = /^(list of|index of|wikipedia:|template:|category:|portal:|dra
 // replaying one cached random selection for every refill in the same session.
 const FRESH_MS = 60_000;
 const RETAIN_SECONDS = 86_400;
-const cooldowns = new Map(), supply = createSupply(),openingCache=createOpeningCache();
+const cooldowns = new Map(), strikes = new Map(), supply = createSupply(),openingCache=createOpeningCache();
 // One answer budget per request. A request can chain several upstream calls,
 // each with its own 6 s deadline, but the browser stops waiting at 7.5 s
 // (10 s for filtered travel). Answer with what is ready and let the rest of
 // the batch finish in the background and fill the edge cache.
 const RESPONSE_BUDGET_MS = 6_500;
+const OUTAGE = new Set(['upstream_unavailable','upstream_timeout','upstream_rate_limited']);
 const TRAVEL_BUDGET_MS = 8_500;
 const within = (promise, ms) => { let timer; return Promise.race([promise, new Promise(resolve => { timer = setTimeout(() => resolve(null), ms); })]).finally(() => clearTimeout(timer)); };
 
@@ -104,7 +105,7 @@ function startBatch(key,lang,mode,depth,cache,ctx,work) {
   let deliver;
   const ready=new Promise(resolve=>{deliver=resolve;});
   // snapshot() returns the cards already usable if the answer budget runs out.
-  const entry={ready,complete:null,snapshot:()=>[],finished:false,deadline:Date.now()+work.timeLeft()};
+  const entry={ready,complete:null,snapshot:()=>[],finished:false,work,deadline:Date.now()+work.timeLeft()};
   inFlight.set(id,entry);
   entry.complete=(async()=>{
     // Popular and Known sample Wikipedia's vital articles (vital.js).
@@ -113,6 +114,9 @@ function startBatch(key,lang,mode,depth,cache,ctx,work) {
       entry.snapshot=()=>info.snapshot?.()||[];
       const payload={articles:await vitalArticles(lang,depth,upstream,ctx,article,info,work),cached_at:new Date().toISOString()};
       deliver(payload);
+      // Optional maintenance tags finish after the reader's answer; the cached
+      // copy carries them.
+      if(info.enrich){await info.enrich;if(payload.articles.length)payload.articles=info.snapshot();}
       // A Known answer borrowed from Popular serves this reader only.
       if(cache&&payload.articles.length&&!info.borrowed)await cache.put(key,json(payload,200,{'Cache-Control':`public, max-age=${RETAIN_SECONDS}`})).catch(()=>{});
       return payload;
@@ -146,16 +150,20 @@ function startBatch(key,lang,mode,depth,cache,ctx,work) {
       supply.hydrate(fresh,lang,mode);
       if(mode==='wiki')await completePageviews(fresh,ids=>upstream(apiURL(lang,mode,{prop:'pageviews',pvipdays:'14',pageids:ids})));
       const chosen=selectCandidates(fresh,lang,mode,depth);
+      // Maintenance tags are optional on ordinary cards: they run in the
+      // scheduler's low-priority lane and never hold back a card whose text
+      // and image are ready. The cached batch waits for them below.
+      const tags=mode==='wiki'&&HELP_LANGS.has(lang)?completeNeeds(lang,chosen,params=>upstream(apiURL(lang,mode,params),{optional:true})):null;
       await Promise.all([
         mode==='how'?completeVoyageImages(chosen,upstream):null,
         completeExtracts(chosen,ids=>upstream(apiURL(lang,mode,extractParams(ids)))).then(()=>mode==='how'?completeLeadFallback(chosen,id=>upstream(apiURL(lang,mode,fullTextParams(id)))):null),
-        mode==='wiki'&&HELP_LANGS.has(lang)?completeNeeds(lang,chosen,params=>upstream(apiURL(lang,mode,params))):null,
       ]);
       // Only a sample that added pages publishes: a duplicate sample must not
       // answer before its sibling's views and introductions have arrived.
       supply.remember(fresh,lang,mode);
       const selected=fresh.length?selectArticles(pages,lang,mode,depth):[];
       if(selected.length)deliver({articles:selected,cached_at:new Date().toISOString()});
+      if(tags){await tags;supply.remember(chosen,lang,mode);}
     }));
     const payload={articles:selectArticles(pages,lang,mode,depth),cached_at:new Date().toISOString()};
     deliver(payload);
@@ -198,8 +206,16 @@ async function articles(request,url,ctx,env,work) {
   ctx.waitUntil(pending.complete);
   let result=await within(url.searchParams.get('resume')==='1'?pending.complete:pending.ready,RESPONSE_BUDGET_MS);
   if(!result)result={articles:pending.snapshot(),cached_at:new Date().toISOString()};
+  // A coalesced request reports the shared job's failure and retry time.
+  work.absorb(pending.work);
   if(!result.articles.length){
     if(!pending.finished&&!work.reason)return json({articles:[],partial:true,code:'batch_pending'},503,{'Retry-After':'1'});
+    // Wikimedia is failing, not slow: complete batches other readers already
+    // received are better than an empty feed. Cache reads only, no upstream.
+    if(OUTAGE.has(work.reason)){
+      const recovered=await cachedWindow(work.cache,draw?new Request(key.url.replace(/&draw=[a-f0-9]+$/,'')):key,batch);
+      if(recovered.articles.length)return json({...recovered,articles:recovered.articles.slice(0,n),code:work.reason},200,{'X-Cache':'RECOVERY','Retry-After':String(work.retrySeconds())});
+    }
     return unavailable(work);
   }
   const paused=!pending.finished&&['upstream_rate_limited','work_rate_limited'].includes(work.reason);
@@ -390,7 +406,7 @@ export default {async fetch(request,env,ctx){
   const url=new URL(request.url);
   const dynamic=url.pathname.startsWith('/api/')||url.pathname.startsWith('/collection')||(url.searchParams.has('a')&&BOTS.test(request.headers.get('User-Agent')||''));
   if(dynamic&&!await permit(env,'REQUEST_LIMIT',request.headers.get('CF-Connecting-IP')||'unknown'))return secure(limited());
-  const work=createWork(env,ctx,createNetwork(cooldowns));
+  const work=createWork(env,ctx,createNetwork(cooldowns,strikes));
   try{return secure(await handle(request,env,ctx,work));}
   catch{return secure(new Response('Temporarily unavailable. Please retry.',{status:503,headers:{'Cache-Control':'no-store','Retry-After':'60'}}));}
 }};

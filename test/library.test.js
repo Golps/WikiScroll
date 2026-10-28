@@ -29,6 +29,9 @@ test('SQL rows are read by column name, including escapes',async()=>{
  const columns=await readTable(table('t',['b','a'],[[1,2]]),(row,c)=>seen.push(row[c.a]));
  assert.deepEqual(columns,{b:0,a:1});assert.deepEqual(seen,[2]);
  await assert.rejects(readTable(['INSERT INTO `t` VALUES (1);'],()=>{}),/no CREATE TABLE/);
+ const rows=[];
+ await readTable(['CREATE TABLE `t` (','  `a` int,','  `b` varbinary(9),',') ENGINE=InnoDB;','INSERT INTO `t` VALUES',"(1,'x;'),","(2,'it\\'s'),","(3,'z');",'UNLOCK TABLES;','INSERT INTO `t` VALUES (4,\'w\'),(5,\'v\');'],(row,c)=>rows.push([row[c.a],row[c.b]]));
+ assert.deepEqual(rows,[[1,'x;'],[2,"it's"],[3,'z'],[4,'w'],[5,'v']],'one row per line after INSERT INTO … VALUES, as in newer dumps');
 });
 
 test('only the card-relevant page properties are kept',async()=>{

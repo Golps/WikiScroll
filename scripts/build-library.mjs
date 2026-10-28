@@ -89,11 +89,14 @@ export function thumbURL(file, repo = 'commons', width = 960) {
   return `https://upload.wikimedia.org/${repo === 'commons' ? 'wikipedia/commons' : repo}/thumb/${hash[0]}/${hash.slice(0, 2)}/${enc}/${width}px-${enc}${/\.svg$/i.test(name) ? '.png' : ''}`;
 }
 
-// Rows of one `INSERT INTO … VALUES (…),(…);` line of a MySQL dump.
-export function* sqlRows(line) {
-  let i = line.indexOf(' VALUES ');
-  if (!line.startsWith('INSERT INTO') || i < 0) return;
-  i += 8;
+// Rows of one line of a MySQL dump: an `INSERT INTO … VALUES (…),(…);` line,
+// or, in dumps that put each row on its own line after `INSERT INTO … VALUES`,
+// a `(…),` line (`continued`).
+export function* sqlRows(line, continued = false) {
+  let i;
+  if (line.startsWith('INSERT INTO')) { i = line.indexOf(' VALUES'); if (i < 0) return; i += 7; }
+  else if (continued) i = 0;
+  else return;
   const n = line.length;
   while (i < n) {
     if (line[i] !== '(') { i++; continue; }
@@ -130,7 +133,7 @@ export function* sqlRows(line) {
 // Reads a table dump by column name, so a schema change (categorylinks moved
 // from cl_to to cl_target_id) is detected instead of misread.
 export async function readTable(lines, onRow) {
-  let columns = null, creating = null;
+  let columns = null, creating = null, inserting = false;
   for await (const line of lines) {
     if (line.startsWith('CREATE TABLE')) { creating = []; continue; }
     if (creating) {
@@ -139,8 +142,11 @@ export async function readTable(lines, onRow) {
       else if (line.startsWith(')')) { columns = Object.fromEntries(creating.map((name, i) => [name, i])); creating = null; }
       continue;
     }
-    if (!columns || !line.startsWith('INSERT INTO')) continue;
-    for (const row of sqlRows(line)) onRow(row, columns);
+    if (!columns) continue;
+    const start = line.startsWith('INSERT INTO');
+    if (!start && !inserting) continue;
+    for (const row of sqlRows(line, !start)) onRow(row, columns);
+    inserting = !line.trimEnd().endsWith(';');
   }
   if (!columns) throw Error('Table dump has no CREATE TABLE statement.');
   return columns;
@@ -468,6 +474,8 @@ if (process.argv[1] && import.meta.url === new URL(process.argv[1], 'file:').hre
     if (!level3 || !level4) throw Error('Vital-article lists are unavailable, keeping the current library.');
     log('Reading page properties');
     const props = await readPageProps(sqlLines(option('page-props')));
+    log(`Page properties: ${props.any.size} lead images (${props.free.size} free), ${props.desc.size} descriptions, ${props.disambiguation.size} disambiguation pages`);
+    if (props.any.size < 1e6) throw Error(`Only ${props.any.size} lead images in page_props: the table was misread, keeping the current library.`);
     log('Reading the category tree');
     const targets = option('linktarget') ? await readLinkTargets(sqlLines(option('linktarget'))) : null;
     const links = await readCategoryLinks(sqlLines(option('categorylinks')), targets);

@@ -802,14 +802,13 @@ function loadStarterLibrary(gen,outage=false) {
 // Prebuilt cards on cards.wikiscroll.com (scripts/build-library.mjs,
 // docs/CARD-LIBRARY.md) serve every feed except filtered travel, in each
 // language that has a library. Each draw is one random shard of 100 cards
-// that this visit has not drawn. A thin setting borrows the nearest depth
-// from the library, never the live API; a setting whose every depth is drawn
-// ends on a card that says so. The Worker and the live API serve only when
+// not drawn in this feed. Depth stays exact; empty or exhausted settings
+// end with an explicit choice to start over or change settings. The Worker and the live API serve only when
 // the library can't (other languages, a failure).
 const LIBRARY_ROOT='https://cards.wikiscroll.com/v1/';
 const LIBRARY_LANGS=new Set(['en','es','fr','de','it','pt','ru','ja','zh','ar','hi','ko','he','nl','pl']);
 // One manifest, failure pause and drawn-shard record per language.
-const libraries=new Map(),libraryDraw={gen:-1,draws:0};
+const libraries=new Map();
 let libraryExhausted=false;
 function libraryLang(){return curMode==='how'?voyageLang():curLang;}
 function libraryFor(lang=libraryLang()){
@@ -817,17 +816,17 @@ function libraryFor(lang=libraryLang()){
   if(!entry)libraries.set(lang,entry={lang,manifest:null,loadedAt:0,task:null,failedUntil:0,drawn:new Map()});
   return entry;
 }
-async function libraryJSON(url,ms){
+async function libraryJSON(url,ms,cache='default'){
   const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),ms);
-  try {const response=await fetch(url,{signal:controller.signal,mode:'cors',credentials:'omit'});return response.ok?await response.json():{missing:response.status===404};}
+  try {const response=await fetch(url,{signal:controller.signal,mode:'cors',credentials:'omit',cache});return response.ok?await response.json():{missing:response.status===404};}
   catch {return null;} finally {clearTimeout(timer);}
 }
-function libraryManifest(library){
-  if(library.manifest&&Date.now()-library.loadedAt<30*6e4)return Promise.resolve(library.manifest);
+function libraryManifest(library,refresh=false){
+  if(!refresh&&library.manifest&&Date.now()-library.loadedAt<30*6e4)return Promise.resolve(library.manifest);
   // lang.js asks for the reader's manifest while the page loads; use that answer once.
-  const early=window.WSLibraryPrefetch?.lang===library.lang&&window.WSLibraryPrefetch.task;
+  const early=!refresh&&window.WSLibraryPrefetch?.lang===library.lang&&window.WSLibraryPrefetch.task;
   if(early)window.WSLibraryPrefetch=null;
-  library.task??=(early?Promise.race([early,new Promise(resolve=>setTimeout(resolve,4000,null))]):libraryJSON(`${LIBRARY_ROOT}${library.lang}/current.json`,4000)).then(data=>{
+  library.task??=(early?Promise.race([early,new Promise(resolve=>setTimeout(resolve,4000,null))]):libraryJSON(`${LIBRARY_ROOT}${library.lang}/current.json`,4000,refresh?'reload':'default')).then(data=>{
     library.task=null;
     // A language whose first library isn't up yet is left to the Worker for a while.
     if(data?.missing)library.failedUntil=Date.now()+30*6e4;
@@ -858,7 +857,7 @@ function libraryShard(library,set,count){
 }
 // Returns cards, [] when this setting has no undrawn shard left, or null when
 // the library can't serve and the Worker should.
-async function fetchLibraryBatch(gen){
+async function fetchLibraryBatch(gen,retried=false){
   const families=libraryFamilies(),library=libraryFor();
   if(!families||Date.now()<library.failedUntil)return null;
   const manifest=await libraryManifest(library);
@@ -866,8 +865,7 @@ async function fetchLibraryBatch(gen){
   if(!manifest){library.failedUntil=Math.max(library.failedUntil,Date.now()+6e4);return null;}
   // A build without this feed's sets (an older library) leaves it to the Worker.
   if(!families.every(f=>Object.hasOwn(manifest.sets,f(depthLevel))))return null;
-  if(libraryDraw.gen!==gen){libraryDraw.gen=gen;libraryDraw.draws=0;}
-  const depths=curMode==='how'?[3]:[1,2,3,4,5].sort((a,b)=>Math.abs(a-depthLevel)-Math.abs(b-depthLevel)||b-a);
+  const depths=[curMode==='how'?3:depthLevel];
   const pick=()=>{
     for(const d of depths){
       const open=families.map(f=>f(d)).filter(set=>(manifest.sets[set]||0)>(library.drawn.get(set)?.size||0));
@@ -875,20 +873,22 @@ async function fetchLibraryBatch(gen){
     }
     return null;
   };
-  let choice=pick();
-  // A reader returning to a setting this visit already used up starts it again.
-  if(!choice&&!libraryDraw.draws){for(const f of families)for(const d of depths)library.drawn.delete(f(d));choice=pick();}
-  if(!choice){if(libraryDraw.draws)libraryExhausted=true;return libraryDraw.draws?[]:null;}
+  const choice=pick();
+  if(!choice){libraryExhausted=true;return [];}
   const [set,shard]=choice;
   const cards=await libraryJSON(`${LIBRARY_ROOT}${library.lang}/${manifest.base}${set}/${shard}.json`,6000);
   if(gen!==fillGeneration)return [];
   if(!Array.isArray(cards)){
     library.drawn.get(set)?.delete(shard);
     // A missing shard means the build changed: read the manifest again.
-    if(cards?.missing){library.manifest=null;return null;}
+    if(cards?.missing&&!retried){
+      library.manifest=null;
+      await libraryManifest(library,true);
+      if(gen!==fillGeneration)return [];
+      return fetchLibraryBatch(gen,true);
+    }
     library.failedUntil=Date.now()+6e4;return null;
   }
-  libraryDraw.draws++;
   const src=curMode;
   return cards.filter(a=>a?.src===src);
 }
@@ -931,7 +931,9 @@ async function fetchLibraryTravel(gen){
       if(!(manifest.places>0))return null;
       const lists=await Promise.all(places.map(async place=>(await libraryJSON(`${LIBRARY_ROOT}${lang}/${manifest.base}places/${placeHash(place,manifest.places)}.json`,6000))?.[place]?.cards));
       if(gen!==fillGeneration)return [];
-      if(lists.every(list=>!Array.isArray(list)))return null;
+      // Missing names and failed index downloads must not become a completed
+      // multi-place result. Keep the live/retry path until every place resolves.
+      if(lists.some(list=>!Array.isArray(list)))return null;
       // Alternate between the places, as the live search does.
       const ids=new Set();cards=[];
       for(let i=0;lists.some(list=>Array.isArray(list)&&i<list.length);i++)for(const list of lists){const card=Array.isArray(list)&&list[i];if(fits(card)&&!ids.has(card.id)){ids.add(card.id);cards.push(card);}}
@@ -962,9 +964,8 @@ function showLibraryEnd(){
   const feed=document.getElementById('feed');
   if(feed.querySelector('.library-end'))return;
   const card=document.createElement('div');card.className='card library-end';
-  // Every depth is drawn by now, so name the setting, not the depth.
-  const what=curMode==='how'?'travel guide':helpOnly()&&curTopics.size?'article in these topics that needs this help':helpOnly()?'article that needs this help':curTopics.size?'article in these topics':'article';
-  card.innerHTML=`<div class="cbg"><div class="cveil"></div></div><div class="err"><div class="err-ico">${uiIcon('discovery')}</div><h2 class="err-ttl">You’re all caught up</h2><div class="err-msg">You’ve seen every ${what} in this week’s library.</div><div class="travel-end-actions"></div></div>`;
+  document.getElementById('spinner')?.remove();
+  card.innerHTML=`<div class="cbg"><div class="cveil"></div></div><div class="err"><div class="err-ico">${uiIcon('discovery')}</div><h2 class="err-ttl">No more matching cards</h2><div class="err-msg">Try different settings or start this selection again.</div><div class="travel-end-actions"></div></div>`;
   const actions=card.querySelector('.travel-end-actions'),add=(label,run)=>{const b=document.createElement('button');b.type='button';b.className='err-btn';b.textContent=label;b.onclick=run;actions.append(b);};
   add('Start over',()=>{libraryFor().drawn.clear();resetFeed();});
   if(curMode==='wiki')add('Change settings',()=>{const desktop=document.getElementById('settingsBtn')?.offsetParent!==null;if(desktop)openSettings();else openBurger();});
@@ -1215,7 +1216,7 @@ function ensureFeedAhead() {
 // A filtered travel feed that has run out ends on a card (features.js). Once
 // the reader chooses to continue, the card goes away when new guides arrive.
 function syncTravelEnd() {
-  if(libraryExhausted&&!queue.length&&articles.length)showLibraryEnd();
+  if(libraryExhausted&&!queue.length)showLibraryEnd();
   const ended=curMode==='how'&&(travelFilters.place||travelFilters.style)&&travelExhausted&&!queue.length&&!supplyTask&&articles.length;
   if(!ended&&!travelContinuing)return;
   const end=document.querySelector('#feed .travel-end');
@@ -1377,7 +1378,7 @@ async function boot() {
     // A server-requested pause is a failed attempt, not active loading. Show
     // the recovery card even during cooldown; the refill timer still waits
     // for Retry-After and successful supply removes this card automatically.
-    if(!articles.length){document.getElementById('spinner')?.remove();showError();scheduleRefill();}
+    if(!articles.length&&!libraryExhausted){document.getElementById('spinner')?.remove();showError();scheduleRefill();}
   } catch(error) {
     if(gen!==fillGeneration)return;
     console.warn('Feed recovery',error);
@@ -1389,6 +1390,9 @@ async function boot() {
 function resetFeed() {
   window.dispatchEvent(new Event('feed-reset'));
   travelOffset=0;travelExhausted=false;travelSuggestion='';travelContinuing=false;travelRetries=0;libraryExhausted=false;libraryTravel.key='';sentinel?.disconnect();
+  // A reset discards queued cards. Release their shard reservations too, so
+  // returning to a selection cannot silently skip those unread cards.
+  for(const library of libraries.values())library.drawn.clear();
   fillGeneration++;pendingDeepGeneration=-1;
   supplyControllers.forEach(controller=>controller.abort());
   articles=[];queue=[];feedSeen.clear();filling=false;supplyTask=null;

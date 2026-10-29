@@ -24,6 +24,10 @@ on:
         description: Languages to build, separated by spaces (en de fr …)
         type: string
         default: en
+concurrency:
+  group: wikiscroll-library-publication
+  cancel-in-progress: false
+  queue: max
 permissions:
   contents: read
 env:
@@ -76,12 +80,10 @@ jobs:
     timeout-minutes: 345
     strategy:
       fail-fast: false
+      max-parallel: 1
       matrix:
         lang: ${{ fromJSON(needs.plan.outputs.languages) }}
-    # One build per language at a time; different languages build side by side.
-    concurrency:
-      group: wikiscroll-card-library-${{ matrix.lang }}
-      cancel-in-progress: false
+    # Serialize languages and workflow runs: all uploads share one budget ledger.
     env:
       LANG_CODE: ${{ matrix.lang }}
       WIKI: ${{ matrix.lang }}wiki
@@ -180,34 +182,6 @@ jobs:
             | tee -a "$GITHUB_STEP_SUMMARY"
       - name: Upload, then switch the site to the new build
         if: steps.live.outputs.skip != 'true' && env.R2_ENDPOINT != '' && inputs.upload != false
-        run: |
-          set -euo pipefail
-          build="${{ steps.dump.outputs.build }}" prefix="v1/$LANG_CODE"
-          # Listing an empty prefix (a language's first build) exits non-zero; it counts as 0.
-          total() { { aws s3 ls "s3://$R2_BUCKET/$1" --recursive --summarize --endpoint-url "$R2_ENDPOINT" || true; } | awk '/Total Size:/{n=$3} END{print n+0}'; }
-          # Storage guard: the bucket without this language's current build, plus the new build.
-          used=$(total "") ours=$(total "$prefix/") new=$(du -sb "$RUNNER_TEMP/library" | cut -f1)
-          after=$((${used:-0} - ${ours:-0} + new))
-          echo "Storage after this upload: $(awk -v b="$after" 'BEGIN{printf "%.2f", b/1e9}') GB of the $(awk -v b="$STORAGE_LIMIT" 'BEGIN{printf "%.1f", b/1e9}') GB limit." | tee -a "$GITHUB_STEP_SUMMARY"
-          if [ "$after" -gt "$STORAGE_LIMIT" ]; then echo "Not uploading: the bucket would pass the storage limit. The current library keeps serving." >&2; exit 1; fi
-          # Write guard: every upload records its writes (each shard, the manifest,
-          # the record itself and a margin for the listings) in a monthly ledger
-          # in the bucket, and none may take the month past WRITE_LIMIT.
-          ledger="usage/writes-$(date -u +%Y-%m).json"
-          recorded() { { aws s3 cp "s3://$R2_BUCKET/$ledger" - --endpoint-url "$R2_ENDPOINT" 2>/dev/null || echo '{}'; } | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{let n=0;try{n=Number(JSON.parse(s).writes)||0}catch{}console.log(n)})'; }
-          cost=$(( $(find "$RUNNER_TEMP/library" -type f | wc -l) + 2000 )) written=$(recorded)
-          echo "Writes this month: $written recorded, this upload about $cost, limit $WRITE_LIMIT." | tee -a "$GITHUB_STEP_SUMMARY"
-          if [ $((written + cost)) -gt "$WRITE_LIMIT" ]; then echo "Not uploading: this month's writes would pass the write limit. The current library keeps serving." >&2; exit 1; fi
-          # Recorded before uploading, so a job uploading at the same time counts it.
-          echo "{\"writes\":$(( $(recorded) + cost ))}" | aws s3 cp - "s3://$R2_BUCKET/$ledger" --endpoint-url "$R2_ENDPOINT" --only-show-errors --content-type application/json --cache-control no-store
-          aws configure set default.s3.max_concurrent_requests 32
-          # Shards never change once uploaded; the manifest is re-read every few minutes.
-          aws s3 sync "$RUNNER_TEMP/library/$build" "s3://$R2_BUCKET/$prefix/$build" --endpoint-url "$R2_ENDPOINT" --only-show-errors \
-            --content-type application/json --content-encoding gzip --cache-control 'public, max-age=31536000, immutable'
-          aws s3 cp "$RUNNER_TEMP/library/current.json" "s3://$R2_BUCKET/$prefix/current.json" --endpoint-url "$R2_ENDPOINT" --only-show-errors \
-            --content-type application/json --content-encoding gzip --cache-control 'public, max-age=300'
-          # Only one build stays stored, which keeps the library inside R2's free 10 GB.
-          for old in $(aws s3 ls "s3://$R2_BUCKET/$prefix/" --endpoint-url "$R2_ENDPOINT" | awk '$1=="PRE"{print $2}' | tr -d /); do
-            if [ "$old" != "$build" ]; then aws s3 rm "s3://$R2_BUCKET/$prefix/$old" --recursive --endpoint-url "$R2_ENDPOINT" --only-show-errors; fi
-          done
-          echo "Library $LANG_CODE $build is live." | tee -a "$GITHUB_STEP_SUMMARY"
+        env:
+          LIBRARY_BUILD: ${{ steps.dump.outputs.build }}
+        run: node scripts/publish-library.mjs "$RUNNER_TEMP/library"

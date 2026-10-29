@@ -4,6 +4,7 @@ Releases of this repository. Each entry describes what changed in the code; [doc
 
 ## Unreleased
 
+- Build card libraries for German, French and Spanish alongside English: one builder for every language, English weekly and the others in turn, each in its own job, with a 9 GB storage guard before any upload. The reader draws from each language's own library and falls back to the Worker for a language whose library isn't up yet. The "You're all caught up" card is translated.
 - Sample the bundled starter pool from the card library instead of hundreds of live API calls; the API remains the fallback when the library can't be read.
 - Shrink the first-launch gesture coach to one small pill under the header. It shows the scroll tip first and changes in place to the swipe tip after the first scroll, so it no longer covers the card or its Save and Share buttons.
 - Replace the bouncing "Scroll to discover" toast with a gesture coach: animated line-art hands show scrolling and swiping (keyboard wording on desktop). Each row stops appearing once the reader has made that gesture.

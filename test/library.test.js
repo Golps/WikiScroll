@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import zlib from 'node:zlib';
 import crypto from 'node:crypto';
-import {readLocalFiles,MIN_LOCAL_FILES,thumbURL,sqlRows,readTable,readPageProps,readLinkTargets,readCategoryLinks,readPages,topicCategories,cirrusReader,libraryCard,voyageCard,cardNeeds,cardSets,dailyViews,vitalLevels,buildLibrary,averageDailyViews,emptyProps,shorten,SETS,TOPICS,HELP,SHARD_SIZE,MINIMUM,MAX_FILES,MAX_BYTES,SLICE_CAP,BODY_CHARS} from '../scripts/build-library.mjs';
+import {readLocalFiles,MIN_LOCAL_FILES,thumbURL,sqlRows,readTable,readPageProps,readLinkTargets,readCategoryLinks,readPages,topicCategories,cirrusReader,libraryCard,voyageCard,cardNeeds,cardSets,dailyViews,vitalLevels,buildLibrary,averageDailyViews,emptyProps,shorten,SETS,TOPICS,HELP,SHARD_SIZE,MINIMUM,MAX_FILES,MAX_BYTES,SLICE_CAP,BODY_CHARS,translateTitles,localRoots} from '../scripts/build-library.mjs';
 import {roots,bands} from '../worker/topics.js';
 import {availableHelpTypes} from '../worker/needs.js';
 
@@ -180,7 +180,7 @@ test('a thin build fails before anything is written for upload',async()=>{
 });
 
 test('free-tier guards leave room for five weekly builds and the weekly swap',()=>{
- assert.ok(MAX_FILES*5<1_000_000,'R2 includes 1M writes a month');
+ assert.ok(MAX_FILES*2*5<1_000_000,'R2 includes 1M writes a month: two builds a week');
  assert.ok(MAX_BYTES*2<10e9,'R2 includes 10 GB; old and new builds overlap during the swap');
  assert.ok(SLICE_CAP>=SHARD_SIZE*100,'topic and Help slices stay large pools');
 });
@@ -198,4 +198,28 @@ test('the image table names real local uploads, not File: pages that describe Co
  const p=props();p.free.set(5,'Panther_chameleon.jpg');p.local=names;
  assert.match(libraryCard(5,{namespace:0,title:'Panther chameleon',opening_text:text},p).img,/\/wikipedia\/commons\/thumb\//,'a free image with only a local description page stays on Commons');
  assert.ok(MIN_LOCAL_FILES>=100000);
+});
+
+test('English titles follow interlanguage links, through renames and redirects', async () => {
+  const urls = [];
+  const fetchJSON = async url => {
+    urls.push(url);
+    return {query: {normalized: [{from: 'lake example', to: 'Lake example'}], redirects: [{from: 'Lake example', to: 'Lake Example'}],
+      pages: [{title: 'Lake Example', langlinks: [{lang: 'de', title: 'Beispielsee'}]}, {title: 'Unlinked'}]}};
+  };
+  const found = await translateTitles(['lake example', 'Unlinked'], 'de', fetchJSON);
+  assert.deepEqual([...found], [['lake example', 'Beispielsee']]);
+  assert.match(urls[0], /lllang=de/);
+  assert.equal(await translateTitles(['X'], 'de', async () => null), null, 'a failed lookup is not an empty answer');
+});
+
+test('topic roots become the linked local categories', async () => {
+  assert.equal(await localRoots('en'), roots);
+  const fetchJSON = async url => {
+    const titles = new URLSearchParams(url.split('?')[1]).get('titles').split('|');
+    return {query: {pages: titles.map((title, i) => ({title, ...(i % 2 ? {} : {langlinks: [{title: 'Kategorie:' + title.slice(9) + ' (de)'}]})}))}};
+  };
+  const local = await localRoots('de', fetchJSON);
+  assert.deepEqual(Object.keys(local), Object.keys(roots));
+  for (const list of Object.values(local)) for (const root of list) assert.match(root, /^[^:]+ \(de\)$/, 'namespace dropped');
 });

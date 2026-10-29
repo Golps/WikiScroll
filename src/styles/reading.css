@@ -11,7 +11,7 @@ body .ambient-excerpt { font-size: calc(var(--reading-ambient-base) * var(--read
 body.dim-images:not(.light) :is(.art-img,.saved-image img,.cbg img) { filter: brightness(.72); }
 body.dim-images:not(.light) .art-backdrop { filter: blur(18px) brightness(.72); }
 body.dim-images:not(.light) .ambient-bg { filter: brightness(.72); }
-.art-img[data-image-inspect] { cursor: zoom-in; pointer-events: auto; }
+.art-img[data-image-inspect] { cursor: zoom-in; pointer-events: auto; color: transparent; } /* alt text stays hidden while a photo retries */
 .art-img[data-image-inspect]:focus-visible { outline: 2px solid var(--accent); outline-offset: -4px; }
 .image-dialog { width: min(1000px,calc(100vw - 32px)); max-height: calc(100dvh - 32px); box-sizing: border-box; padding: 24px; overflow: auto; }
 .image-dialog h2 { margin: 0 52px 18px 0; font: 600 22px/1.35 var(--sans); overflow-wrap: anywhere; }

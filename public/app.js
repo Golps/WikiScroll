@@ -824,7 +824,10 @@ async function libraryJSON(url,ms){
 }
 function libraryManifest(library){
   if(library.manifest&&Date.now()-library.loadedAt<30*6e4)return Promise.resolve(library.manifest);
-  library.task??=libraryJSON(`${LIBRARY_ROOT}${library.lang}/current.json`,4000).then(data=>{
+  // lang.js asks for the reader's manifest while the page loads; use that answer once.
+  const early=window.WSLibraryPrefetch?.lang===library.lang&&window.WSLibraryPrefetch.task;
+  if(early)window.WSLibraryPrefetch=null;
+  library.task??=(early?Promise.race([early,new Promise(resolve=>setTimeout(resolve,4000,null))]):libraryJSON(`${LIBRARY_ROOT}${library.lang}/current.json`,4000)).then(data=>{
     library.task=null;
     // A language whose first library isn't up yet is left to the Worker for a while.
     if(data?.missing)library.failedUntil=Date.now()+30*6e4;
@@ -1524,6 +1527,8 @@ function setupImageInspection(card, article) {
   const image = card.querySelector('.art-img');
   if (!image) return;
   image.dataset.imageInspect = 'true';
+  // A button needs a real image, not a decorative one, so alt can't stay empty.
+  image.alt = globalThis.WSI18n?.translate('View image') || 'View image';
   image.setAttribute('role', 'button');
   image.setAttribute('aria-label', 'View image');
   image.setAttribute('aria-haspopup', 'dialog');

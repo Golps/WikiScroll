@@ -49,6 +49,7 @@ test('image inspection ignores drags and long presses, and supports keyboard act
  handlers.pointerdown({isPrimary:true,pointerId:1,clientX:0,clientY:0});now=800;handlers.click();assert.equal(opens,1);
  let prevented=false;handlers.keydown({key:'Enter',preventDefault(){prevented=true;}});assert.equal(opens,2);assert.ok(prevented);
  assert.equal(attrs.role,'button');assert.equal(attrs['aria-haspopup'],'dialog');
+ assert.equal(image.alt,'View image','a button is never a decorative image');
 });
 test('every interface dictionary covers the new reading and image controls',()=>{
  const files=fs.readdirSync(new URL('../public/translations/',import.meta.url));

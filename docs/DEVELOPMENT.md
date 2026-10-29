@@ -96,6 +96,7 @@ With a token scoped to one Worker, Wrangler reports an error with code `10000` o
 
 - `name`: your Worker's name. `scripts/deploy.sh` looks for `Uploaded wikiscroll` in Wrangler's output, so update that too if you rename the Worker.
 - `ratelimits`: keep the two bindings (`REQUEST_LIMIT`, `WORK_LIMIT`). The Worker refuses expensive work without them.
+- `workers_dev` and `preview_urls` are `false`, so the Worker only answers on its custom domain, where the zone's security rules apply.
 - `keep_vars: true` keeps variables set in the dashboard (such as `WEB_ANALYTICS_TOKEN`) across deploys.
 - The account ID is read from `CLOUDFLARE_ACCOUNT_ID`, so it isn't in this file.
 

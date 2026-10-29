@@ -20,6 +20,10 @@ jobs:
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          # Dependencies install and tests run before the push, so the write
+          # token stays out of the Git settings and only the push step gets it.
+          persist-credentials: false
       - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
           node-version-file: .nvmrc
@@ -34,6 +38,8 @@ jobs:
       - name: Test suite
         run: pnpm test
       - name: Commit the new pool
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           git add public/data/starter
           if git diff --cached --quiet; then echo "Pool unchanged."; exit 0; fi
@@ -42,8 +48,10 @@ jobs:
           git commit -m 'Refresh starter pool'
           # The build takes about half an hour, so main often moves meanwhile.
           # Replay the pool on top of it and test again before each push.
+          # Kept in an unexported variable, so the tests below never see it.
+          auth="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)"; unset GH_TOKEN
           for attempt in 1 2 3; do
-            git push && exit 0
+            git -c http.https://github.com/.extraheader="$auth" push && exit 0
             git pull --rebase origin main
             pnpm test
           done

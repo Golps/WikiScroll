@@ -30,4 +30,10 @@
     setTimeout(() => root.classList.remove('i18n-pending'), 1500);
     load(lang);
   }
+  // Ask the card library for this language's manifest now, while the scripts
+  // download; app.js takes this answer for its first draw (libraryManifest).
+  const library = 'en es fr de it pt ru ja zh ar hi ko he nl pl'.split(' ').includes(lang) ? lang : 'en';
+  if (navigator.onLine !== false && window.fetch) window.WSLibraryPrefetch = {lang: library,
+    task: fetch(`https://cards.wikiscroll.com/v1/${library}/current.json`, {mode: 'cors', credentials: 'omit'})
+      .then(response => response.ok ? response.json() : {missing: response.status === 404}).catch(() => null)};
 })();

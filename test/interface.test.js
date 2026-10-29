@@ -360,3 +360,29 @@ test('every interface language reads its own card library', () => {
  const library = app.match(/const LIBRARY_LANGS=new Set\((\[[^\]]+\])\)/)[1];
  assert.deepEqual(JSON.parse(library.replace(/'/g, '"')).sort(), langs.sort());
 });
+
+test('the first card\'s library manifest is requested while the page loads, and used once', async () => {
+  let asked;
+  const window = {fetch: true};
+  const c = vm.createContext({window, navigator: {onLine: true}, location: {search: '?lang=pl'}, localStorage: {getItem: () => null}, URLSearchParams,
+    document: {documentElement: {classList: {add() {}, remove() {}}}, head: {append() {}}, createElement: () => ({})}, setTimeout,
+    fetch: url => { asked = url; return Promise.resolve({ok: true, json: () => ({v: 1, build: 'b', base: 'b/', sets: {}})}); }});
+  vm.runInContext(read('lang.js'), c);
+  assert.equal(asked, 'https://cards.wikiscroll.com/v1/pl/current.json');
+  assert.equal(window.WSLibraryPrefetch.lang, 'pl');
+  let fetches = 0;
+  const app2 = vm.createContext({window, setTimeout, LIBRARY_ROOT: 'https://cards.wikiscroll.com/v1/', libraryJSON: () => { fetches++; return Promise.resolve(null); }});
+  vm.runInContext(slice(app, 'function libraryManifest(', '\n// Each family'), app2);
+  const library = {lang: 'pl', manifest: null, loadedAt: 0, task: null, failedUntil: 0, drawn: new Map()};
+  assert.equal((await app2.libraryManifest(library)).build, 'b');
+  assert.equal(fetches, 0, 'the early answer is reused');
+  assert.equal(window.WSLibraryPrefetch, null);
+});
+
+test('the gesture hint sits in a landmark', () => {
+  assert.match(html, /<aside class="coach" id="coach"/);
+});
+
+test('hashed stylesheets are cached for a year', () => {
+  assert.match(read('_headers'), /\/_astro\/\*\n  Cache-Control: public, max-age=31536000, immutable/);
+});

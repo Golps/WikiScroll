@@ -462,6 +462,23 @@ test('complete travel pages are shared from the edge cache; partial pages are no
     t.mock.timers.tick(7000);await settle();
   },partial);
 });
+test('readers asking for the same travel page at once share one search, each with a response of its own',async()=>{
+  let searches=0,release;const gate=new Promise(resolve=>release=resolve);
+  await mocked(async url=>{const p=new URL(url).searchParams;if(p.has('generator')){searches++;await gate;return Response.json({query:{pages:{7:page(7,{title:'Kyoto',extract:undefined})}}});}
+    return Response.json({query:{pages:{7:{pageid:7,extract:'A historic city of Japan with temples, gardens and a famous market street.'}}}});},async(worker,jobs)=>{
+    // Workers refuse to read another request's Response, clones included.
+    const clone=Response.prototype.clone;Response.prototype.clone=()=>{throw Error('a Response crossed requests');};
+    try{
+      const ask=()=>worker.fetch(new Request('https://wikiscroll.com/api/travel?lang=en&style=culture&place=Japan'),env,jobs);
+      const first=ask();await settle();
+      const others=[ask(),ask()];await settle();release();
+      const responses=await Promise.all([first,...others]);
+      assert.deepEqual(responses.map(r=>r.status),[200,200,200]);
+      for(const response of responses)assert.equal((await response.json()).articles[0].title,'Kyoto');
+      assert.equal(searches,1);
+    }finally{Response.prototype.clone=clone;}
+  });
+});
 test('a travel place filter can name one place or several',async()=>{
   const {parsePlaces,parseCursor,formatCursor,namesPlace}=await import('../worker/travel.js');
   assert.deepEqual(parsePlaces('Japan, Tuscany'),['Japan','Tuscany']);

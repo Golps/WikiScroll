@@ -3,8 +3,8 @@
   "name": "wikiscroll",
   "main": "worker/index.js",
   "compatibility_date": "2026-09-15",
-  "workers_dev": true,
-  "preview_urls": true,
+  "workers_dev": false,
+  "preview_urls": false,
   "build": {"command": "pnpm build", "watch_dir": ["src", "astro.config.mjs"]},
   "assets": {
     "directory": "./dist",

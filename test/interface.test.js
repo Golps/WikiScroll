@@ -96,6 +96,18 @@ test('menu buttons announce whether their panel is open', () => {
   assert.match(html, /id="feed" role="main"/, 'the feed is the page\'s main landmark');
 });
 
+test('screen readers skip the Save and Skip labels that only show mid-swipe', () => {
+  const labels = app.match(/<div class="swipe-ind[^>]*>/g);
+  assert.equal(labels.length, 2);
+  for (const label of labels) assert.match(label, /aria-hidden="true"/, label);
+});
+
+test('the card library connection opens while the scripts download', () => {
+  // The library is fetched without credentials, so only a crossorigin connection can serve it.
+  const head = html.slice(0, html.indexOf('/lang.js'));
+  assert.match(head, /<link rel="preconnect" href="https:\/\/cards\.wikiscroll\.com" crossorigin>/);
+});
+
 test('light theme secondary text and destructive actions meet 4.5:1 contrast', () => {
   const luminance = hex => { const [r, g, b] = [0, 2, 4].map(i => parseInt(hex.slice(i + 1, i + 3), 16) / 255).map(v => v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4); return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
   const ratio = (a, b) => { const [x, y] = [luminance(a), luminance(b)].sort((p, q) => q - p); return (x + 0.05) / (y + 0.05); };
@@ -347,4 +359,30 @@ test('every interface language reads its own card library', () => {
  const langs = [...app.slice(app.indexOf('const LANGS = ['), app.indexOf('];', app.indexOf('const LANGS = ['))).matchAll(/c:'([a-z]+)'/g)].map(m => m[1]);
  const library = app.match(/const LIBRARY_LANGS=new Set\((\[[^\]]+\])\)/)[1];
  assert.deepEqual(JSON.parse(library.replace(/'/g, '"')).sort(), langs.sort());
+});
+
+test('the first card\'s library manifest is requested while the page loads, and used once', async () => {
+  let asked;
+  const window = {fetch: true};
+  const c = vm.createContext({window, navigator: {onLine: true}, location: {search: '?lang=pl'}, localStorage: {getItem: () => null}, URLSearchParams,
+    document: {documentElement: {classList: {add() {}, remove() {}}}, head: {append() {}}, createElement: () => ({})}, setTimeout,
+    fetch: url => { asked = url; return Promise.resolve({ok: true, json: () => ({v: 1, build: 'b', base: 'b/', sets: {}})}); }});
+  vm.runInContext(read('lang.js'), c);
+  assert.equal(asked, 'https://cards.wikiscroll.com/v1/pl/current.json');
+  assert.equal(window.WSLibraryPrefetch.lang, 'pl');
+  let fetches = 0;
+  const app2 = vm.createContext({window, setTimeout, LIBRARY_ROOT: 'https://cards.wikiscroll.com/v1/', libraryJSON: () => { fetches++; return Promise.resolve(null); }});
+  vm.runInContext(slice(app, 'function libraryManifest(', '\n// Each family'), app2);
+  const library = {lang: 'pl', manifest: null, loadedAt: 0, task: null, failedUntil: 0, drawn: new Map()};
+  assert.equal((await app2.libraryManifest(library)).build, 'b');
+  assert.equal(fetches, 0, 'the early answer is reused');
+  assert.equal(window.WSLibraryPrefetch, null);
+});
+
+test('the gesture hint sits in a landmark', () => {
+  assert.match(html, /<aside class="coach" id="coach"/);
+});
+
+test('hashed stylesheets are cached for a year', () => {
+  assert.match(read('_headers'), /\/_astro\/\*\n  Cache-Control: public, max-age=31536000, immutable/);
 });

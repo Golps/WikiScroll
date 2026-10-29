@@ -48,6 +48,11 @@ const strip = s => String(s ?? '').replace(/<[^>]*>/g,'').replace(/\s+/g,' ').tr
 // it sends no CORS headers: other sites cannot spend its Wikimedia budget from
 // their visitors' browsers.
 const json = (body,status=200,headers={}) => Response.json(body,{status,headers:{'Cache-Control':'no-store',...headers}});
+// A Response belongs to the request that made it: Workers refuse to read its
+// body, or a clone of it, from another request. Requests that share one
+// travel search share a plain copy and each build their own Response.
+const snapshot = async response => ({status:response.status,headers:[...response.headers],body:await response.text()});
+const replay = shared => new Response(shared.body,{status:shared.status,headers:shared.headers});
 
 function apiURL(lang,mode,params) {
   return `https://${lang}.${mode==='how'?'wikivoyage':'wikipedia'}.org/w/api.php?`+new URLSearchParams({action:'query',format:'json',...params});
@@ -278,7 +283,7 @@ async function handle(request,env,ctx,work) {
         const key=new Request(`${url.origin}/api/travel?v=11&lang=${lang}&place=${encodeURIComponent(places.map(fold).join('|'))}&style=${style}&offset=${cursor.map(c=>c??'-').join('.')}`),cache=work.cache;
         expireJobs(travelPending);
         try{const hit=await cache?.match(key);if(hit)return json(await hit.json(),200,{'X-Cache':'HIT'});}catch{}
-        if(travelPending.has(key.url))return (await travelPending.get(key.url)).clone();
+        if(travelPending.has(key.url))return replay(await travelPending.get(key.url));
         if(!await permit(env,'WORK_LIMIT','travel'))return limited();
         const job=(async()=>{
         const started=Date.now(),limit=String(places.length>1?Math.ceil(30/places.length):30);
@@ -341,9 +346,9 @@ async function handle(request,env,ctx,work) {
         if(cache&&complete)ctx.waitUntil(cache.put(key,json(body,200,{'Cache-Control':'public, max-age=3600'})).catch(()=>{}));
         if(!body.articles.length&&!complete&&work.reason)return unavailable(work,'Travel guides are temporarily unavailable');
         return json(body,200,{'X-Cache':'MISS'});
-        })();
+        })().then(snapshot);
         job.deadline=Date.now()+work.timeLeft();travelPending.set(key.url,job);work.keep(job);
-        try{return (await job).clone();}finally{if(travelPending.get(key.url)===job)travelPending.delete(key.url);}
+        try{return replay(await job);}finally{if(travelPending.get(key.url)===job)travelPending.delete(key.url);}
       }
       if(url.pathname==='/api/today'){
         const response=await todayResponse(url,ctx,{langs:LANGS,permit,limited,env,work,feed:address=>work.upstream(address,{timeoutMs:15000})});

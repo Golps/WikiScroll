@@ -36,7 +36,8 @@ import Icon from "./Icon.astro";
 </div>
 
 <!-- GESTURE COACH: shown on launch until the reader has scrolled and swiped once -->
-<div class="coach" id="coach" role="note" aria-hidden="true">
+<!-- An aside, so the hint sits in a landmark like the rest of the page. -->
+<aside class="coach" id="coach" aria-hidden="true">
   <div class="coach-row" data-gesture="scroll">
     <svg class="coach-ico" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
       <g class="coach-track"><path d="M1.4 3.6 3.2 1.6 5 3.6M1.4 9.4l1.8 2 1.8-2M3.2 2.4v8.8"/></g>
@@ -51,7 +52,7 @@ import Icon from "./Icon.astro";
     </svg>
     <p><span class="coach-touch"><strong>Swipe.</strong> Right to save, left to skip.</span><span class="coach-desk"><strong>Save or skip.</strong> Right arrow to save, left arrow to skip.</span></p>
   </div>
-</div>
+</aside>
 
 <!-- PULL TO REFRESH -->
 <div class="ptr-indicator" id="ptrIndicator" aria-hidden="true">

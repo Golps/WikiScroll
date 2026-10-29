@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import zlib from 'node:zlib';
 import crypto from 'node:crypto';
-import {readLocalFiles,MIN_LOCAL_FILES,thumbURL,sqlRows,readTable,readPageProps,readLinkTargets,readCategoryLinks,readPages,topicCategories,cirrusReader,libraryCard,voyageCard,guideBanner,cardNeeds,cardSets,dailyViews,vitalLevels,buildLibrary,averageDailyViews,emptyProps,shorten,SETS,TOPICS,HELP,SHARD_SIZE,MINIMUM,MAX_FILES,MAX_BYTES,SLICE_CAP,BODY_CHARS,translateTitles,localRoots} from '../scripts/build-library.mjs';
+import {readLocalFiles,MIN_LOCAL_FILES,thumbURL,sqlRows,readTable,readPageProps,readLinkTargets,readCategoryLinks,readPages,topicCategories,cirrusReader,libraryCard,voyageCard,guideBanner,guidePhotoGaps,fillGuidePhoto,cardNeeds,cardSets,dailyViews,vitalLevels,buildLibrary,averageDailyViews,emptyProps,shorten,SETS,TOPICS,HELP,SHARD_SIZE,MINIMUM,MAX_FILES,MAX_BYTES,SLICE_CAP,BODY_CHARS,translateTitles,localRoots} from '../scripts/build-library.mjs';
 import {roots,bands} from '../worker/topics.js';
 import {availableHelpTypes} from '../worker/needs.js';
 
@@ -129,6 +129,21 @@ test('a guide banner comes from its pagebanner template, never a default or cont
  assert.equal(guideBanner('{{pagebanner}}'),'');assert.equal(guideBanner(undefined),'');
 });
 
+test('guides without a lead photo take their banner, else the Wikipedia photo of the same place',async()=>{
+ const guide=text.slice(0,60),doc=(title,extra)=>({namespace:0,title,opening_text:guide,...extra});
+ const docs={1:doc('Harbour',{source_text:'{{pagebanner|Harbour banner.jpg}}',wikibase_item:'Q1'}),2:doc('Hill town',{wikibase_item:'Q2'}),3:doc('Lake',{wikibase_item:'Q3'}),4:doc('Old Town',{wikibase_item:'Q4'})};
+ const p=props();p.free.set(4,'Old Town square.jpg');
+ const voyage={props:p,lines:Object.entries(docs).flatMap(([id,d])=>[JSON.stringify({index:{_id:id}}),JSON.stringify(d)])};
+ const gaps=await guidePhotoGaps(voyage);
+ assert.deepEqual([...gaps.keys()].sort(),['Q2','Q3'],'only guides with no lead photo and no banner wait for Wikipedia');
+ gaps.set('Q2','Hill town view.jpg');
+ const fill=id=>{const card=voyageCard(Number(id),docs[id],p);return [fillGuidePhoto(card,docs[id],gaps),card.img];};
+ const [how1,img1]=fill(1);assert.equal(how1,'banner');assert.match(img1,/wikipedia\/commons\/.*Harbour_banner\.jpg/);
+ const [how2,img2]=fill(2);assert.equal(how2,'wikipedia');assert.match(img2,/wikipedia\/commons\/.*Hill_town_view\.jpg/);
+ assert.deepEqual(fill(3),[false,''],'no match leaves the guide without a photo');
+ const [how4,img4]=fill(4);assert.equal(how4,false);assert.match(img4,/Old_Town_square\.jpg/,'a lead photo is kept as it is');
+});
+
 test('travel guides skip phrasebooks and travel topics and need no image',()=>{
  const p=props(),guide=text.slice(0,60);
  const card=voyageCard(3,{namespace:0,title:'Vilnius',opening_text:guide},p);
@@ -176,10 +191,13 @@ test('a full build shuffles every card into exactly one shard per set and writes
     for(const c of cards){assert.ok(!seen[set].has(c.id),'no card repeats within a set');seen[set].add(c.id);if(set.startsWith('topic-'))assert.equal(c.topic,'geo');if(set.startsWith('help-'))assert.ok(c.needs.length);}
    }
   }
-  const guides=JSON.parse(zlib.gunzipSync(fs.readFileSync(path.join(out,'20261025','how-en','0.json')))),photo=t=>guides.find(c=>c.title===t).img;
-  assert.match(photo('Town 0'),/wikipedia\/commons\/.*Town_0_banner\.jpg/,'a guide takes its own banner');
-  assert.match(photo('Town 1'),/wikipedia\/commons\/.*Photo_7\.jpg/,'or the Wikipedia photo of the same place');
-  assert.equal(photo('Town 2'),'','default banners never count');
+  // One shard holds a sample of the 150 guides, so check whichever filled guides it kept.
+  const guides=JSON.parse(zlib.gunzipSync(fs.readFileSync(path.join(out,'20261025','how-en','0.json'))));
+  for(const c of guides){
+   if(c.title==='Town 0')assert.match(c.img,/wikipedia\/commons\/.*Town_0_banner\.jpg/,'a guide takes its own banner');
+   if(c.title==='Town 1')assert.match(c.img,/wikipedia\/commons\/.*Photo_7\.jpg/,'or the Wikipedia photo of the same place');
+   if(c.title==='Town 2')assert.equal(c.img,'','default banners never count');
+  }
   assert.equal(manifest.sets['wiki-en-1'],5,'550 Level 3 cards make five full shards');
   assert.ok(!seen['wiki-en-2'].has('w1'),'Level 3 articles are Popular, not Known');
   assert.ok(manifest.sets['topic-en-geo-1']>0&&manifest.sets['help-en-detail-4']>0,'topic and Help sets are built');assert.equal(manifest.sets['how-en'],1);

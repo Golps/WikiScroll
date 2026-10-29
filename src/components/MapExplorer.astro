@@ -1,4 +1,5 @@
 ---
+import CloseIcon from "./CloseIcon.astro";
 import Icon from "./Icon.astro";
 ---
 <!-- WIKIVOYAGE MAP EXPLORER -->
@@ -6,7 +7,7 @@ import Icon from "./Icon.astro";
   <div class="map-container">
     <div class="map-hdr">
       <div class="map-title" id="mapTitle" dir="auto">Exploring…</div>
-      <button class="map-close" id="mapClose" aria-label="Close map">✕</button>
+      <button class="map-close" id="mapClose" aria-label="Close map"><CloseIcon /></button>
     </div>
     <div class="map-loading" id="mapLoading">
       <div class="map-loading-text"><Icon name="map" /><span>Loading map…</span></div>

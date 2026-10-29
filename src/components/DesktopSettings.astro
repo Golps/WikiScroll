@@ -1,4 +1,5 @@
 ---
+import CloseIcon from "./CloseIcon.astro";
 import Icon from "./Icon.astro";
 import DiscoveryControls from "./settings/DiscoveryControls.astro";
 import ReadingPreferences from "./settings/ReadingPreferences.astro";
@@ -8,7 +9,7 @@ import AboutGestures from "./settings/AboutGestures.astro";
 <!-- SETTINGS PANEL (desktop) -->
 <div class="sp-backdrop" id="spBackdrop"></div>
 <div class="sp" id="settingsPanel" role="region" aria-label="Settings">
-  <div class="sp-hdr"><span>Settings</span><button class="sp-x" id="spClose" aria-label="Close settings">✕</button></div>
+  <div class="sp-hdr"><span>Settings</span><button class="sp-x" id="spClose" aria-label="Close settings"><CloseIcon /></button></div>
 
   <div class="sp-section">
     <div class="sp-section-title">Stats</div>

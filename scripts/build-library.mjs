@@ -65,10 +65,13 @@ export const SLICE_CAP = 40_000, COMBO_CAP = 10_000;
 // A set below this many cards fails the build, so a bad week keeps last week's library.
 // English minima. Popular and Known follow the English lists through
 // interlanguage links, so most of them carry over; the random depths and
-// travel guides scale with each wiki's size.
+// travel guides scale with each wiki's size. Smaller wikis have few rarely read
+// articles once views are scaled (Chinese: about 4,500), so their floor for
+// that depth only rules out a misread.
 const EN_MINIMUM = {1: 500, 2: 3000, 3: 50000, 4: 50000, 5: 50000};
+const RARE_MINIMUM = 1000;
 export const MINIMUM_SCALE = {en: 1, de: 0.4, fr: 0.4, es: 0.3}, GUIDE_MINIMUM = {en: 10000, de: 5000, fr: 1500, es: 500};
-export const MINIMUM = Object.fromEntries([...DEPTHS.map(d => [`wiki-${LANG}-${d}`, Math.round(EN_MINIMUM[d] * (d <= 2 ? (LANG === 'en' ? 1 : 0.8) : MINIMUM_SCALE[LANG] ?? 0.1))]), [`how-${LANG}`, GUIDE_MINIMUM[LANG] ?? 100]]);
+export const MINIMUM = Object.fromEntries([...DEPTHS.map(d => [`wiki-${LANG}-${d}`, d === 5 && !(LANG in MINIMUM_SCALE) ? RARE_MINIMUM : Math.round(EN_MINIMUM[d] * (d <= 2 ? (LANG === 'en' ? 1 : 0.8) : MINIMUM_SCALE[LANG] ?? 0.1))]), [`how-${LANG}`, GUIDE_MINIMUM[LANG] ?? 100]]);
 // R2's free tier allows 1M writes and 10 GB a month. One build plus the next
 // one during the swap must fit the storage, and no single build may take a
 // large share of the writes, so a build over either limit is refused before

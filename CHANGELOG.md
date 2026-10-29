@@ -4,7 +4,7 @@ Releases of this repository. Each entry describes what changed in the code; [doc
 
 ## Unreleased
 
-- Update the README for the card library: a new "How it works" section (weekly build, how the reader draws cards, the fallback chain, free-tier guards), fresh screenshots of the current interface, and notes on mature topics, guides without photos and library freshness.
+- Update the README for the card library: a new "How it works" section (weekly build, how the reader draws cards, the fallback chain, free-tier guards), fresh screenshots and swipe demos of the current interface, and notes on mature topics, guides without photos and library freshness.
 - Build card libraries for all 15 languages: English weekly and five others each week in turn, mature-topic category rules for every language, travel guides only where Wikivoyage exists, and a monthly write ledger that refuses any upload past 900,000 writes.
 - Add a travel place index to the card library: each Wikivoyage place lists the guides inside it, with trip-style tags, and stands in for travel search when it fails.
 - The first-launch hint drops its pill: the hand and line of text sit on a soft fade from the header, which keeps them readable over any photo.

@@ -106,7 +106,7 @@ The same reader adapts to a portrait screen, with full-page settings and cards t
 
 ### See the reader move
 
-These demos use a small fixture of real Wikimedia articles and were recorded before the most recent interface polish, so a few details differ from the screenshots above. Desktop uses the right arrow; mobile uses a touch swipe. Saving does not personalize subsequent discovery. The inline previews run at 50 fps; open the videos below for 60 fps playback.
+These demos use the current app and a few real cards from the card library. Desktop uses the right arrow; mobile uses a touch swipe. Saving does not personalize subsequent discovery. The inline previews run at 50 fps; open the videos below for 60 fps playback.
 
 <table>
 <tr>

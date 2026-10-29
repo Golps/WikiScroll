@@ -1,6 +1,9 @@
+---
+import CloseIcon from "./CloseIcon.astro";
+---
 <!-- LIKES PANEL -->
 <div class="lp" id="lp" role="region" aria-label="Saved Articles">
-  <div class="lp-hdr"><span>Saved Articles</span><button class="lp-x" id="lpClose" aria-label="Close saved articles"><span class="panel-x" aria-hidden="true">✕</span><span class="panel-done">Done</span></button></div>
+  <div class="lp-hdr"><span>Saved Articles</span><button class="lp-x" id="lpClose" aria-label="Close saved articles"><span class="panel-x" aria-hidden="true"><CloseIcon /></span><span class="panel-done">Done</span></button></div>
   <div class="coll-tabs" id="collTabs"></div>
   <div class="coll-new-row">
     <input class="coll-new-input" aria-label="New collection name" id="collNewInput" placeholder="New collection name…" maxlength="30">

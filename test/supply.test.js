@@ -56,7 +56,7 @@ function harness({librarySets=undefined,languages={},places=null}={}) {
     workerRequest:()=>new Promise(resolve=>requests.push(resolve)),
     directRequest:async()=>{directCalls++;return [];},
   });
-  vm.runInContext(`let curMode='wiki',curLang='en',depthLevel=3,curTopics=new Set(),travelFilters={place:'',style:''},helpMode='off',showMature=false;
+  vm.runInContext(`let curMode='wiki',curLang='en',depthLevel=3,curTopics=new Set(),travelFilters={place:'',style:''},helpMode='off',showMature=false,showImageless=false;
     let queue=[],articles=[],filling=false,hinted=false,fillGeneration=0,fillBudget=null,apiCooldownUntil=0,travelExhausted=false,travelContinuing=false;
     const helpTypeQuery=()=>'',matchesHelpTypes=a=>Array.isArray(a.needs)&&a.needs.some(n=>['sources','citations','unsourced','copyedit','clarify','images','outdated','incomplete','stub'].includes(n));
     const fetchWiki=()=>directRequest(),fetchWikiByTopic=()=>directRequest(),fetchVoyage=()=>directRequest();
@@ -135,6 +135,14 @@ test('mature topics stay out of the feed unless the reader turns them on', () =>
   assert.equal(h.add(cards()),1,'flagged cards and cards that only match by text are both hidden');
   const shown=harness();shown.run('showMature=true;');
   assert.equal(shown.add(cards()),4);
+});
+
+test('travel guides without a photo stay out unless the reader turns them on or searched a place', () => {
+  const guide=(n,img)=>({...article(n),id:'v'+n,src:'how',url:'https://en.wikivoyage.org/wiki/G'+n,img});
+  const cards=()=>[guide(1,'https://upload.wikimedia.org/a.jpg'),guide(2,''),article(3)];
+  assert.equal(harness().add(cards()),2,'only the guide without a photo is hidden; Wikipedia cards are untouched');
+  const shown=harness();shown.run('showImageless=true;');assert.equal(shown.add(cards()),3);
+  const searched=harness();searched.run("travelFilters.place='Japan';");assert.equal(searched.add(cards()),3);
 });
 
 test('Only these articles rejects untagged supply while Off and Show tags leave the feed unchanged',()=>{

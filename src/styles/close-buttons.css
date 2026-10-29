@@ -1,0 +1,28 @@
+/* Close buttons: a plain drawn X with no box. Hover lights it up the way Settings
+   rows do. Phones keep the "Done" text buttons on Saved, History and Topics. */
+html body :is(#mapClose, #spClose, #ambientClose, #imageClose, #aboutClose, #privacyClose, #sourceDialog .modal-close) {
+  display: grid; place-items: center; flex: none;
+  width: 44px; height: 44px; min-height: 0; padding: 0;
+  border: 0; border-radius: 12px; box-shadow: none;
+  background: transparent; color: var(--muted);
+  -webkit-backdrop-filter: none; backdrop-filter: none;
+  line-height: 1; cursor: pointer; -webkit-tap-highlight-color: transparent;
+  transition: background-color .15s ease, color .15s ease, transform .12s ease;
+}
+@media (min-width: 768px) {
+  html body :is(#lp .lp-x, #hp .hp-x, #topicSheet .topic-close) {
+    display: grid; place-items: center; flex: none; width: 44px; height: 44px; padding: 0;
+    border: 0; border-radius: 12px; background: transparent; color: var(--muted);
+    transition: background-color .15s ease, color .15s ease, transform .12s ease;
+  }
+}
+.close-x { width: 26px; height: 26px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
+html body :is(#mapClose, #spClose, #ambientClose, #imageClose, #aboutClose, #privacyClose, #sourceDialog .modal-close, #lp .lp-x, #hp .hp-x, #topicSheet .topic-close):active { transform: scale(.92); }
+@media (hover: hover) {
+  html body :is(#mapClose, #spClose, #ambientClose, #imageClose, #aboutClose, #privacyClose, #sourceDialog .modal-close, #lp .lp-x, #hp .hp-x, #topicSheet .topic-close):hover {
+    color: var(--ink);
+    background: color-mix(in srgb, var(--ink) 9%, transparent);
+  }
+}
+/* Ambient mode sits over a photo, so its X keeps full contrast and a soft halo. */
+html body #ambientClose { color: var(--ink); filter: drop-shadow(0 0 4px var(--paper)); }

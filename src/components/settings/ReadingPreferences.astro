@@ -19,6 +19,10 @@ const readingLabel = `${desktop ? 'dk' : 'm'}ReadingLabel`;
   <button type="button" class="toggle-sw" id={desktop ? 'dkMatureToggle' : 'matureToggle'} role="switch" aria-label="Mature topics" aria-checked="false"></button>
 </div>
 <div class={`${row} reading-option-row`}>
+  <div class={label}><span class="ico"><Icon name="images" /></span><div><div>Guides without photos</div><div class={sub}>Show travel guides that have no picture.</div></div></div>
+  <button type="button" class="toggle-sw" id={desktop ? 'dkImagelessToggle' : 'imagelessToggle'} role="switch" aria-label="Guides without photos" aria-checked="false"></button>
+</div>
+<div class={`${row} reading-option-row`}>
   <div class={label}><span class="ico"><Icon name="ambient" /></span><div><div>Ambient Mode</div><div class={sub}>{desktop ? 'Spacebar for distraction-free reading.' : 'Long-press for distraction-free reading.'}</div></div></div>
   <button class="toggle-sw on" id={desktop ? 'dkAmbientToggle' : 'ambientToggle'} role="switch" aria-label="Ambient Mode" aria-checked="true"></button>
 </div>

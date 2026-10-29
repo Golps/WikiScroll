@@ -105,25 +105,25 @@ body:has(#ambientOverlay.open) .feed-service-status { opacity: 0; visibility: hi
 @media (prefers-reduced-motion: reduce) { .feed-service-status { transition: none; } }
 
 /* ── Gesture coach (first launches) ──────────────────────────────────────
-   One pill under the header, one gesture at a time. Line-art hands in the
-   style of system gesture guides: the hand drags along its arrow track, and
-   the track lights in the direction of travel. */
+   One line under the header, one gesture at a time, with no box: the header's
+   colour fades down behind it so the text stays readable over any photo.
+   Line-art hands in the style of system gesture guides: the hand drags along
+   its arrow track, and the track lights in the direction of travel. */
 .coach {
-  position: fixed; z-index: 60; left: 50%; top: 128px;
-  box-sizing: border-box; width: max-content; max-width: calc(100vw - 32px); min-height: 40px; padding: 6px 16px 6px 10px;
-  display: flex; align-items: center;
-  border: 1px solid color-mix(in srgb, var(--rule) 70%, transparent); border-radius: 999px;
-  background: color-mix(in srgb, var(--surface) 86%, transparent); color: var(--ink);
-  -webkit-backdrop-filter: blur(16px) saturate(1.4); backdrop-filter: blur(16px) saturate(1.4);
-  box-shadow: 0 6px 20px #0005; cursor: pointer;
+  position: fixed; z-index: 60; left: 50%; top: 128px; isolation: isolate;
+  box-sizing: border-box; width: max-content; max-width: calc(100vw - 32px); min-height: 40px; padding: 6px 4px;
+  display: flex; align-items: center; color: var(--ink); cursor: pointer;
   opacity: 0; visibility: hidden; pointer-events: none; transform: translate(-50%, -6px);
   transition: opacity .28s ease, transform .36s cubic-bezier(.22, 1, .36, 1), visibility 0s .36s;
 }
-body.light .coach { box-shadow: 0 6px 20px #0002; }
+.coach::before {
+  content: ""; position: absolute; z-index: -1; top: -12px; bottom: -22px; left: -100vw; right: -100vw; pointer-events: none;
+  background: linear-gradient(to bottom, var(--paper) 0%, color-mix(in srgb, var(--paper) 82%, transparent) 55%, transparent 100%);
+}
 .coach.is-visible { opacity: 1; visibility: visible; pointer-events: auto; transform: translate(-50%, 0); transition-delay: 0s; }
 .coach-row { display: flex; align-items: center; gap: 8px; animation: coach-in .32s ease both; }
 .coach-row[hidden] { display: none; }
-.rtl-ui .coach { direction: rtl; padding: 6px 10px 6px 16px; }
+.rtl-ui .coach { direction: rtl; }
 .coach-row p { margin: 0; font: 500 14px/1.35 var(--sans); color: var(--muted); }
 .coach-row strong { font-weight: 600; color: var(--ink); }
 .coach-ico { flex: none; width: 26px; height: 26px; overflow: visible; fill: none; stroke: var(--ink); stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }

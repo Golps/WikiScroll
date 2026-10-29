@@ -36,6 +36,7 @@ import {randomDepths} from './build-starter.mjs';
 import {vitalTitles} from '../worker/vital.js';
 import {isDisambiguation, isPhrasebook, PHRASEBOOK_CATEGORY, fold, TRAVEL_TERMS, TRAVEL_STYLES} from '../worker/travel.js';
 import {imageURL} from '../worker/supply.js';
+import {voyagePhoto} from '../worker/voyage-images.js';
 import {guideReadable} from '../worker/extracts.js';
 import {roots, bands as TOPIC_BANDS} from '../worker/topics.js';
 import {isMature} from '../worker/mature.js';
@@ -416,6 +417,34 @@ export function placeIndex({titles, parents, cards}, random = Math.random) {
   for (const [key, entry] of keys) out[placeHash(key, files)][key] = {title: entry.title, cards: entry.cards};
   return {files: out, places: members.size, keys: keys.size};
 }
+// PageImages skips Wikivoyage's banners, so about a quarter of guides arrive
+// without a photo. Their own {{pagebanner}} file comes first, as on the live
+// feed; otherwise the free lead photo of the Wikipedia article on the same
+// place (shared Wikidata item). Default and continent banners don't count.
+export function guideBanner(source) {
+  const match = /\{\{\s*pagebanner\s*\|\s*([^|}\n=]+?)\s*[|}]/i.exec(String(source || ''));
+  const name = match ? 'File:' + match[1].replace(/^(?:file|image)\s*:\s*/i, '') : '';
+  return voyagePhoto(name) ? name.slice(5) : '';
+}
+const guidePhotoURL = file => imageURL(thumbURL(file, 'commons'));
+// Wikidata items of guides that will need a Wikipedia photo, each mapped to ''
+// until the article stream fills it in.
+export async function guidePhotoGaps(voyage) {
+  const gaps = new Map(), read = cirrusReader();
+  for await (const line of voyage.lines) {
+    const entry = read(line), card = entry && voyageCard(entry.pageid, entry.doc, voyage.props);
+    const item = entry?.doc.wikibase_item;
+    if (card && !card.img && typeof item === 'string' && !guideBanner(entry.doc.source_text)) gaps.set(item, '');
+  }
+  return gaps;
+}
+export function fillGuidePhoto(card, doc, gaps) {
+  if (!card || card.img) return false;
+  const banner = guideBanner(doc.source_text), file = banner || gaps.get(doc.wikibase_item);
+  const img = file ? guidePhotoURL(file) : '';
+  if (img) card.img = img;
+  return img ? (banner ? 'banner' : 'wikipedia') : false;
+}
 
 // An external shuffle: every card goes to a random gzipped bucket file, then
 // each bucket is shuffled in memory. Millions of cards never sit in memory at once.
@@ -478,12 +507,16 @@ export async function packSet(bucketDir, set, outDir, shardSize = SHARD_SIZE, ca
 }
 
 export async function buildLibrary({lines, props, dailyTotal, levels, reach = new Map(), photoTitles = new Set(), voyage = null, outDir, tmpDir, build, source = {}}) {
-  const buckets = createBuckets(tmpDir), stats = {pages: 0, cards: 0, unknown: 0, guides: 0};
+  const buckets = createBuckets(tmpDir), stats = {pages: 0, cards: 0, unknown: 0, guides: 0, guideBanners: 0, guideWikipedia: 0, guidesWithout: 0};
+  // The caller finds the gaps before opening stdin, whose lines would otherwise be dropped meanwhile.
+  const gaps = voyage ? voyage.gaps ?? await guidePhotoGaps(voyage) : new Map();
   let read = cirrusReader();
   for await (const line of lines) {
     const entry = read(line);
     if (!entry) continue;
     stats.pages++;
+    const item = entry.doc.wikibase_item;
+    if (gaps.has(item)) { const file = props.free.get(entry.pageid); if (file && voyagePhoto('File:' + file)) gaps.set(item, file); }
     const card = libraryCard(entry.pageid, entry.doc, props);
     if (!card) continue;
     const views = dailyViews(entry.doc, dailyTotal);
@@ -499,7 +532,10 @@ export async function buildLibrary({lines, props, dailyTotal, levels, reach = ne
       const entry = read(line);
       if (entry?.doc.namespace === 0 && typeof entry.doc.title === 'string') voyageTitles.set(entry.pageid, entry.doc.title);
       const card = entry && voyageCard(entry.pageid, entry.doc, voyage.props);
-      if (card) { stats.guides++; guides.set(entry.pageid, card); await buckets.add(`how-${LANG}`, card); }
+      if (!card) continue;
+      const filled = fillGuidePhoto(card, entry.doc, gaps);
+      if (filled === 'banner') stats.guideBanners++; else if (filled === 'wikipedia') stats.guideWikipedia++; else if (!card.img) stats.guidesWithout++;
+      stats.guides++; guides.set(entry.pageid, card); await buckets.add(`how-${LANG}`, card);
     }
   }
   await buckets.close();
@@ -655,6 +691,11 @@ if (process.argv[1] && import.meta.url === new URL(process.argv[1], 'file:').hre
     // Opened only when read: a reader opened now would drop its lines while the articles stream in.
     const voyageFile = option('voyage');
     const voyage = voyageFile ? {get lines() { return textLines(voyageFile); }, props: option('voyage-props') ? await readPageProps(sqlLines(option('voyage-props'))) : emptyProps()} : null;
+    if (voyage) {
+      log('Finding travel guides without a photo');
+      voyage.gaps = await guidePhotoGaps(voyage);
+      log(`Guides that may take a Wikipedia photo: ${voyage.gaps.size}`);
+    }
     const tmpDir = await fsp.mkdtemp(path.join(option('tmp') || outDir, '.buckets-'));
     log('Reading articles');
     const result = await buildLibrary({lines: readline.createInterface({input: process.stdin, crlfDelay: Infinity}), props, dailyTotal, levels: vitalLevels(level3, level4),
@@ -662,7 +703,7 @@ if (process.argv[1] && import.meta.url === new URL(process.argv[1], 'file:').hre
     await fsp.rm(tmpDir, {recursive: true, force: true});
     const images = await checkImages(outDir, result.manifest);
     const per = test => SETS.filter(test).reduce((sum, s) => sum + result.manifest.sets[s], 0), starts = prefix => s => s.startsWith(prefix);
-    console.log(`Card library ${LANG} ${build}: ${result.pages} pages read, ${result.cards} articles in at least one set (${result.unknown} without readership), ${result.guides} travel guides.`);
+    console.log(`Card library ${LANG} ${build}: ${result.pages} pages read, ${result.cards} articles in at least one set (${result.unknown} without readership), ${result.guides} travel guides (photos added from ${result.guideBanners} banners and ${result.guideWikipedia} Wikipedia articles; ${result.guidesWithout} still without one).`);
     console.log(`${result.files} shards, ${(result.bytes / 1e9).toFixed(2)} GB: depth sets ${per(starts('wiki-'))}, topic sets ${per(s => s.startsWith('topic-') && !s.includes('-help-'))}, topic Help sets ${per(s => s.includes('-help-'))}, Help sets ${per(starts('help-'))}, travel ${per(starts('how-'))} shards.`);
     if (result.places) console.log(`Travel place index: ${result.places} places (${result.placeKeys} names) in ${result.manifest.places} files.`);
     console.log('Cards per set: ' + SETS.map(set => `${set} ${result.counts[set]}`).join(', ') + `. Average daily views used: ${Math.round(dailyTotal)}.`);

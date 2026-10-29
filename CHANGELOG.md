@@ -6,6 +6,9 @@ Releases of this repository. Each entry describes what changed in the code; [doc
 
 - Build card libraries for all 15 languages: English weekly and five others each week in turn, mature-topic category rules for every language, travel guides only where Wikivoyage exists, and a monthly write ledger that refuses any upload past 900,000 writes.
 - Add a travel place index to the card library: each Wikivoyage place lists the guides inside it, with trip-style tags, and stands in for travel search when it fails.
+- The first-launch hint drops its pill: the hand and line of text sit on a soft fade from the header, which keeps them readable over any photo.
+- Settings hover is consistent: Reading text sizes, Help types, depth labels and the About links brighten on hover like the Help Wikipedia choices (mouse only). Settings now always opens at the top instead of where it was last scrolled.
+- The About card shows its gestures as three centred, animated icons (swipe left to skip, swipe right to save, Spacebar or long-press for Ambient Mode) instead of one line of text. "Ambient Mode" is now translated in Settings too.
 - Reword the Mature topics setting to "Show articles on adult and sensitive subjects."
 - Build card libraries for German, French and Spanish alongside English: one builder for every language, English weekly and the others in turn, each in its own job, with a 9 GB storage guard before any upload. The reader draws from each language's own library and falls back to the Worker for a language whose library isn't up yet. The "You're all caught up" card is translated.
 - Sample the bundled starter pool from the card library instead of hundreds of live API calls; the API remains the fallback when the library can't be read.

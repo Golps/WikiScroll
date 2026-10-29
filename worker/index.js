@@ -56,7 +56,7 @@ function apiURL(lang,mode,params) {
 function article(p,lang,mode) {
   // The short description ("species of beetle") labels the card's category.
   const desc=typeof p.description==='string'?strip(p.description).slice(0,160):'';
-  return {id:(mode==='how'?'v':'w')+p.pageid,src:mode,title:p.title,body:strip(p.extract),img:imageURL(p.thumbnail?.source),url:p.fullurl||`https://${lang}.${mode==='how'?'wikivoyage':'wikipedia'}.org/wiki/${encodeURIComponent(p.title.replace(/ /g,'_'))}`,...(desc?{desc}:{}),...(mode==='wiki'&&p.needs?.length?{needs:p.needs}:{}),...(mode==='wiki'&&isMature({title:p.title,description:desc,categories:p.categories})?{mature:1}:{})};
+  return {id:(mode==='how'?'v':'w')+p.pageid,src:mode,title:p.title,body:strip(p.extract),img:imageURL(p.thumbnail?.source),url:p.fullurl||`https://${lang}.${mode==='how'?'wikivoyage':'wikipedia'}.org/wiki/${encodeURIComponent(p.title.replace(/ /g,'_'))}`,...(desc?{desc}:{}),...(mode==='wiki'&&p.needs?.length?{needs:p.needs}:{}),...(mode==='wiki'&&isMature({title:p.title,description:desc,categories:p.categories,lang})?{mature:1}:{})};
 }
 
 function shuffle(values) {

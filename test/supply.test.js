@@ -19,15 +19,18 @@ function starterPool(path,onShard,sets=Object.fromEntries(Object.keys(SET_BASE).
   onShard();return Response.json(batch(30,SET_BASE[set]+Number(shard)*100,set==='how-en'?'how':'wiki'));
 }
 // The card library on cards.wikiscroll.com: `sets` maps each set to its shard count.
-function cardLibrary(url,sets,log){
-  if(url==='https://cards.wikiscroll.com/v1/en/current.json')return sets?Response.json({v:1,build:'20261025',base:'20261025/',sets}):new Response('',{status:503});
-  const [,set,shard]=url.match(/^https:\/\/cards\.wikiscroll\.com\/v1\/en\/20261025\/(.+)\/(\d+)\.json$/)||[];
+// Other languages' libraries are in `languages`; one missing there is not built yet.
+function cardLibrary(url,sets,log,languages={}){
+  const lang=url.match(/^https:\/\/cards\.wikiscroll\.com\/v1\/([a-z]+)\//)?.[1];
+  if(lang!=='en')sets=languages[lang];
+  if(url===`https://cards.wikiscroll.com/v1/${lang}/current.json`)return sets?Response.json({v:1,build:'20261025',base:'20261025/',sets}):new Response('',{status:lang==='en'?503:404});
+  const [,set,shard]=url.match(/^https:\/\/cards\.wikiscroll\.com\/v1\/[a-z]+\/20261025\/(.+)\/(\d+)\.json$/)||[];
   if(!set||!(sets?.[set]>Number(shard)))return new Response('',{status:404});
-  log.push(set+'/'+shard);
-  const how=set==='how-en',base=10000*(1+Object.keys(sets).indexOf(set))+Number(shard)*100;
+  log.push((lang==='en'?'':lang+':')+set+'/'+shard);
+  const how=set.startsWith('how-'),base=10000*(1+Object.keys(sets).indexOf(set))+Number(shard)*100;
   return Response.json(batch(100,base,how?'how':'wiki').map(a=>set.includes('help')?{...a,needs:['citations']}:a));
 }
-function harness({librarySets=undefined}={}) {
+function harness({librarySets=undefined,languages={}}={}) {
   const storage = new Map(), timers = new Map(), requests = [];
   const nodes = [], feed = {querySelectorAll:() => nodes, addEventListener() {}};
   let timerId=0, selectedIndex=0, directCalls=0, starterRequests=0;const starterPaths=[],shards=[];
@@ -46,7 +49,7 @@ function harness({librarySets=undefined}={}) {
     lsSet:(key,value)=>storage.set(key,JSON.stringify(value)),
     getCurrentFeedCard:()=>nodes[selectedIndex]||null,
     renderCard:a=>nodes.push({dataset:{id:a.id}}),
-    fetch:async path=>path.startsWith('https://')?cardLibrary(path,librarySets,shards):starterPool(path,()=>{starterRequests++;starterPaths.push(path);}),
+    fetch:async path=>path.startsWith('https://')?cardLibrary(path,librarySets,shards,languages):starterPool(path,()=>{starterRequests++;starterPaths.push(path);}),
     workerRequest:()=>new Promise(resolve=>requests.push(resolve)),
     directRequest:async()=>{directCalls++;return [];},
   });
@@ -57,7 +60,7 @@ function harness({librarySets=undefined}={}) {
     ${voyage}
     ${supply}
     // Card-library tests switch it on; these tests cover the Worker path.
-    library.failedUntil=${librarySets===undefined?'Infinity':'0'};
+    for(const lang of LIBRARY_LANGS)libraryFor(lang).failedUntil=${librarySets===undefined?'Infinity':'0'};
     let helpTypes=['sources'];const activeHelpTypes=()=>helpTypes;
     const liveFetchWorkerBatch=fetchWorkerBatch;
     fetchWorkerBatch=()=>workerRequest();
@@ -412,6 +415,20 @@ test('the Worker serves when the library is unreachable or lacks the language', 
   let h=harness({librarySets:null});
   let filling=h.run('fillQueue()');await settle();
   assert.equal(h.requests.length,1,'manifest failure falls back');h.requests[0]([]);await filling;
-  h=harness({librarySets:LIBRARY_SETS});h.change("curLang='fr';");
+  h=harness({librarySets:LIBRARY_SETS});h.change("curLang='it';");
   filling=h.run('fillQueue()');assert.equal(h.requests.length,1);assert.equal(h.shards.length,0);h.requests[0]([]);await filling;
+  // A library language whose first build isn't uploaded yet waits a while before asking again.
+  h=harness({librarySets:LIBRARY_SETS});h.change("curLang='fr';");
+  filling=h.run('fillQueue()');await settle();
+  assert.equal(h.requests.length,1,'a missing French library falls back');assert.equal(h.shards.length,0);h.requests[0]([]);await filling;
+  assert.ok(h.run("libraryFor('fr').failedUntil-Date.now()")>20*6e4);
+});
+
+test('each library language draws from its own build', async () => {
+  const de=Object.fromEntries(Object.keys(LIBRARY_SETS).map(set=>[set.replace('-en','-de'),LIBRARY_SETS[set]]));
+  const h=harness({librarySets:LIBRARY_SETS,languages:{de}});h.change("curLang='de';");
+  const filling=h.run('fillQueue()');await settle();await filling;
+  assert.ok(h.shards.length>0&&h.shards.every(s=>s.startsWith('de:wiki-de-')),h.shards.join());
+  assert.equal(h.requests.length,0);assert.equal(h.directCalls,0);
+  assert.equal(h.run("libraryFor('en').drawn.size"),0,'English draws are kept apart');
 });

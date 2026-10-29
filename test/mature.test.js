@@ -44,3 +44,14 @@ test('library and starter cards carry the mature flag',()=>{
  assert.equal(libraryCard(5,{namespace:0,title:'Example',opening_text:body,category:['Lakes']},emptyProps()).mature,undefined);
  assert.equal(toCard({pageid:5,title:'Example',description:'American pornographic actress',extract:body,thumbnail:{source:'https://upload.wikimedia.org/x.jpg'}},'wiki').mature,1);
 });
+
+test('German, French and Spanish categories have their own mature rules', () => {
+  assert.equal(isMature({title: 'X', categories: ['Kategorie:Pornografie'], lang: 'de'}), true);
+  assert.equal(isMature({title: 'X', categories: ['Catégorie:Viol'], lang: 'fr'}), true);
+  assert.equal(isMature({title: 'X', categories: ['Categoría:Prostitución'], lang: 'es'}), true);
+  // Whole words only: a violinist or a German painter is not flagged.
+  assert.equal(isMature({title: 'X', categories: ['Catégorie:Violoniste français'], lang: 'fr'}), false);
+  assert.equal(isMature({title: 'X', categories: ['Kategorie:Maler (Deutschland)'], lang: 'de'}), false);
+  // A language without rules checks only the title and description.
+  assert.equal(isMature({title: 'X', categories: ['Categoria:Pornografia'], lang: 'it'}), false);
+});

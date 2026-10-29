@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import {pack,writePool,validCard,toCard,randomDepths,shorten,SETS,SHARD_SIZE,TARGET,buildPool,MINIMUM} from '../scripts/build-starter.mjs';
+import {pack,writePool,validCard,toCard,randomDepths,shorten,SETS,SHARD_SIZE,TARGET,buildPool,MINIMUM,libraryPool} from '../scripts/build-starter.mjs';
 import {DEPTH_BANDS} from '../worker/pageviews.js';
 
 const dir=new URL('../public/data/starter/',import.meta.url);
@@ -80,4 +80,23 @@ test('a full build against a fake Wikimedia fills every set and packs valid shar
  const {files,index}=pack(sets);
  assert.ok(Object.values(index).every(n=>n===TARGET/SHARD_SIZE));
  assert.ok(Object.values(files).every(cards=>cards.length===SHARD_SIZE));
+});
+
+test('the pool samples whole library shards, keeps each card in one set and skips invalid cards',async()=>{
+ const base='https://cards.example/v1/en/',shardSets={};
+ for(const set of SETS)shardSets[set]=6;
+ const requests=[];
+ const fetchJSON=async url=>{
+  requests.push(url);
+  if(url===base+'current.json')return {v:1,build:'20261025',base:'20261025/',shardSize:100,sets:shardSets};
+  const [,set,shard]=/20261025\/([a-z0-9-]+)\/(\d+)\.json$/.exec(url),src=set.startsWith('how')?'how':'wiki';
+  // Shard 0 of every set repeats the same cards, so later sets must skip them.
+  return Array.from({length:100},(_,i)=>{const n=shard==='0'?i+1:SETS.indexOf(set)*1e4+Number(shard)*100+i+1000;const c=card(n,src);if(src==='how'){c.url='https://en.wikivoyage.org/wiki/G'+n;}else c.url='https://en.wikipedia.org/wiki/A'+n;return i===0&&shard==='1'?{...c,url:'https://evil.test/x'}:c;});
+ };
+ const {sets,build}=await libraryPool(fetchJSON,base);
+ assert.equal(build,'20261025');
+ const ids=new Set();
+ for(const set of SETS){assert.ok(sets[set].length>=MINIMUM&&sets[set].length<=TARGET,set);for(const c of sets[set]){assert.ok(!ids.has(c.id),'one set per card');ids.add(c.id);assert.notEqual(c.url,'https://evil.test/x');}}
+ assert.ok(requests.every(url=>url.startsWith(base)));
+ assert.equal(await libraryPool(async()=>null,base),null,'an unreadable library falls back to the live API');
 });

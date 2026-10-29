@@ -1,4 +1,4 @@
-// Builds the English card library: millions of prebuilt cards for every feed
+// Builds one language's card library (English by default, --lang de etc.): millions of prebuilt cards for every feed
 // the site offers (depths, topics, Help Wikipedia, Wikivoyage), read from
 // Wikimedia's weekly dumps instead of the live API. Cards keep the Worker's
 // own answer shapes and are grouped into sets, shuffled across each whole set
@@ -10,7 +10,7 @@
 //     --page enwiki-page.sql.gz --categorylinks enwiki-categorylinks.sql.gz \
 //     [--linktarget enwiki-linktarget.sql.gz] \
 //     [--voyage enwikivoyage_content.ndjson --voyage-props enwikivoyage-page_props.sql.gz] \
-//     --out library
+//     [--lang en] --out library
 //
 // Inputs:
 // - stdin: the decompressed enwiki_content CirrusSearch dump (bulk format: an
@@ -21,9 +21,10 @@
 //   the right upload folder (File: pages are the fallback).
 // - page + categorylinks (+ linktarget on the newer schema): the category tree
 //   for topics, and talk-page photo requests for Help Wikipedia.
-// - Two small live lookups: the vital-article lists (Popular, Known) and
-//   English Wikipedia's average daily pageviews, which turns each page's
-//   popularity share into daily views for the Worker's depth bands.
+// - A few small live lookups: the vital-article lists (Popular, Known) and,
+//   for other languages, their titles and topic root categories there via
+//   English Wikipedia's interlanguage links; and the wiki's average daily
+//   pageviews, which turns each page's popularity share into daily views.
 import fs from 'node:fs';
 import fsp from 'node:fs/promises';
 import path from 'node:path';
@@ -33,14 +34,16 @@ import readline from 'node:readline';
 import {once} from 'node:events';
 import {randomDepths} from './build-starter.mjs';
 import {vitalTitles} from '../worker/vital.js';
-import {isDisambiguation, isPhrasebook} from '../worker/travel.js';
+import {isDisambiguation, isPhrasebook, PHRASEBOOK_CATEGORY} from '../worker/travel.js';
 import {imageURL} from '../worker/supply.js';
 import {guideReadable} from '../worker/extracts.js';
 import {roots, bands as TOPIC_BANDS} from '../worker/topics.js';
 import {isMature} from '../worker/mature.js';
+import {VIEW_SCALE} from '../worker/pageviews.js';
 import {NEED_CATEGORIES, TALK_NEED_CATEGORIES, HELP_TYPES, NEED_ORDER, availableHelpTypes} from '../worker/needs.js';
 
-const LANG = 'en';
+// The language comes from --lang, so the exported set names match the build.
+export const LANG = (() => { const i = process.argv.indexOf('--lang'), lang = i > 0 ? process.argv[i + 1] : 'en'; if (!/^[a-z]{2,3}$/.test(lang)) throw Error('Use --lang with a wiki language code.'); return lang; })();
 export const TOPICS = Object.keys(roots), HELP = availableHelpTypes(LANG), DEPTHS = [1, 2, 3, 4, 5];
 export const SETS = [
   ...DEPTHS.map(d => `wiki-${LANG}-${d}`),
@@ -59,11 +62,18 @@ export const topicLevels = depth => depth >= 4 ? 3 : 2;
 // random sample instead of every match; the depth sets keep every card.
 export const SLICE_CAP = 40_000, COMBO_CAP = 10_000;
 // A set below this many cards fails the build, so a bad week keeps last week's library.
-export const MINIMUM = {'wiki-en-1': 500, 'wiki-en-2': 3000, 'wiki-en-3': 50000, 'wiki-en-4': 50000, 'wiki-en-5': 50000, 'how-en': 10000};
-// R2's free tier allows 1M writes and 10 GB a month. Five weekly builds must
-// fit the writes, and one build plus the next one during the swap must fit
-// the storage, so a build over either limit is refused before any upload.
-export const MAX_FILES = 190_000, MAX_BYTES = 4.5e9;
+// English minima. Popular and Known follow the English lists through
+// interlanguage links, so most of them carry over; the random depths and
+// travel guides scale with each wiki's size.
+const EN_MINIMUM = {1: 500, 2: 3000, 3: 50000, 4: 50000, 5: 50000};
+export const MINIMUM_SCALE = {en: 1, de: 0.4, fr: 0.4, es: 0.3}, GUIDE_MINIMUM = {en: 10000, de: 5000, fr: 1500, es: 500};
+export const MINIMUM = Object.fromEntries([...DEPTHS.map(d => [`wiki-${LANG}-${d}`, Math.round(EN_MINIMUM[d] * (d <= 2 ? (LANG === 'en' ? 1 : 0.8) : MINIMUM_SCALE[LANG] ?? 0.1))]), [`how-${LANG}`, GUIDE_MINIMUM[LANG] ?? 100]]);
+// R2's free tier allows 1M writes and 10 GB a month. Two builds a week (English
+// and one other language) for five weeks must fit the writes, and one build
+// plus the next one during the swap must fit the storage, so a build over
+// either limit is refused before any upload. The workflow also checks the
+// whole bucket against its storage limit before each upload.
+export const MAX_FILES = 95_000, MAX_BYTES = 4.5e9;
 // The category walk reaches hundreds of thousands of categories; far fewer
 // means the tree was misread, so the build stops before reading articles.
 export const MIN_TOPIC_CATEGORIES = 5000;
@@ -186,7 +196,7 @@ export async function readLinkTargets(lines) {
   return titles;
 }
 export async function readCategoryLinks(lines, targets = null) {
-  const edges = [], photoTalk = new Set(), photo = Object.keys(TALK_NEED_CATEGORIES[LANG] || {}).map(t => t.replace(/^Category:/, '').replace(/ /g, '_'));
+  const edges = [], photoTalk = new Set(), photo = Object.keys(TALK_NEED_CATEGORIES[LANG] || {}).map(t => bare(t).replace(/ /g, '_'));
   const columns = await readTable(lines, (row, c) => {
     const parent = (targets && 'cl_target_id' in c ? targets.get(row[c.cl_target_id]) : null) || ('cl_to' in c ? row[c.cl_to] : null);
     if (!parent) return;
@@ -261,7 +271,9 @@ export function cirrusReader() {
   };
 }
 
-const ARTICLE_NEEDS = Object.fromEntries(Object.entries(NEED_CATEGORIES[LANG] || {}).map(([title, code]) => [title.replace(/^Category:/, ''), code]));
+// Category titles without their namespace (Category:, Kategorie:, Catégorie:…).
+const bare = title => String(title).replace(/^[^:]+:/, '');
+const ARTICLE_NEEDS = Object.fromEntries(Object.entries(NEED_CATEGORIES[LANG] || {}).map(([title, code]) => [bare(title), code]));
 // Maintenance needs in the live order; photo requests come from talk pages.
 export function cardNeeds(doc, photoTitles = new Set()) {
   const found = new Set();
@@ -284,7 +296,7 @@ export function libraryCard(pageid, doc, props, src = 'wiki', host = `${LANG}.wi
   const local = props.local ? props.local.has(String(file).replace(/ /g, '_')) : !free;
   const img = imageURL(thumbURL(file, local ? (src === 'how' ? 'wikivoyage/' : 'wikipedia/') + LANG : 'commons'));
   return {id: (src === 'how' ? 'v' : 'w') + pageid, src, title: doc.title, body, img, url: `https://${host}/wiki/${encodeURIComponent(doc.title.replace(/ /g, '_'))}`, ...(desc ? {desc} : {}),
-    ...(src === 'wiki' && isMature({title: doc.title, description: desc, categories: doc.category}) ? {mature: 1} : {})};
+    ...(src === 'wiki' && isMature({title: doc.title, description: desc, categories: doc.category, lang: LANG}) ? {mature: 1} : {})};
 }
 
 // popularity_score is the page's share of the wiki's weekly views; unknown
@@ -314,7 +326,10 @@ export function pageTopics(doc, reach) {
   return topics;
 }
 // Every set a page belongs to, with the card variant each set serves.
-export function cardSets(doc, card, views, {levels, reach = new Map(), photoTitles = new Set()}) {
+export function cardSets(doc, card, localViews, {levels, reach = new Map(), photoTitles = new Set()}) {
+  // The bands are English readership; a smaller wiki's views are scaled up to
+  // match, as the Worker scales its bands (scaleBand).
+  const views = localViews === null ? null : localViews / (VIEW_SCALE[LANG] ?? 1);
   const sets = [], needs = cardNeeds(doc, photoTitles), tagged = needs.length ? {...card, needs} : card;
   if (card.img) {
     const level = vitalLevel(doc, levels);
@@ -338,7 +353,8 @@ export function cardSets(doc, card, views, {levels, reach = new Map(), photoTitl
 }
 // Wikivoyage guides: no depth, an optional image, no phrasebooks or travel topics.
 export function voyageCard(pageid, doc, props) {
-  const page = {title: doc.title, categories: (Array.isArray(doc.category) ? doc.category : []).filter(c => c === 'Phrasebooks')};
+  const phrasebooks = PHRASEBOOK_CATEGORY[LANG] ? bare(PHRASEBOOK_CATEGORY[LANG]) : null;
+  const page = {title: doc.title, categories: (Array.isArray(doc.category) ? doc.category : []).filter(c => c === phrasebooks)};
   if (isPhrasebook(page) || /^(?:travel topics?|itineraries)(?:[ :/]|$)/i.test(doc.title || '')) return null;
   return libraryCard(pageid, doc, props, 'how', `${LANG}.wikivoyage.org`);
 }
@@ -453,9 +469,9 @@ async function request(url) {
   return null;
 }
 const day = date => date.toISOString().slice(0, 10).replace(/-/g, '');
-export async function averageDailyViews(fetchJSON = request, now = Date.now()) {
+export async function averageDailyViews(fetchJSON = request, now = Date.now(), lang = LANG) {
   const end = new Date(now - 2 * 86400000), start = new Date(end - 6 * 86400000);
-  const data = await fetchJSON(`https://wikimedia.org/api/rest_v1/metrics/pageviews/aggregate/en.wikipedia/all-access/user/daily/${day(start)}00/${day(end)}00`);
+  const data = await fetchJSON(`https://wikimedia.org/api/rest_v1/metrics/pageviews/aggregate/${lang}.wikipedia/all-access/user/daily/${day(start)}00/${day(end)}00`);
   const views = (data?.items || []).map(item => item.views).filter(v => Number.isFinite(v) && v > 0);
   return views.length >= 5 ? views.reduce((a, b) => a + b, 0) / views.length : null;
 }
@@ -467,9 +483,36 @@ async function vitalLists() {
   return [await vitalTitles(3, upstream, {}, options), await vitalTitles(4, upstream, {}, options)];
 }
 
+// Other languages: English titles to this wiki's titles through English
+// Wikipedia's interlanguage links, 50 per request. Unlinked titles drop out.
+export async function translateTitles(titles, lang, fetchJSON = request) {
+  const found = new Map();
+  for (let i = 0; i < titles.length; i += 50) {
+    const batch = titles.slice(i, i + 50);
+    const data = await fetchJSON('https://en.wikipedia.org/w/api.php?' + new URLSearchParams({action: 'query', format: 'json', formatversion: '2', prop: 'langlinks', lllang: lang, lllimit: 'max', redirects: '1', titles: batch.join('|'), maxlag: '5'}));
+    if (!data?.query) return null;
+    const renamed = new Map([...(data.query.normalized || []), ...(data.query.redirects || [])].map(({from, to}) => [to, from]));
+    for (const page of data.query.pages || []) {
+      const target = page.langlinks?.[0]?.title;
+      let source = page.title;
+      while (renamed.has(source)) source = renamed.get(source);
+      if (target) found.set(source, target);
+    }
+  }
+  return found;
+}
+// Topic roots are English category names; elsewhere their linked categories.
+export async function localRoots(lang, fetchJSON = request) {
+  if (lang === 'en') return roots;
+  const all = [...new Set(Object.values(roots).flat())].map(root => 'Category:' + root);
+  const found = await translateTitles(all, lang, fetchJSON);
+  if (!found) return null;
+  return Object.fromEntries(Object.entries(roots).map(([topic, list]) => [topic, list.map(root => found.get('Category:' + root)).filter(Boolean).map(title => title.replace(/^[^:]+:/, ''))]));
+}
+
 // Report only: how many sampled image links load. Builds never fail on it.
 async function checkImages(dir, manifest, sample = 100) {
-  const set = 'wiki-en-3', shard = Math.floor(Math.random() * manifest.sets[set]);
+  const set = `wiki-${LANG}-3`, shard = Math.floor(Math.random() * manifest.sets[set]);
   const cards = JSON.parse(zlib.gunzipSync(await fsp.readFile(path.join(dir, manifest.base, set, shard + '.json'))));
   // Thumbnail servers rate-limit a datacenter IP (429) long before a reader's
   // browser, so a 429 is retried once and then reported apart from failures.
@@ -501,9 +544,17 @@ if (process.argv[1] && import.meta.url === new URL(process.argv[1], 'file:').hre
     for (const name of ['page-props', 'page', 'categorylinks']) if (!option(name)) throw Error(`Missing --${name}.`);
     if (!/^\d{8}(-\d+)?$/.test(build || '')) throw Error('Use --build YYYYMMDD, or YYYYMMDD-N for a rebuild.');
     const dailyTotal = await averageDailyViews();
-    if (!dailyTotal) throw Error('English Wikipedia pageview totals are unavailable, keeping the current library.');
-    const [level3, level4] = await vitalLists();
+    if (!dailyTotal) throw Error(`${LANG} Wikipedia pageview totals are unavailable, keeping the current library.`);
+    let [level3, level4] = await vitalLists();
     if (!level3 || !level4) throw Error('Vital-article lists are unavailable, keeping the current library.');
+    if (LANG !== 'en') {
+      const translated = await translateTitles([...new Set([...level3, ...level4])], LANG);
+      if (!translated) throw Error('Interlanguage links are unavailable, keeping the current library.');
+      [level3, level4] = [level3, level4].map(list => list.map(title => translated.get(title)).filter(Boolean));
+      log(`Vital articles in ${LANG}: ${level3.length} of level 3, ${level4.length} of level 4`);
+    }
+    const topicRoots = await localRoots(LANG);
+    if (!topicRoots) throw Error('Topic root categories are unavailable, keeping the current library.');
     log('Reading page properties');
     const props = await readPageProps(sqlLines(option('page-props')));
     // page_image holds only non-free lead images; free ones are page_image_free.
@@ -523,7 +574,7 @@ if (process.argv[1] && import.meta.url === new URL(process.argv[1], 'file:').hre
     if (props.local === uploads) localFiles.clear();
     const edgeCount = links.edges.length / 2;
     links.edges.length = 0;
-    const reach = topicCategories(children);
+    const reach = topicCategories(children, topicRoots);
     log(`Categories with subcategories: ${children.size} of ${edgeCount} edges resolved; topic categories: ${reach.size}; photo requests: ${photoTitles.size}; local files: ${props.local.size}${props.local === uploads ? ' (image table)' : ' (File: pages)'}`);
     children.clear();
     if (reach.size < MIN_TOPIC_CATEGORIES) throw Error(`Only ${reach.size} topic categories: the category tree was misread, keeping the current library.`);
@@ -538,7 +589,7 @@ if (process.argv[1] && import.meta.url === new URL(process.argv[1], 'file:').hre
     await fsp.rm(tmpDir, {recursive: true, force: true});
     const images = await checkImages(outDir, result.manifest);
     const per = test => SETS.filter(test).reduce((sum, s) => sum + result.manifest.sets[s], 0), starts = prefix => s => s.startsWith(prefix);
-    console.log(`Card library ${build}: ${result.pages} pages read, ${result.cards} articles in at least one set (${result.unknown} without readership), ${result.guides} travel guides.`);
+    console.log(`Card library ${LANG} ${build}: ${result.pages} pages read, ${result.cards} articles in at least one set (${result.unknown} without readership), ${result.guides} travel guides.`);
     console.log(`${result.files} shards, ${(result.bytes / 1e9).toFixed(2)} GB: depth sets ${per(starts('wiki-'))}, topic sets ${per(s => s.startsWith('topic-') && !s.includes('-help-'))}, topic Help sets ${per(s => s.includes('-help-'))}, Help sets ${per(starts('help-'))}, travel ${per(starts('how-'))} shards.`);
     console.log('Cards per set: ' + SETS.map(set => `${set} ${result.counts[set]}`).join(', ') + `. Average daily views used: ${Math.round(dailyTotal)}.`);
     console.log(`Image check: ${images.ok} of ${images.checked} sampled images loaded (status counts ${JSON.stringify(images.statuses)}).` + (images.broken.length ? ' Broken: ' + images.broken.join(', ') : ''));

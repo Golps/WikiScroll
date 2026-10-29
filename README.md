@@ -329,7 +329,7 @@ This repository contains the source used to deploy wikiscroll.com. It isn't fini
 - **Coverage varies by language.** Help Wikipedia is available in 4 languages. Category labels on cards are English-only. Wikivoyage covers 12 editions.
 - **Built for wikiscroll.com.** Share links, preview URLs and cache keys use that domain. See [Make it your own](docs/DEVELOPMENT.md#make-it-your-own) before deploying elsewhere.
 - **Library freshness.** Library cards are rebuilt from weekly dumps: up to about a week old in English and a few weeks old in the other languages. A just-edited article shows its older introduction until the next build.
-- **Automated checks.** The project includes 407 regression tests; see [what the tests cover](docs/ENGINEERING.md#testing).
+- **Automated checks.** The project includes 410 regression tests; see [what the tests cover](docs/ENGINEERING.md#testing).
 
 ## Forking and contributing
 

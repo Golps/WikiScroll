@@ -5,8 +5,10 @@ export const voyageImageParams = {imlimit:'max'};
 const files=new Map(),TTL=86400000,MAX_FILES=512;
 const excluded=/\b(?:flag|logo|icon|symbol|map|locator|coat.of.arms|gpx|pictogram|default|disambig)\b/i;
 const genericBanner=/^File:(?:Africa|Asia|Europe|Oceania|North America|South America|Antarctica|Australia|Caribbean|New Zealand|Middle East)[ _].*banner/i;
+// A photo worth showing: not a flag, map, logo or default/continent banner.
+export const voyagePhoto=n=>typeof n==='string'&&n.length<=240&&/^File:/i.test(n)&&/\.(?:jpe?g|png|webp)$/i.test(n)&&!excluded.test(n.replaceAll('_',' '))&&!genericBanner.test(n.replaceAll('_',' '));
 export function voyageImageCandidates(page){
- const names=(page.images||[]).map(x=>x.title).filter(n=>typeof n==='string'&&n.length<=240&&/^File:/i.test(n)&&/\.(?:jpe?g|png|webp)$/i.test(n)&&!excluded.test(n.replaceAll('_',' '))&&!genericBanner.test(n.replaceAll('_',' ')));
+ const names=(page.images||[]).map(x=>x.title).filter(voyagePhoto);
  return [...new Set(names)].sort((a,b)=>Number(/banner/i.test(b))-Number(/banner/i.test(a))).slice(0,2);
 }
 export async function completeVoyageImages(pages,fetchURL){

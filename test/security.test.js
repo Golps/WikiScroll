@@ -65,3 +65,11 @@ test('robots.txt declares content signals and keeps the API out of crawlers', ()
   assert.match(robots, /^User-agent: \*\nContent-Signal: search=yes, ai-input=yes, ai-train=no\nAllow: \/\nDisallow: \/api\/$/m);
   assert.match(robots, /^Sitemap: https:\/\/wikiscroll\.com\/sitemap\.xml$/m);
 });
+
+test('the site answers only on its own domain, and the pool job keeps its write token for the push', () => {
+  const config = fs.readFileSync(new URL('../wrangler.jsonc', import.meta.url), 'utf8');
+  assert.match(config, /"workers_dev": false/);assert.match(config, /"preview_urls": false/);
+  const pool = fs.readFileSync(new URL('../.github/workflows/starter-pool.yml', import.meta.url), 'utf8');
+  assert.match(pool, /persist-credentials: false/);
+  assert.match(pool, /unset GH_TOKEN/, 'the retry tests never see the token');
+});

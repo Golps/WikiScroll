@@ -1,5 +1,10 @@
+---
+// In the reader, About is a closed dialog: about.js sets the poster when it opens.
+const {deferPoster = false} = Astro.props;
+const poster = "/media/wikiscroll-film-poster-v5.jpg";
+---
 <h1 id="aboutTitle">Turn doomscrolling into discovery</h1>
-<figure class="about-film"><video controls playsinline preload="none" poster="/media/wikiscroll-film-poster-v5.jpg" width="1280" height="720" aria-label="WikiScroll film: 20 seconds of art, maps, nature and space, then the WikiScroll reader"><source src="/media/wikiscroll-film-v5.mp4" type="video/mp4"></video><figcaption>20 seconds of discovery. Images: public domain and CC0 works from Wikimedia Commons.</figcaption></figure>
+<figure class="about-film"><video controls playsinline preload="none" poster={deferPoster ? undefined : poster} data-poster={deferPoster ? poster : undefined} width="1280" height="720" aria-label="WikiScroll film: 20 seconds of art, maps, nature and space, then the WikiScroll reader"><source src="/media/wikiscroll-film-v5.mp4" type="video/mp4"></video><figcaption>20 seconds of discovery. Images: public domain and CC0 works from Wikimedia Commons.</figcaption></figure>
 <p class="about-lead">A spare moment can leave you with something worth knowing. WikiScroll turns Wikipedia knowledge and Wikivoyage travel guides into a thoughtful, swipeable reader.</p>
 <p>Instead of another stream of reactions and headlines, discover an unfamiliar idea, a surprising life, or a place you have never considered visiting. Read a short introduction, follow the original article when something catches your attention, and stop whenever you like.</p>
 <h2>Follow your curiosity, not an engagement score</h2>

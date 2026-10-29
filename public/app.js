@@ -274,8 +274,9 @@ document.addEventListener('error', event => {
     return;
   }
   // The library picks Commons or the wiki's own upload folder from the dumps;
-  // the thumbnail path is the same in both, so a link that still fails tries the other one.
-  const moved = img.getAttribute('src')?.replace(/^(https:\/\/upload\.wikimedia\.org\/)(?:wikipedia\/commons|(wikipedia|wikivoyage)\/en)\/thumb\//, (_, host, local) => host + (local ? 'wikipedia/commons' : 'wikipedia/en') + '/thumb/');
+  // the thumbnail path is the same in both, so a link that still fails tries the
+  // other one: any wiki's own folder tries Commons, Commons tries English Wikipedia's.
+  const moved = img.getAttribute('src')?.replace(/^(https:\/\/upload\.wikimedia\.org\/)(?:wikipedia\/commons|(wikipedia|wikivoyage)\/[a-z-]+)\/thumb\//, (_, host, local) => host + (local ? 'wikipedia/commons' : 'wikipedia/en') + '/thumb/');
   if (!img.dataset.imageMoved && navigator.onLine && moved && moved !== img.getAttribute('src')) {
     img.dataset.imageMoved = '1';
     img.src = moved;
@@ -823,7 +824,10 @@ async function libraryJSON(url,ms){
 }
 function libraryManifest(library){
   if(library.manifest&&Date.now()-library.loadedAt<30*6e4)return Promise.resolve(library.manifest);
-  library.task??=libraryJSON(`${LIBRARY_ROOT}${library.lang}/current.json`,4000).then(data=>{
+  // lang.js asks for the reader's manifest while the page loads; use that answer once.
+  const early=window.WSLibraryPrefetch?.lang===library.lang&&window.WSLibraryPrefetch.task;
+  if(early)window.WSLibraryPrefetch=null;
+  library.task??=(early?Promise.race([early,new Promise(resolve=>setTimeout(resolve,4000,null))]):libraryJSON(`${LIBRARY_ROOT}${library.lang}/current.json`,4000)).then(data=>{
     library.task=null;
     // A language whose first library isn't up yet is left to the Worker for a while.
     if(data?.missing)library.failedUntil=Date.now()+30*6e4;
@@ -1464,8 +1468,8 @@ function renderCard(a) {
   card.dataset.id = a.id;
   card.innerHTML = `
     <div class="cbg">${img}<div class="cveil"></div></div>
-    <div class="swipe-ind like-ind">Save</div>
-    <div class="swipe-ind skip-ind">SKIP</div>
+    <div class="swipe-ind like-ind" aria-hidden="true">Save</div>
+    <div class="swipe-ind skip-ind" aria-hidden="true">SKIP</div>
     <div class="panel">
       <div class="chip ${isHow?'h':'w'}">${isHow?'Wikivoyage':'Wikipedia'}</div>
       ${artImg}
@@ -1523,6 +1527,8 @@ function setupImageInspection(card, article) {
   const image = card.querySelector('.art-img');
   if (!image) return;
   image.dataset.imageInspect = 'true';
+  // A button needs a real image, not a decorative one, so alt can't stay empty.
+  image.alt = globalThis.WSI18n?.translate('View image') || 'View image';
   image.setAttribute('role', 'button');
   image.setAttribute('aria-label', 'View image');
   image.setAttribute('aria-haspopup', 'dialog');
@@ -2009,7 +2015,8 @@ function syncAllToggles() {
   setSw('imagelessToggle', showImageless);
   setSw('dkImagelessToggle', showImageless);
   setSw('dkDimImagesToggle', dimImages);
-  document.querySelectorAll('[data-reading-size]').forEach(button => {
+  // Only the buttons: the body carries data-reading-size for the stylesheet.
+  document.querySelectorAll('button[data-reading-size]').forEach(button => {
     const selected = button.dataset.readingSize === readingTextSize;
     button.classList.toggle('on', selected);
     button.setAttribute('aria-checked', String(selected));
@@ -2061,7 +2068,7 @@ function setTheme(val) {
 }
 function setDepth(val) { depthLevel=parseInt(val)||3; saveSettings(); syncAllToggles(); toast(`Depth: ${DEPTH_LABELS[depthLevel]}`); resetFeed(); }
 
-document.querySelectorAll('[data-reading-size]').forEach(button => {
+document.querySelectorAll('button[data-reading-size]').forEach(button => {
   button.addEventListener('click', () => setReadingTextSize(button.dataset.readingSize));
   button.addEventListener('keydown', event => {
     if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(event.key)) return;

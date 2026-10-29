@@ -222,7 +222,17 @@ export async function readLocalFiles(lines) {
   need(await readTable(lines, (row, c) => { names.add(row[c.img_name]); }), 'img_name');
   return names;
 }
-export const MIN_LOCAL_FILES = 100_000;
+// The image table is trusted at any size (Spanish Wikipedia uploads no files
+// of its own, Polish a few hundred) when nearly every name in it has a File:
+// page here, which a misread table would not. An empty table stands only for a
+// wiki with few File: pages. Returns null when File: pages must stand in.
+export function trustedUploads(uploads, filePages) {
+  if (!uploads) return null;
+  if (!uploads.size) return filePages.size <= 1000 ? uploads : null;
+  let matched = 0;
+  for (const name of uploads) if (filePages.has(name)) matched++;
+  return matched >= uploads.size * 0.9 ? uploads : null;
+}
 // Category page titles for the edges' children, article titles for the photo
 // requests, and the files uploaded to this wiki itself rather than Commons.
 export async function readPages(lines, {edges, photoTalk}) {
@@ -622,7 +632,8 @@ export async function localRoots(lang, fetchJSON = request) {
   return Object.fromEntries(Object.entries(roots).map(([topic, list]) => [topic, list.map(root => found.get('Category:' + root)).filter(Boolean).map(title => title.replace(/^[^:]+:/, ''))]));
 }
 
-// Report only: how many sampled image links load. Builds never fail on it.
+// How many sampled image links load. A build whose answered links are mostly
+// broken stops before upload (MAX_BROKEN_IMAGES); rate limits prove nothing.
 async function checkImages(dir, manifest, sample = 100) {
   const set = `wiki-${LANG}-3`, shard = Math.floor(Math.random() * manifest.sets[set]);
   const cards = JSON.parse(zlib.gunzipSync(await fsp.readFile(path.join(dir, manifest.base, set, shard + '.json'))));
@@ -680,10 +691,10 @@ if (process.argv[1] && import.meta.url === new URL(process.argv[1], 'file:').hre
     targets?.clear();
     const {children, photoTitles, localFiles} = await readPages(sqlLines(option('page')), links);
     // The image table names real uploads; File: pages are the fallback.
-    const uploads = option('images') ? await readLocalFiles(sqlLines(option('images'))) : null;
-    if (uploads && uploads.size < MIN_LOCAL_FILES) log(`Warning: the image table lists only ${uploads.size} files; using File: pages instead.`);
-    props.local = uploads && uploads.size >= MIN_LOCAL_FILES ? uploads : localFiles;
-    if (props.local === uploads) localFiles.clear();
+    const read = option('images') ? await readLocalFiles(sqlLines(option('images'))) : null, uploads = trustedUploads(read, localFiles);
+    if (read && !uploads) log(`Warning: the image table's ${read.size} files don't match the ${localFiles.size} File: pages; using File: pages instead.`);
+    props.local = uploads || localFiles;
+    if (uploads) localFiles.clear();
     const edgeCount = links.edges.length / 2;
     links.edges.length = 0;
     const reach = topicCategories(children, topicRoots);

@@ -5,7 +5,8 @@
   if(event.ctrlKey||event.metaKey||event.shiftKey||event.altKey||event.button!==0)return;
   if(!dialog.showModal)return;
   event.preventDefault();trigger=link;
-  dialog.showModal();dialog.scrollTop=0;
+  if(film?.dataset?.poster&&!film.getAttribute('poster'))film.setAttribute('poster',film.dataset.poster);
+ dialog.showModal();dialog.scrollTop=0;
  }));
  dialog.addEventListener('keydown',event=>event.stopPropagation());
  document.getElementById('aboutClose').addEventListener('click',()=>dialog.close());

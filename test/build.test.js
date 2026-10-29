@@ -6,7 +6,7 @@ const root=new URL('../',import.meta.url),read=p=>fs.readFileSync(new URL(p,root
 test('Astro keeps the reader scripts classic and in their required execution order',()=>{
  const html=read('dist/index.html');
  const scripts=[...html.matchAll(/<script\b([^>]*\bsrc="([^"]+)"[^>]*)>/g)];
- assert.deepEqual(scripts.map(m=>new URL(m[2],'https://wikiscroll.com').pathname),['/lang.js','/i18n.js','/discovery.js','/share-card.js','/app.js','/atlas.js','/features.js','/webmcp.js','/about.js']);
+ assert.deepEqual(scripts.map(m=>new URL(m[2],'https://wikiscroll.com').pathname),['/lang.js','/i18n.js','/discovery.js','/app.js','/atlas.js','/features.js','/webmcp.js','/about.js']);
  for(const m of scripts)assert.doesNotMatch(m[1],/\b(?:async|defer|type="module")\b/);
  assert.doesNotMatch(html,/<astro-island|astro:page-load|<script[^>]+src="\/_astro\//);
  assert.ok(html.indexOf('/lang.js')<html.indexOf('<body'));

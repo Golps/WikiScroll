@@ -15,4 +15,6 @@ English sets hold up to 300 cards and other languages' sets 120, in shards of 60
 
 The service worker caches only `index.json` at install. Once the feed is up, the page names its language's six sets and the service worker saves one random shard of each set it doesn't hold yet (about 100–250 KB compressed, once per device and language), so offline openings work without downloading other languages. Topic and Help-only feeds have no starter sets.
 
+Old pools stay in Git history, which grows by about 90 MB a year. After each run the workflow reads the repository's size from the GitHub API and opens (or comments on) a "Repository past the size warning" issue once it reaches 500 MB, about half of GitHub's suggested 1 GB. The fix then is to build the pool during the deploy or to trim its history.
+
 Every card keeps its source URL and Wikimedia thumbnail URL. See the original article for contributors and licensing. Excerpts are plain text and may be shortened. Session deduplication excludes repeats.

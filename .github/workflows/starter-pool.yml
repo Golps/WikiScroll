@@ -2,12 +2,15 @@ name: Starter pool
 # Refreshes the bundled outage/offline cards in public/data/starter/ each week,
 # resampling each language whose card library was rebuilt since the last run.
 # A language whose library is thin or unreadable keeps its current pool.
+# Old pools stay in Git history, so the job also opens an issue once the
+# repository passes REPO_WARN_MB (GitHub suggests staying under 1 GB).
 on:
   schedule:
     - cron: '17 6 * * 1'
   workflow_dispatch:
 permissions:
   contents: write
+  issues: write
 concurrency:
   group: wikiscroll-starter-pool
   cancel-in-progress: false
@@ -45,3 +48,16 @@ jobs:
             pnpm test
           done
           exit 1
+      - name: Warn when the repository grows large
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO_WARN_MB: 500
+        run: |
+          kb=$(gh api "repos/$GITHUB_REPOSITORY" --jq .size) || { echo "Repository size unavailable."; exit 0; }
+          mb=$((kb / 1024)); echo "Repository size: $mb MB (warning at $REPO_WARN_MB MB)." | tee -a "$GITHUB_STEP_SUMMARY"
+          [ "$mb" -ge "$REPO_WARN_MB" ] || exit 0
+          title='Repository past the size warning'
+          body="The repository is $mb MB. Weekly starter-pool commits keep old pools in Git history (about 90 MB a year). Consider building the pool at deploy time or trimming its history; see docs/STARTER-SOURCES.md."
+          open=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --search "\"$title\" in:title" --json number --jq '.[0].number')
+          if [ -n "$open" ]; then gh issue comment --repo "$GITHUB_REPOSITORY" "$open" --body "$body"; else gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" --body "$body"; fi

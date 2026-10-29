@@ -76,7 +76,9 @@ export const MINIMUM = Object.fromEntries([...DEPTHS.map(d => [`wiki-${LANG}-${d
 export const MAX_FILES = LANG === 'en' ? 95_000 : 40_000, MAX_BYTES = 4.5e9;
 // The category walk reaches hundreds of thousands of categories; far fewer
 // means the tree was misread, so the build stops before reading articles.
-export const MIN_TOPIC_CATEGORIES = 5000;
+export const MIN_TOPIC_CATEGORIES = LANG === 'en' ? 5000 : 500;
+// Likewise for lead images in page_props; smaller wikis have far fewer pages.
+export const MIN_LEAD_IMAGES = LANG === 'en' ? 1e6 : 20_000;
 // Share of answered image links that may fail in the sample before a build is refused.
 export const MAX_BROKEN_IMAGES = 0.05;
 const UA = 'WikiScroll-card-library/1.0 (https://wikiscroll.com; contact@wikiscroll.com)';
@@ -631,7 +633,7 @@ if (process.argv[1] && import.meta.url === new URL(process.argv[1], 'file:').hre
     // page_image holds only non-free lead images; free ones are page_image_free.
     const leadImages = props.free.size + props.any.size;
     log(`Page properties: ${props.free.size} free and ${props.any.size} other lead images, ${props.desc.size} descriptions, ${props.disambiguation.size} disambiguation pages`);
-    if (leadImages < 1e6) throw Error(`Only ${leadImages} lead images in page_props: the table was misread, keeping the current library.`);
+    if (leadImages < MIN_LEAD_IMAGES) throw Error(`Only ${leadImages} lead images in page_props: the table was misread, keeping the current library.`);
     log('Reading the category tree');
     const targets = option('linktarget') ? await readLinkTargets(sqlLines(option('linktarget'))) : null;
     const links = await readCategoryLinks(sqlLines(option('categorylinks')), targets);

@@ -798,7 +798,7 @@ function loadStarterLibrary(gen,outage=false) {
 // ends on a card that says so. The Worker and the live API serve only when
 // the library can't (other languages, a failure).
 const LIBRARY_ROOT='https://cards.wikiscroll.com/v1/';
-const LIBRARY_LANGS=new Set(['en','de','fr','es']);
+const LIBRARY_LANGS=new Set(['en','es','fr','de','it','pt','ru','ja','zh','ar','hi','ko','he','nl','pl']);
 // One manifest, failure pause and drawn-shard record per language.
 const libraries=new Map(),libraryDraw={gen:-1,draws:0};
 let libraryExhausted=false;
@@ -879,6 +879,71 @@ async function fetchLibraryBatch(gen){
   libraryDraw.draws++;
   const src=curMode;
   return cards.filter(a=>a?.src===src);
+}
+// Travel search's stand-in while /api/travel can't answer (a Wikimedia or
+// Worker failure): the library's place index, where each place lists the
+// guides inside it by Wikivoyage's breadcrumbs, and the trip styles tagged on
+// each guide (scripts/build-library.mjs placeIndex, guideStyles). Once a filter
+// falls back, it stays on the library until the feed is reset, so the two
+// sources never interleave their pages.
+const libraryTravel={key:'',cards:null,pos:0};
+// Same as worker/travel.js fold and parsePlaces.
+const travelFold=text=>String(text||'').normalize('NFD').replace(/\p{M}/gu,'').toLowerCase().replace(/[’‘`´]/g,"'").replace(/[-‐–—]/g,' ').replace(/\s+/g,' ').trim();
+function travelPlaces(input){
+  const seen=new Set(),places=[];
+  for(const part of String(input||'').replace(/[’‘`´]/g,"'").split(/[,;/|、，；،]|\s(?:or|o|ou|oder|lub|или|או|أو)\s/iu)){
+    const key=travelFold(part.replace(/[^\p{L}\p{N}\s'-]/gu,' '));
+    if(key&&!seen.has(key)){seen.add(key);places.push(key);}
+  }
+  return places.slice(0,3);
+}
+function placeHash(key,files){
+  let hash=0x811c9dc5;
+  for(let i=0;i<key.length;i++)hash=Math.imul(hash^key.charCodeAt(i),0x01000193)>>>0;
+  return hash%files;
+}
+// Returns guides, [] at the end (travelExhausted is set), or null when the
+// library can't stand in either (an unknown place, no library, a failure).
+async function fetchLibraryTravel(gen){
+  const lang=voyageLang(),style=travelFilters.style||'',places=travelPlaces(travelFilters.place);
+  if(!LIBRARY_LANGS.has(lang))return null;
+  const library=libraryFor(lang);
+  if(Date.now()<library.failedUntil)return null;
+  const manifest=await libraryManifest(library);
+  if(gen!==fillGeneration)return [];
+  if(!manifest)return null;
+  const key=JSON.stringify([lang,manifest.build,places,style]),fits=card=>card?.src==='how'&&(!style||card.styles?.includes(style));
+  if(libraryTravel.key!==key){
+    let cards=null;
+    if(places.length){
+      if(!(manifest.places>0))return null;
+      const lists=await Promise.all(places.map(async place=>(await libraryJSON(`${LIBRARY_ROOT}${lang}/${manifest.base}places/${placeHash(place,manifest.places)}.json`,6000))?.[place]?.cards));
+      if(gen!==fillGeneration)return [];
+      if(lists.every(list=>!Array.isArray(list)))return null;
+      // Alternate between the places, as the live search does.
+      const ids=new Set();cards=[];
+      for(let i=0;lists.some(list=>Array.isArray(list)&&i<list.length);i++)for(const list of lists){const card=Array.isArray(list)&&list[i];if(fits(card)&&!ids.has(card.id)){ids.add(card.id);cards.push(card);}}
+    }
+    libraryTravel.key=key;libraryTravel.cards=cards;libraryTravel.pos=0;
+  }
+  if(libraryTravel.cards){
+    const page=libraryTravel.cards.slice(libraryTravel.pos,libraryTravel.pos+30);
+    libraryTravel.pos+=page.length;
+    if(libraryTravel.pos>=libraryTravel.cards.length)travelExhausted=true;
+    return page;
+  }
+  // A trip style alone: undrawn travel shards, keeping the guides of that style.
+  const set='how-'+lang,count=manifest.sets[set]||0;
+  for(let tries=0;tries<3;tries++){
+    const shard=libraryShard(library,set,count);
+    if(shard<0){travelExhausted=true;return [];}
+    const cards=await libraryJSON(`${LIBRARY_ROOT}${lang}/${manifest.base}${set}/${shard}.json`,6000);
+    if(gen!==fillGeneration)return [];
+    if(!Array.isArray(cards)){library.drawn.get(set)?.delete(shard);return null;}
+    const found=cards.filter(fits);
+    if(found.length)return found;
+  }
+  return [];
 }
 // The library has no more cards for these settings: say so and offer a next step.
 function showLibraryEnd(){
@@ -1310,7 +1375,7 @@ async function boot() {
 }
 function resetFeed() {
   window.dispatchEvent(new Event('feed-reset'));
-  travelOffset=0;travelExhausted=false;travelSuggestion='';travelContinuing=false;travelRetries=0;libraryExhausted=false;sentinel?.disconnect();
+  travelOffset=0;travelExhausted=false;travelSuggestion='';travelContinuing=false;travelRetries=0;libraryExhausted=false;libraryTravel.key='';sentinel?.disconnect();
   fillGeneration++;pendingDeepGeneration=-1;
   supplyControllers.forEach(controller=>controller.abort());
   articles=[];queue=[];feedSeen.clear();filling=false;supplyTask=null;

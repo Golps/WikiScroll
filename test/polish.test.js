@@ -88,16 +88,11 @@ test('focus rings hide after a tap or click and return on any key press',()=>{
  assert.match(css,/\.pointer-input :focus, \.pointer-input :focus-visible \{ outline: none !important; \}/);
 });
 
-test('share sends the branded image with the link when it is ready, and the link alone otherwise',async()=>{
+test('sharing an article sends the link alone so apps show its preview',async()=>{
  const code=app.slice(app.indexOf('async function doShare'),app.indexOf('// ── TOPICS'));
- const shared=[],prepared=[],file={name:'Octopus.jpg'};let ready=null;
- const navigator={share:async data=>{shared.push(data)},canShare:data=>Array.isArray(data.files)};
- const window={WSShareCard:{ready:()=>ready,prepare:a=>prepared.push(a.id)}};
- const c=vm.createContext({navigator,window,deepLinkUrl:()=> 'https://wikiscroll.com/?a=w1',toast(){}});vm.runInContext(code,c);
+ const shared=[];
+ const c=vm.createContext({navigator:{share:async data=>{shared.push(data)}},deepLinkUrl:()=> 'https://wikiscroll.com/?a=w1',toast(){}});vm.runInContext(code,c);
  await c.doShare({id:'w1',title:'Octopus'});
- assert.equal(JSON.stringify(shared[0]),'{"url":"https://wikiscroll.com/?a=w1"}','never waits for the image');assert.equal(prepared.join(),'w1');
- ready=file;await c.doShare({id:'w1',title:'Octopus'});
- assert.equal(shared[1].files[0],file);assert.equal(shared[1].url,'https://wikiscroll.com/?a=w1');
- navigator.share=async data=>{if(data.files)throw Object.assign(Error(),{name:'NotAllowedError'});shared.push(data)};
- await c.doShare({id:'w1',title:'Octopus'});assert.equal(JSON.stringify(shared[2]),'{"url":"https://wikiscroll.com/?a=w1"}','falls back to the link');
+ assert.equal(JSON.stringify(shared),'[{"url":"https://wikiscroll.com/?a=w1"}]');
+ assert.doesNotMatch(app,/WSShareCard|files:/);
 });

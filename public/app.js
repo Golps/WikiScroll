@@ -817,17 +817,17 @@ function libraryFor(lang=libraryLang()){
   if(!entry)libraries.set(lang,entry={lang,manifest:null,loadedAt:0,task:null,failedUntil:0,drawn:new Map()});
   return entry;
 }
-async function libraryJSON(url,ms){
+async function libraryJSON(url,ms,cache='default'){
   const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),ms);
-  try {const response=await fetch(url,{signal:controller.signal,mode:'cors',credentials:'omit'});return response.ok?await response.json():{missing:response.status===404};}
+  try {const response=await fetch(url,{signal:controller.signal,mode:'cors',credentials:'omit',cache});return response.ok?await response.json():{missing:response.status===404};}
   catch {return null;} finally {clearTimeout(timer);}
 }
-function libraryManifest(library){
-  if(library.manifest&&Date.now()-library.loadedAt<30*6e4)return Promise.resolve(library.manifest);
+function libraryManifest(library,refresh=false){
+  if(!refresh&&library.manifest&&Date.now()-library.loadedAt<30*6e4)return Promise.resolve(library.manifest);
   // lang.js asks for the reader's manifest while the page loads; use that answer once.
-  const early=window.WSLibraryPrefetch?.lang===library.lang&&window.WSLibraryPrefetch.task;
+  const early=!refresh&&window.WSLibraryPrefetch?.lang===library.lang&&window.WSLibraryPrefetch.task;
   if(early)window.WSLibraryPrefetch=null;
-  library.task??=(early?Promise.race([early,new Promise(resolve=>setTimeout(resolve,4000,null))]):libraryJSON(`${LIBRARY_ROOT}${library.lang}/current.json`,4000)).then(data=>{
+  library.task??=(early?Promise.race([early,new Promise(resolve=>setTimeout(resolve,4000,null))]):libraryJSON(`${LIBRARY_ROOT}${library.lang}/current.json`,4000,refresh?'reload':'default')).then(data=>{
     library.task=null;
     // A language whose first library isn't up yet is left to the Worker for a while.
     if(data?.missing)library.failedUntil=Date.now()+30*6e4;
@@ -858,7 +858,7 @@ function libraryShard(library,set,count){
 }
 // Returns cards, [] when this setting has no undrawn shard left, or null when
 // the library can't serve and the Worker should.
-async function fetchLibraryBatch(gen){
+async function fetchLibraryBatch(gen,retried=false){
   const families=libraryFamilies(),library=libraryFor();
   if(!families||Date.now()<library.failedUntil)return null;
   const manifest=await libraryManifest(library);
@@ -884,8 +884,14 @@ async function fetchLibraryBatch(gen){
   if(gen!==fillGeneration)return [];
   if(!Array.isArray(cards)){
     library.drawn.get(set)?.delete(shard);
-    // A missing shard means the build changed: read the manifest again.
-    if(cards?.missing){library.manifest=null;return null;}
+    // A missing shard means the build changed: read the manifest again, past
+    // the browser cache, and retry once before leaving this draw to the Worker.
+    if(cards?.missing&&!retried){
+      library.manifest=null;
+      await libraryManifest(library,true);
+      if(gen!==fillGeneration)return [];
+      return fetchLibraryBatch(gen,true);
+    }
     library.failedUntil=Date.now()+6e4;return null;
   }
   libraryDraw.draws++;
@@ -929,8 +935,12 @@ async function fetchLibraryTravel(gen){
     let cards=null;
     if(places.length){
       if(!(manifest.places>0))return null;
-      const lists=await Promise.all(places.map(async place=>(await libraryJSON(`${LIBRARY_ROOT}${lang}/${manifest.base}places/${placeHash(place,manifest.places)}.json`,6000))?.[place]?.cards));
+      const files=await Promise.all(places.map(place=>libraryJSON(`${LIBRARY_ROOT}${lang}/${manifest.base}places/${placeHash(place,manifest.places)}.json`,6000)));
       if(gen!==fillGeneration)return [];
+      // A failed index download would turn into a short, finished result:
+      // leave the search to the live/retry path until every file arrives.
+      if(files.some(file=>!file||file.missing))return null;
+      const lists=places.map((place,i)=>files[i][place]?.cards);
       if(lists.every(list=>!Array.isArray(list)))return null;
       // Alternate between the places, as the live search does.
       const ids=new Set();cards=[];

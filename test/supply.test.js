@@ -488,3 +488,28 @@ test('a place the index does not know leaves travel to the live search', async (
   old.change("curMode='how';travelFilters={place:'Japan',style:''};");
   assert.equal(await old.run('fetchLibraryTravel(fillGeneration)'),null);
 });
+
+test('a missing shard refreshes the manifest past the browser cache and retries once',async()=>{
+ const h=harness({librarySets:LIBRARY_SETS});let manifests=0,shards=0,cache;
+ h.context.fetch=async(url,options)=>{
+  if(url.endsWith('current.json')){manifests++;cache=options.cache;return Response.json({v:1,build:manifests===1?'old':'new',base:manifests===1?'old/':'new/',sets:{'wiki-en-3':1}});}
+  shards++;return url.includes('/old/')?new Response('',{status:404}):Response.json(batch(100));
+ };
+ const cards=await h.run('fetchLibraryBatch(fillGeneration)');
+ assert.equal(cards.length,100);assert.equal(manifests,2);assert.equal(shards,2);assert.equal(cache,'reload');assert.equal(h.requests.length,0);
+});
+
+test('a missing shard retry is bounded even when the refreshed build is also missing',async()=>{
+ const h=harness({librarySets:LIBRARY_SETS});let shards=0;
+ h.context.fetch=async url=>url.endsWith('current.json')?Response.json({v:1,build:'old',base:'old/',sets:{'wiki-en-3':1}}):(shards++,new Response('',{status:404}));
+ assert.equal(await h.run('fetchLibraryBatch(fillGeneration)'),null);assert.equal(shards,2);
+});
+
+test('a failed place-index download stays retryable instead of ending the search',async()=>{
+ const h=harness({librarySets:LIBRARY_SETS,places:PLACES});
+ h.change("curMode='how';travelFilters={place:'Japan',style:''};");
+ const original=h.context.fetch;let fail=true;
+ h.context.fetch=(url,...args)=>fail&&url.includes('/places/')?new Response('',{status:503}):original(url,...args);
+ assert.equal(await h.run('fetchLibraryTravel(fillGeneration)'),null);assert.equal(h.run('travelExhausted'),false);assert.equal(h.run('libraryTravel.key'),'');
+ fail=false;assert.ok((await h.run('fetchLibraryTravel(fillGeneration)')).length>0);
+});

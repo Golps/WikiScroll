@@ -24,6 +24,12 @@ on:
         description: Languages to build, separated by spaces (en de fr …)
         type: string
         default: en
+# One run at a time, and one language at a time inside it: every upload
+# reads and rewrites the same monthly write ledger.
+concurrency:
+  group: wikiscroll-library-publication
+  cancel-in-progress: false
+  queue: max
 permissions:
   contents: read
 env:
@@ -76,12 +82,9 @@ jobs:
     timeout-minutes: 345
     strategy:
       fail-fast: false
+      max-parallel: 1
       matrix:
         lang: ${{ fromJSON(needs.plan.outputs.languages) }}
-    # One build per language at a time; different languages build side by side.
-    concurrency:
-      group: wikiscroll-card-library-${{ matrix.lang }}
-      cancel-in-progress: false
     env:
       LANG_CODE: ${{ matrix.lang }}
       WIKI: ${{ matrix.lang }}wiki
@@ -207,6 +210,9 @@ jobs:
           aws s3 cp "$RUNNER_TEMP/library/current.json" "s3://$R2_BUCKET/$prefix/current.json" --endpoint-url "$R2_ENDPOINT" --only-show-errors \
             --content-type application/json --content-encoding gzip --cache-control 'public, max-age=300'
           # Only one build stays stored, which keeps the library inside R2's free 10 GB.
+          # Readers may hold the old manifest for its 5-minute edge cache; wait that
+          # out so their next shard still loads, then delete the old build.
+          sleep 330
           for old in $(aws s3 ls "s3://$R2_BUCKET/$prefix/" --endpoint-url "$R2_ENDPOINT" | awk '$1=="PRE"{print $2}' | tr -d /); do
             if [ "$old" != "$build" ]; then aws s3 rm "s3://$R2_BUCKET/$prefix/$old" --recursive --endpoint-url "$R2_ENDPOINT" --only-show-errors; fi
           done

@@ -118,8 +118,3 @@ test('the About card gestures are translated in every language',()=>{
  assert.deepEqual([...strings].sort(),['Ambient Mode','Long-press','Spacebar','Swipe left','Swipe right','to save','to skip']);
  for(const lang of Object.keys(w.WS_TRANSLATIONS))for(const text of strings)assert.notEqual(api.translate(text,lang),text,lang+': '+text);
 });
-
-test('library completion wording is translated without claiming every card was read',()=>{
- const w=harness(),api=w.WSI18n;
- for(const lang of Object.keys(w.WS_TRANSLATIONS))for(const text of ['No more matching cards','Try different settings or start this selection again.'])assert.notEqual(api.translate(text,lang),text,lang+': '+text);
-});

@@ -67,7 +67,6 @@ function harness({librarySets=undefined,languages={},places=null}={}) {
     let helpTypes=['sources'];const activeHelpTypes=()=>helpTypes;
     const liveFetchWorkerBatch=fetchWorkerBatch;
     fetchWorkerBatch=()=>workerRequest();
-    let libraryEndShown=false;function showLibraryEnd(){libraryEndShown=true;}
     function withTodaySurprises(batch){return batch;}`, context);
   const run = text => vm.runInContext(text, context);
   return {
@@ -78,7 +77,7 @@ function harness({librarySets=undefined,languages={},places=null}={}) {
     select(index){selectedIndex=index;},
     persist(){run('persistFeedReserve()');for(const [id,timer] of timers)if(timer.delay===200){timers.delete(id);timer.fn();}},
     async fire(delay){for(const [id,timer] of [...timers])if(timer.delay===delay){timers.delete(id);await timer.fn();}},
-    change(script){run('fillGeneration++;queue=[];articles=[];feedSeen.clear();supplyTask=null;libraryExhausted=false;for(const lib of libraries.values())lib.drawn.clear();'+script);nodes.length=0;selectedIndex=0;},
+    change(script){run('fillGeneration++;queue=[];articles=[];feedSeen.clear();supplyTask=null;'+script);nodes.length=0;selectedIndex=0;},
   };
 }
 
@@ -398,15 +397,11 @@ test('the card library fills the feed without asking the Worker or Wikipedia', a
   assert.ok(h.shards.every(s=>/^wiki-en-3\/[0-2]$/.test(s)),h.shards.join());
 });
 
-test('library shards do not repeat within a feed and are released when resetting discarded queues', async () => {
+test('each library draw is a shard this visit has not drawn', async () => {
   const h=harness({librarySets:LIBRARY_SETS});
-  for(let i=0;i<3;i++)await h.run('fetchLibraryBatch(fillGeneration)');
-  assert.equal(new Set(h.shards).size,3);
-  assert.deepEqual([...await h.run('fetchLibraryBatch(fillGeneration)')],[]);
-  assert.equal(h.run('libraryExhausted'),true);
-  h.change('');
-  assert.equal((await h.run('fetchLibraryBatch(fillGeneration)')).length,100);
-  assert.equal(h.run('libraryExhausted'),false);
+  for(let i=0;i<3;i++){h.change('');const filling=h.run('fillQueue()');await settle();await filling;}
+  const depth3=h.shards.filter(s=>s.startsWith('wiki-en-3/'));
+  assert.equal(new Set(depth3).size,3,'all three Balanced shards before any repeat');
 });
 
 test('topic, Help and their combination read their own prebuilt sets', async () => {
@@ -420,14 +415,12 @@ test('topic, Help and their combination read their own prebuilt sets', async () 
   assert.equal(h.requests.length,0);
 });
 
-test('an empty exact-depth library ends clearly without silently borrowing or calling the API', async () => {
+test('a thin library setting borrows the nearest depth instead of the live API', async () => {
   const h=harness({librarySets:LIBRARY_SETS});
   h.change("depthLevel=1;helpMode='only';helpTypes=['sources'];");
   const filling=h.run('fillQueue()');await settle();await filling;
-  assert.deepEqual(h.shards,[]);
+  assert.deepEqual(h.shards.slice(0,2),['help-en-sources-2/0','help-en-sources-3/0']);
   assert.equal(h.requests.length,0);assert.equal(h.directCalls,0);
-  assert.equal(h.run('libraryExhausted'),true);
-  assert.equal(h.run('libraryEndShown'),true,'empty selections replace the spinner with an end card');
 });
 
 test('a used-up library setting ends without falling back to the live feed', async () => {
@@ -496,7 +489,7 @@ test('a place the index does not know leaves travel to the live search', async (
   assert.equal(await old.run('fetchLibraryTravel(fillGeneration)'),null);
 });
 
-test('a missing shard refreshes the manifest without browser cache and retries once in the same fill',async()=>{
+test('a missing shard refreshes the manifest past the browser cache and retries once',async()=>{
  const h=harness({librarySets:LIBRARY_SETS});let manifests=0,shards=0,cache;
  h.context.fetch=async(url,options)=>{
   if(url.endsWith('current.json')){manifests++;cache=options.cache;return Response.json({v:1,build:manifests===1?'old':'new',base:manifests===1?'old/':'new/',sets:{'wiki-en-3':1}});}
@@ -512,20 +505,11 @@ test('a missing shard retry is bounded even when the refreshed build is also mis
  assert.equal(await h.run('fetchLibraryBatch(fillGeneration)'),null);assert.equal(shards,2);
 });
 
-test('multi-place travel requires every requested place, and failed downloads remain retryable',async()=>{
+test('a failed place-index download stays retryable instead of ending the search',async()=>{
  const h=harness({librarySets:LIBRARY_SETS,places:PLACES});
- h.change("curMode='how';travelFilters={place:'Japan, Atlantis',style:''};");
- assert.equal(await h.run('fetchLibraryTravel(fillGeneration)'),null);assert.equal(h.run('travelExhausted'),false);assert.equal(h.run('libraryTravel.key'),'');
+ h.change("curMode='how';travelFilters={place:'Japan',style:''};");
  const original=h.context.fetch;let fail=true;
- h.change("travelFilters={place:'Japan',style:''};");
  h.context.fetch=(url,...args)=>fail&&url.includes('/places/')?new Response('',{status:503}):original(url,...args);
- assert.equal(await h.run('fetchLibraryTravel(fillGeneration)'),null);assert.equal(h.run('travelExhausted'),false);
+ assert.equal(await h.run('fetchLibraryTravel(fillGeneration)'),null);assert.equal(h.run('travelExhausted'),false);assert.equal(h.run('libraryTravel.key'),'');
  fail=false;assert.ok((await h.run('fetchLibraryTravel(fillGeneration)')).length>0);
-});
-
-test('boot does not append a network-error card after an empty exact library selection',async()=>{
- const h=harness({librarySets:LIBRARY_SETS});h.context.location={search:''};
- h.change("depthLevel=1;helpMode='only';helpTypes=['sources'];");
- h.run(`let errorShown=false;function startStartupFallback(){return Promise.resolve();}function warmStarterPool(){}function showError(){errorShown=true;} ${source.slice(source.indexOf('async function boot()'),source.indexOf('function resetFeed()'))}`);
- await h.run('boot()');assert.equal(h.run('libraryEndShown'),true);assert.equal(h.run('errorShown'),false);
 });

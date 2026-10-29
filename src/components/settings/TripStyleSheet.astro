@@ -1,0 +1,30 @@
+---
+// The trip style sheet (public/features.js openTripStyles). Labels must match
+// TRAVEL_STYLE_LABELS in features.js; icons live in /images/ui-icons.svg.
+const groups = [
+  ['Cities and towns', [['city', 'Big cities'], ['town', 'Small towns']]],
+  ['Coast and nature', [['island', 'Islands'], ['beach', 'Beaches'], ['mountain', 'Mountains'], ['park', 'National parks']]],
+  ['Things to do', [['hiking', 'Hiking'], ['diving', 'Diving'], ['heritage', 'World Heritage']]],
+];
+const icon = (name) => `/images/ui-icons.svg?v=5#trip-${name}`;
+---
+<!-- Inert shell, cloned only when the trip style row is tapped. -->
+<template id="tripStyleTemplate">
+  <dialog class="trip-sheet" aria-labelledby="tripStyleTitle">
+    <div class="trip-sheet-head">
+      <h2 id="tripStyleTitle">Trip style</h2>
+      <button type="button" class="trip-sheet-close">Done</button>
+    </div>
+    <button type="button" class="trip-chip" data-style="" aria-pressed="false"><svg class="ws-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href={icon('any')}></use></svg><span>Any style</span></button>
+    {groups.map(([title, styles]) => (
+      <section class="trip-group">
+        <h3>{title}</h3>
+        <div class="trip-chips">
+          {styles.map(([style, label]) => (
+            <button type="button" class="trip-chip" data-style={style} aria-pressed="false"><svg class="ws-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href={icon(style)}></use></svg><span>{label}</span></button>
+          ))}
+        </div>
+      </section>
+    ))}
+  </dialog>
+</template>

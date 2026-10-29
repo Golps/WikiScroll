@@ -2322,7 +2322,7 @@ body .lp.open, body .sp.open, body .hp.open, body.light .lp.open, body.light .sp
   display: block;
 }
 
-.travel-filters input, .travel-filters select {
+.travel-filters input, .travel-filters .travel-style-pick {
   box-sizing: border-box;
   border: 1px solid var(--rule);
   background: var(--surface);
@@ -2519,16 +2519,12 @@ body .lp.open, body .sp.open, body .hp.open, body.light .lp.open, body.light .sp
     font-size: 15px;
   }
 
-  .travel-filters input, .travel-filters select {
+  .travel-filters input, .travel-filters .travel-style-pick {
     border-radius: 10px;
     min-height: 54px;
     padding: 14px 16px;
     font-size: 17px;
     line-height: 1.4;
-  }
-
-  .travel-filters select option {
-    font-size: 17px;
   }
 
   .travel-filters .feature-buttons {

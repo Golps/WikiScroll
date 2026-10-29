@@ -411,7 +411,7 @@ body .sp-about-logo, body.how .sp-about-logo, body.light .sp-about-logo {
   border-color: var(--accent);
 }
 
-.travel-filters input, .travel-filters select, .collection-name-input {
+.travel-filters input, .travel-filters .travel-style-pick, .collection-name-input {
   background: var(--surface);
   color: var(--ink);
   border: 1px solid var(--rule);
@@ -962,7 +962,7 @@ body.light, body.light.how {
   border-radius: 12px !important;
 }
 
-.travel-filters input, .travel-filters select, .collection-name-input {
+.travel-filters input, .travel-filters .travel-style-pick, .collection-name-input {
   font-family: var(--sans);
   border-radius: 12px;
   padding: 12px 14px;

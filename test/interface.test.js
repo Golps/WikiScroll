@@ -349,7 +349,7 @@ test('a failed travel search falls back to the card library and stays there for 
  const c=vm.createContext({HELP_TYPE_IDS,helpTypes:[...HELP_TYPE_IDS],workerCooldownUntil:0,libraryTravel:{key:''},feedSeen:new Set(),supplyControllers:new Set(),AbortController,Date,setTimeout:()=>1,clearTimeout(){},fillGeneration:0,travelFilters:{place:'Japan'},travelOffset:0,travelExhausted:false,travelRetries:0,articles:[],queue:[],voyageLang:()=>'en',URLSearchParams,workerSourceKey:()=>'how|en',noteWorkerCooldown:async()=>{},
   fetchLibraryTravel:async()=>{stand++;c.libraryTravel.key='k';return [{id:'v9'}];},
   fetch:async()=>{live++;return {ok:false,status:503};}});
- vm.runInContext(slice(features,'// When the live search can','// When a travel filter runs out'),c);
+ vm.runInContext(slice(features,'// A trip style is answered by the card library','// When a travel filter runs out'),c);
  assert.deepEqual((await c.fetchFilteredTravel()).map(a=>a.id),['v9']);
  await c.fetchFilteredTravel();
  assert.equal(live,1,'the live search is not asked again for this filter');assert.equal(stand,2);

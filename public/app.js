@@ -1877,6 +1877,8 @@ function openBurger() {
   document.getElementById('settingsSource').textContent=curMode==='how'?'Wikivoyage':'Wikipedia';
   syncActivityDisplay();
   syncTopicUI();
+  // Settings always opens at the top, like a fresh page.
+  const inner = document.querySelector('#burgerMenu .burger-inner'); if (inner) inner.scrollTop = 0;
   document.getElementById('burgerMenu').classList.add('open');
   document.getElementById('burgerBackdrop').classList.add('open');
 }
@@ -2069,6 +2071,7 @@ document.getElementById('historyList').addEventListener('click', ev => {
 // Desktop settings panel open/close
 function openSettings()  {
   syncActivityDisplay();
+  document.getElementById('settingsPanel').scrollTop = 0; // always opens at the top
   document.getElementById('settingsPanel').classList.add('open');
   document.getElementById('spBackdrop').classList.add('open');
 }

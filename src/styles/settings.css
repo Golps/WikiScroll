@@ -28,3 +28,17 @@ body.light .ws-icon[data-ui-icon="dim-images"] { --ui-icon-color:#396f8a; }
 .reading-option-row .burger-row-label > div > div:first-child,.reading-option-row .sp-row-label > div > div:first-child { line-height:24px; }
 .reading-option-row > .toggle-sw { margin-top:0; }
 @media(min-width:768px) { #settingsPanel .sp-row.reading-option-row > .toggle-sw { margin-top:-1px; } }
+
+/* Hover: every clickable choice in Settings brightens its words to the ink
+   colour, matching the Help Wikipedia choices. Touch screens skip it so a tap
+   never leaves a lit label behind. */
+.reading-size-choices button { cursor: pointer; transition: color .2s, background-color .2s; }
+@media (hover: hover) {
+  .reading-size-choices button:not(.on):hover,
+  .help-type-grid button:hover,
+  .depth-step:not(.active):hover,
+  body.light .depth-step:not(.active):hover { color: var(--ink); }
+  .sp-about-links .about-link:hover,
+  .sp-about-links .privacy-link-btn:hover,
+  body.light .sp-about-links .privacy-link-btn:hover { color: var(--ink) !important; }
+}

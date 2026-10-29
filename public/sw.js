@@ -1,4 +1,4 @@
-const CACHE='wikiscroll-atlas-v130';
+const CACHE='wikiscroll-atlas-v131';
 const SHELL=['/images/ui-icons.svg?v=4','/discovery.js?v=52','/about/','/about.css?v=51','/about.js?v=48','/images/wordmark-dark.svg','/images/wordmark-light.svg','/images/favicon.ico?v=42','/images/apple-touch-icon.png?v=42','/images/icon-192.png?v=42','/images/icon-512.png?v=42','/lang.js?v=18','/translations/es.js?v=18','/translations/fr.js?v=18','/translations/de.js?v=18','/translations/it.js?v=18','/translations/pt.js?v=18','/translations/ru.js?v=18','/translations/ja.js?v=18','/translations/zh.js?v=18','/translations/ar.js?v=18','/translations/hi.js?v=18','/translations/ko.js?v=18','/translations/nl.js?v=18','/translations/pl.js?v=18','/translations/he.js?v=18','/i18n.js?v=55','/features.js?v=72','/webmcp.js?v=1','/','/app.js?v=110','/atlas.js?v=57','/manifest.json','/images/icon-192.png','/images/icon-512.png',/* ASTRO_STYLES */];
 // Wikimedia serves article images from both hosts (thumb.wikimedia.org since 2026).
 const IMAGE_HOSTS=new Set(['upload.wikimedia.org','thumb.wikimedia.org']);

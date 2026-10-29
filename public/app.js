@@ -111,7 +111,7 @@ let travelOffset=0, travelExhausted=false, travelSuggestion='', travelContinuing
 let ambientEnabled = true;
 let readingTextSize = 'standard', dimImages = false;
 const READING_TEXT_SIZES = ['standard', 'large', 'larger'];
-let swipeEnabled = true, kbBarEnabled = true, helpMode = 'off', showMature = false;
+let swipeEnabled = true, kbBarEnabled = true, helpMode = 'off', showMature = false, showImageless = false;
 let helpTypes = [...HELP_TYPE_IDS];
 let lightMode = false, depthLevel = 3;
 let history = [];
@@ -193,6 +193,7 @@ function loadPersistedState() {
   readingTextSize = READING_TEXT_SIZES.includes(settings.readingTextSize) ? settings.readingTextSize : 'standard';
   dimImages = settings.dimImages === true;
   showMature = settings.mature === true;
+  showImageless = settings.imageless === true;
   kbBarEnabled = settings.kbBar !== false;
   helpMode = helpTopic ? 'only' : HELP_MODES.includes(settings.helpMode) ? settings.helpMode : settings.help === true ? 'tags' : 'off';
   const savedHelpTypes = Array.isArray(settings.helpTypes) ? HELP_TYPE_IDS.filter(id => settings.helpTypes.includes(id)) : [];
@@ -214,7 +215,7 @@ function loadPersistedState() {
 }
 function saveLiked()    { lsSet('ws_liked',    [...liked.values()]); }
 function saveTopics()   { lsSet('ws_topics',   [...curTopics]); }
-function saveSettings() { lsSet('ws_settings', { readingTextSize, dimImages, mature: showMature, ambient: ambientEnabled, swipe: swipeEnabled, kbBar: kbBarEnabled, helpMode: helpMode, helpTypes, lightMode: lightMode, depth: depthLevel, lang: curLang }); }
+function saveSettings() { lsSet('ws_settings', { readingTextSize, dimImages, mature: showMature, imageless: showImageless, ambient: ambientEnabled, swipe: swipeEnabled, kbBar: kbBarEnabled, helpMode: helpMode, helpTypes, lightMode: lightMode, depth: depthLevel, lang: curLang }); }
 function saveHistory()     { lsSet('ws_history', history.slice(0, 50)); }
 function saveCollections() { lsSet('ws_collections', collections); }
 
@@ -648,6 +649,9 @@ async function fetchVoyage() {
 // (worker/mature.js) for cards that arrived without one.
 const MATURE_TEXT_RE = /\b(?:porn(?:o|ography|ographic|s|stars?)?|pornogr\w*|pornodarsteller\w*|erotic (?:actor|actress|model|film|video|art|literature)|adult (?:film|video|model|entertain\w*)|sex (?:act|position|toy|worker|industry)s?|sexual (?:acts?|positions?|practices?|fetish\w*)|glamour model|playboy playmate|penthouse pet|striptease|camgirl|onlyfans|masturbat\w*|orgasm|bdsm|fellatio|cunnilingus|anal sex|oral sex|hentai)\b/i;
 function hiddenMature(a) { return !showMature && (a?.mature === 1 || MATURE_TEXT_RE.test(a?.title || '') || MATURE_TEXT_RE.test(a?.desc || '')); }
+// Travel guides with no photo stay out of the feed unless the reader asks for them,
+// or searched for a place, where every matching guide counts.
+function hiddenImageless(a) { return !showImageless && a?.src === 'how' && !a.img && !travelFilters.place; }
 // Data reserve is deliberately much larger than the rendered window.
 const QUEUE_MIN = 60, QUEUE_TARGET = 100, CARDS_AHEAD = 16;
 let supplyTask = null, reserveTimer = null, pendingDeepGeneration = -1;
@@ -751,7 +755,7 @@ function acceptSupply(batch,gen,randomize=true) {
   if(gen!==fillGeneration)return 0;
   let added=0;
   for(const a of randomize?shuffled(batch||[]):batch||[]) {
-    if(!validReserveArticle(a)||feedSeen.has(a.id)||hiddenMature(a))continue;
+    if(!validReserveArticle(a)||feedSeen.has(a.id)||hiddenMature(a)||hiddenImageless(a))continue;
     if(curMode==='wiki'&&helpOnly()&&!matchesHelpTypes(a))continue;
     feedSeen.add(a.id);queue.push(a);added++;
   }
@@ -1927,6 +1931,8 @@ function syncAllToggles() {
   setSw('dimImagesToggle', dimImages);
   setSw('matureToggle', showMature);
   setSw('dkMatureToggle', showMature);
+  setSw('imagelessToggle', showImageless);
+  setSw('dkImagelessToggle', showImageless);
   setSw('dkDimImagesToggle', dimImages);
   document.querySelectorAll('[data-reading-size]').forEach(button => {
     const selected = button.dataset.readingSize === readingTextSize;
@@ -1958,6 +1964,7 @@ function setDimImages(value) {
 }
 // Turning mature topics off also clears them from the cards waiting in line.
 function setMature(value) { showMature = value === true; if (!showMature) queue = queue.filter(a => !hiddenMature(a)); saveSettings(); syncAllToggles(); }
+function setImageless(value) { showImageless = value === true; if (!showImageless) queue = queue.filter(a => !hiddenImageless(a)); saveSettings(); syncAllToggles(); }
 function setAmbient(val) { ambientEnabled=val; if(!val)closeAmbient(); window.dispatchEvent(new Event('ambient-preference-change')); saveSettings(); syncAllToggles(); }
 function setSwipe(val) { swipeEnabled=val; saveSettings(); syncAllToggles(); }
 
@@ -1995,6 +2002,7 @@ document.querySelectorAll('[data-reading-size]').forEach(button => {
 ['dimImagesToggle','dkDimImagesToggle'].forEach(id => document.getElementById(id).addEventListener('click', () => setDimImages(!dimImages)));
 
 ['matureToggle','dkMatureToggle'].forEach(id=>document.getElementById(id).addEventListener('click',()=>setMature(!showMature)));
+['imagelessToggle','dkImagelessToggle'].forEach(id=>document.getElementById(id).addEventListener('click',()=>setImageless(!showImageless)));
 ['ambientToggle','dkAmbientToggle'].forEach(id=>document.getElementById(id).addEventListener('click',()=>setAmbient(!ambientEnabled)));
 
 // Mobile toggles

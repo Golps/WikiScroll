@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import zlib from 'node:zlib';
 import crypto from 'node:crypto';
-import {readLocalFiles,MIN_LOCAL_FILES,thumbURL,sqlRows,readTable,readPageProps,readLinkTargets,readCategoryLinks,readPages,topicCategories,cirrusReader,libraryCard,voyageCard,cardNeeds,cardSets,dailyViews,vitalLevels,buildLibrary,averageDailyViews,emptyProps,shorten,SETS,TOPICS,HELP,SHARD_SIZE,MINIMUM,MAX_FILES,MAX_BYTES,SLICE_CAP,BODY_CHARS,translateTitles,localRoots} from '../scripts/build-library.mjs';
+import {readLocalFiles,MIN_LOCAL_FILES,thumbURL,sqlRows,readTable,readPageProps,readLinkTargets,readCategoryLinks,readPages,topicCategories,cirrusReader,libraryCard,voyageCard,guideBanner,cardNeeds,cardSets,dailyViews,vitalLevels,buildLibrary,averageDailyViews,emptyProps,shorten,SETS,TOPICS,HELP,SHARD_SIZE,MINIMUM,MAX_FILES,MAX_BYTES,SLICE_CAP,BODY_CHARS,translateTitles,localRoots} from '../scripts/build-library.mjs';
 import {roots,bands} from '../worker/topics.js';
 import {availableHelpTypes} from '../worker/needs.js';
 
@@ -120,6 +120,15 @@ test('each page joins the depth, topic and Help sets the live feeds would draw i
  assert.ok(!tagged.some(([s])=>s==='topic-en-geo-help-sources-3'),'only the Help types it needs');
 });
 
+test('a guide banner comes from its pagebanner template, never a default or continent one',()=>{
+ assert.equal(guideBanner('{{pagebanner|Vilnius Old Town banner.jpg|caption=Old Town}}\nText'),'Vilnius Old Town banner.jpg');
+ assert.equal(guideBanner('{{ Pagebanner | File:Kyoto banner.JPG }}'),'Kyoto banner.JPG');
+ assert.equal(guideBanner('{{pagebanner|Pagebanner default.jpg}}'),'');
+ assert.equal(guideBanner('{{pagebanner|Europe banner Alps.jpg}}'),'');
+ assert.equal(guideBanner('{{pagebanner|caption=Only named}}'),'');
+ assert.equal(guideBanner('{{pagebanner}}'),'');assert.equal(guideBanner(undefined),'');
+});
+
 test('travel guides skip phrasebooks and travel topics and need no image',()=>{
  const p=props(),guide=text.slice(0,60);
  const card=voyageCard(3,{namespace:0,title:'Vilnius',opening_text:guide},p);
@@ -142,15 +151,19 @@ test('a full build shuffles every card into exactly one shard per set and writes
  for(let i=1;i<=count;i++){
   p.free.set(i,`Photo ${i}.jpg`);
   const depth=3+i%3,title=i<=600?`Vital ${i}`:`Article ${i}`;
-  lines.push(JSON.stringify({index:{_id:String(i)}}),JSON.stringify({namespace:0,title,opening_text:text,popularity_score:views[depth]/1e6,category:['Islands',...(i%5?[]:['All stub articles'])]}));
+  lines.push(JSON.stringify({index:{_id:String(i)}}),JSON.stringify({namespace:0,title,opening_text:text,popularity_score:views[depth]/1e6,category:['Islands',...(i%5?[]:['All stub articles'])],...(i===7?{wikibase_item:'Q7'}:{})}));
  }
  lines.push(JSON.stringify({index:{_id:'99999'}}),JSON.stringify({namespace:0,title:'Unknown',opening_text:text}));p.free.set(99999,'U.jpg');
- const voyage={props:props(),lines:Array.from({length:150},(_,i)=>[JSON.stringify({index:{_id:String(i+1)}}),JSON.stringify({namespace:0,title:'Town '+i,opening_text:text})]).flat()};
+ // Town 0 has its own banner, Town 1 shares a Wikidata item with Wikipedia's article 7,
+ // Town 2 has only a default banner and no match, so it stays without a photo.
+ const guideExtras={0:{source_text:'{{pagebanner|Town 0 banner.jpg|caption=Harbour}}',wikibase_item:'Q99'},1:{wikibase_item:'Q7'},2:{source_text:'{{pagebanner|Pagebanner default.jpg}}',wikibase_item:'Q404'}};
+ const voyage={props:props(),lines:Array.from({length:150},(_,i)=>[JSON.stringify({index:{_id:String(i+1)}}),JSON.stringify({namespace:0,title:'Town '+i,opening_text:text,...guideExtras[i]})]).flat()};
  const level3=Array.from({length:550},(_,i)=>`Vital ${i+1}`),level4=Array.from({length:600},(_,i)=>`Vital ${i+1}`);
  const minimum={...MINIMUM};for(const set of Object.keys(MINIMUM))MINIMUM[set]=1;
  try{
   const result=await buildLibrary({lines,props:p,dailyTotal:1e6,levels:vitalLevels(level3,level4),reach:topicCategories(new Map(),{geo:['Islands']}),voyage,outDir:out,tmpDir:tmp,build:'20261025'});
   assert.equal(result.pages,count+1);assert.equal(result.unknown,1);assert.equal(result.guides,150);
+  assert.equal(result.guideBanners,1);assert.equal(result.guideWikipedia,1);assert.equal(result.guidesWithout,148);
   const manifest=JSON.parse(zlib.gunzipSync(fs.readFileSync(path.join(out,'current.json'))));
   assert.equal(manifest.v,1);assert.equal(manifest.base,'20261025/');assert.equal(manifest.shardSize,SHARD_SIZE);assert.deepEqual(Object.keys(manifest.sets),SETS);
   const seen=Object.fromEntries(SETS.map(s=>[s,new Set()]));
@@ -163,6 +176,10 @@ test('a full build shuffles every card into exactly one shard per set and writes
     for(const c of cards){assert.ok(!seen[set].has(c.id),'no card repeats within a set');seen[set].add(c.id);if(set.startsWith('topic-'))assert.equal(c.topic,'geo');if(set.startsWith('help-'))assert.ok(c.needs.length);}
    }
   }
+  const guides=JSON.parse(zlib.gunzipSync(fs.readFileSync(path.join(out,'20261025','how-en','0.json')))),photo=t=>guides.find(c=>c.title===t).img;
+  assert.match(photo('Town 0'),/wikipedia\/commons\/.*Town_0_banner\.jpg/,'a guide takes its own banner');
+  assert.match(photo('Town 1'),/wikipedia\/commons\/.*Photo_7\.jpg/,'or the Wikipedia photo of the same place');
+  assert.equal(photo('Town 2'),'','default banners never count');
   assert.equal(manifest.sets['wiki-en-1'],5,'550 Level 3 cards make five full shards');
   assert.ok(!seen['wiki-en-2'].has('w1'),'Level 3 articles are Popular, not Known');
   assert.ok(manifest.sets['topic-en-geo-1']>0&&manifest.sets['help-en-detail-4']>0,'topic and Help sets are built');assert.equal(manifest.sets['how-en'],1);

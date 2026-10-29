@@ -180,7 +180,7 @@ test('a thin build fails before anything is written for upload',async()=>{
 });
 
 test('free-tier guards leave room for five weekly builds and the weekly swap',()=>{
- assert.ok(MAX_FILES*2*5<1_000_000,'R2 includes 1M writes a month: two builds a week');
+ assert.ok(MAX_FILES*5<1_000_000/2,'one language takes at most half of R2\'s free 1M writes a month; the workflow\'s write limit guards the total');
  assert.ok(MAX_BYTES*2<10e9,'R2 includes 10 GB; old and new builds overlap during the swap');
  assert.ok(SLICE_CAP>=SHARD_SIZE*100,'topic and Help slices stay large pools');
 });

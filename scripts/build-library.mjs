@@ -68,12 +68,12 @@ export const SLICE_CAP = 40_000, COMBO_CAP = 10_000;
 const EN_MINIMUM = {1: 500, 2: 3000, 3: 50000, 4: 50000, 5: 50000};
 export const MINIMUM_SCALE = {en: 1, de: 0.4, fr: 0.4, es: 0.3}, GUIDE_MINIMUM = {en: 10000, de: 5000, fr: 1500, es: 500};
 export const MINIMUM = Object.fromEntries([...DEPTHS.map(d => [`wiki-${LANG}-${d}`, Math.round(EN_MINIMUM[d] * (d <= 2 ? (LANG === 'en' ? 1 : 0.8) : MINIMUM_SCALE[LANG] ?? 0.1))]), [`how-${LANG}`, GUIDE_MINIMUM[LANG] ?? 100]]);
-// R2's free tier allows 1M writes and 10 GB a month. Two builds a week (English
-// and one other language) for five weeks must fit the writes, and one build
-// plus the next one during the swap must fit the storage, so a build over
-// either limit is refused before any upload. The workflow also checks the
-// whole bucket against its storage limit before each upload.
-export const MAX_FILES = 95_000, MAX_BYTES = 4.5e9;
+// R2's free tier allows 1M writes and 10 GB a month. One build plus the next
+// one during the swap must fit the storage, and no single build may take a
+// large share of the writes, so a build over either limit is refused before
+// any upload. The workflow also checks the whole bucket against its storage
+// limit and the month's writes against its write limit before each upload.
+export const MAX_FILES = LANG === 'en' ? 95_000 : 40_000, MAX_BYTES = 4.5e9;
 // The category walk reaches hundreds of thousands of categories; far fewer
 // means the tree was misread, so the build stops before reading articles.
 export const MIN_TOPIC_CATEGORIES = 5000;
@@ -502,7 +502,8 @@ export async function buildLibrary({lines, props, dailyTotal, levels, reach = ne
   }
   await buckets.close();
   const report = SETS.map(set => `${set}: ${buckets.counts[set]}`).join(', ');
-  const short = Object.entries(MINIMUM).filter(([set, min]) => buckets.counts[set] < min).map(([set]) => `${set}: ${buckets.counts[set]}`);
+  // A language without Wikivoyage (Korean, Arabic, Hindi) reads English guides.
+  const short = Object.entries(MINIMUM).filter(([set]) => voyage || !set.startsWith('how-')).filter(([set, min]) => buckets.counts[set] < min).map(([set]) => `${set}: ${buckets.counts[set]}`);
   if (short.length) throw Error('Too few cards, keeping the current library. ' + short.join(', ') + '\nAll sets: ' + report);
   const sets = {}, root = path.join(outDir, build);
   let files = 0, bytes = 0;

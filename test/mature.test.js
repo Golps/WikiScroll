@@ -53,5 +53,12 @@ test('German, French and Spanish categories have their own mature rules', () => 
   assert.equal(isMature({title: 'X', categories: ['Catégorie:Violoniste français'], lang: 'fr'}), false);
   assert.equal(isMature({title: 'X', categories: ['Kategorie:Maler (Deutschland)'], lang: 'de'}), false);
   // A language without rules checks only the title and description.
-  assert.equal(isMature({title: 'X', categories: ['Categoria:Pornografia'], lang: 'it'}), false);
+  assert.equal(isMature({title: 'X', categories: ['Pornografia'], lang: 'eo'}), false);
+});
+
+test('every interface language with a Wikipedia library has mature category rules', () => {
+  const cases = {it: 'Pornografia', pt: 'Prostituição', ru: 'Порнографические актрисы', nl: 'Verkrachting', pl: 'Pornografia', he: 'זנות', ar: 'الإباحية', hi: 'बलात्कार', ko: '포르노 배우', ja: '日本のAV女優', zh: '色情片'};
+  for (const [lang, category] of Object.entries(cases)) assert.equal(isMature({title: 'X', categories: [category], lang}), true, lang);
+  // Look-alikes: violinists, advisors, Italian penalties, Polish nuclei.
+  for (const [lang, category] of [['pl', 'Polscy skrzypkowie'], ['ko', '대통령 고문'], ['it', 'Pene accessorie'], ['pl', 'Jądra atomowe'], ['ru', 'Эрос (астероид)']]) assert.equal(isMature({title: 'X', categories: [category], lang}), false, lang + ': ' + category);
 });

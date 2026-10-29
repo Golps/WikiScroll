@@ -418,7 +418,7 @@ test('the Worker serves when the library is unreachable or lacks the language', 
   let h=harness({librarySets:null});
   let filling=h.run('fillQueue()');await settle();
   assert.equal(h.requests.length,1,'manifest failure falls back');h.requests[0]([]);await filling;
-  h=harness({librarySets:LIBRARY_SETS});h.change("curLang='it';");
+  h=harness({librarySets:LIBRARY_SETS});h.change("curLang='xx';");
   filling=h.run('fillQueue()');assert.equal(h.requests.length,1);assert.equal(h.shards.length,0);h.requests[0]([]);await filling;
   // A library language whose first build isn't uploaded yet waits a while before asking again.
   h=harness({librarySets:LIBRARY_SETS});h.change("curLang='fr';");

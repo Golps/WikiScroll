@@ -4,6 +4,7 @@ Releases of this repository. Each entry describes what changed in the code; [doc
 
 ## Unreleased
 
+- Build card libraries for all 15 languages: English weekly and five others each week in turn, mature-topic category rules for every language, travel guides only where Wikivoyage exists, and a monthly write ledger that refuses any upload past 900,000 writes.
 - Add a travel place index to the card library: each Wikivoyage place lists the guides inside it, with trip-style tags, and stands in for travel search when it fails.
 - Reword the Mature topics setting to "Show articles on adult and sensitive subjects."
 - Build card libraries for German, French and Spanish alongside English: one builder for every language, English weekly and the others in turn, each in its own job, with a 9 GB storage guard before any upload. The reader draws from each language's own library and falls back to the Worker for a language whose library isn't up yet. The "You're all caught up" card is translated.

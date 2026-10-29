@@ -794,7 +794,7 @@ function loadStarterLibrary(gen,outage=false) {
 // ends on a card that says so. The Worker and the live API serve only when
 // the library can't (other languages, a failure).
 const LIBRARY_ROOT='https://cards.wikiscroll.com/v1/';
-const LIBRARY_LANGS=new Set(['en','de','fr','es']);
+const LIBRARY_LANGS=new Set(['en','es','fr','de','it','pt','ru','ja','zh','ar','hi','ko','he','nl','pl']);
 // One manifest, failure pause and drawn-shard record per language.
 const libraries=new Map(),libraryDraw={gen:-1,draws:0};
 let libraryExhausted=false;

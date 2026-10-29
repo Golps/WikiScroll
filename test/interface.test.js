@@ -342,3 +342,9 @@ test('a failed travel search falls back to the card library and stays there for 
  await c.fetchFilteredTravel();
  assert.equal(live,1,'the live search is not asked again for this filter');assert.equal(stand,2);
 });
+
+test('every interface language reads its own card library', () => {
+ const langs = [...app.slice(app.indexOf('const LANGS = ['), app.indexOf('];', app.indexOf('const LANGS = ['))).matchAll(/c:'([a-z]+)'/g)].map(m => m[1]);
+ const library = app.match(/const LIBRARY_LANGS=new Set\((\[[^\]]+\])\)/)[1];
+ assert.deepEqual(JSON.parse(library.replace(/'/g, '"')).sort(), langs.sort());
+});

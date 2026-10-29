@@ -1,10 +1,10 @@
 # Card library
 
-The card library is a prebuilt set of Wikipedia and Wikivoyage cards, one library per language (English, German, French and Spanish so far), stored in Cloudflare R2 and served from `cards.wikiscroll.com`. It lets the feed draw from millions of ready cards without calling the Wikimedia API. This page covers how it is built, how the site reads it, and how to set it up.
+The card library is a prebuilt set of Wikipedia and Wikivoyage cards, one library for each of the site's 15 languages, stored in Cloudflare R2 and served from `cards.wikiscroll.com`. It lets the feed draw from millions of ready cards without calling the Wikimedia API. This page covers how it is built, how the site reads it, and how to set it up.
 
 ## How a build works
 
-`.github/workflows/card-library.yml` runs on GitHub Actions early every Monday, the day after Wikimedia publishes its weekly dump, and on demand. Each Monday it builds English and one other language in turn (`ROTATION`: German, French, Spanish, by week number), each in its own job at the same time; a manual run takes a `languages` list. Every job does the same steps for its own wiki (`<lang>wiki`, `<lang>wikivoyage`); English names are used below:
+`.github/workflows/card-library.yml` runs on GitHub Actions early every Monday, the day after Wikimedia publishes its weekly dump, and on demand. Each Monday it builds English and `PER_WEEK` (5) of the other 14 languages in turn (`ROTATION`, by week number, so each is rebuilt about every three weeks), each in its own job at the same time; a manual run takes a `languages` list. Every job does the same steps for its own wiki (`<lang>wiki`, `<lang>wikivoyage`); English names are used below:
 
 1. Finds the newest weekly CirrusSearch index dump for `enwiki_content` on dumps.wikimedia.org. If that dump is already live, the run stops, so a rerun never repeats uploads.
 2. Downloads the twice-monthly table dumps: `page_props` (lead images, short descriptions, disambiguation flags), `page` and `categorylinks` (plus `linktarget` where the dump uses it) for the category tree and talk-page photo requests, and the English Wikivoyage search-index dump with its `page_props`.
@@ -19,7 +19,7 @@ The card library is a prebuilt set of Wikipedia and Wikivoyage cards, one librar
    - Every set is shuffled across all of its cards and packed into gzipped shards of 100. Topic and Help sets keep a random sample of up to `SLICE_CAP` (40,000) cards each and topic-with-Help sets up to `COMBO_CAP` (10,000); the depth and travel sets keep every card.
 4. Checks the storage guard: the whole bucket, minus this language's current build, plus the new build must stay at or under `STORAGE_LIMIT` (9 GB), or nothing is uploaded. Then it uploads the shards under `v1/<lang>/<dump date>/<set>/<n>.json`, writes `v1/<lang>/current.json`, which points readers at the new build, and deletes the previous build.
 
-Other languages use the same pipeline: the English vital-article lists and topic root categories are followed through interlanguage links to that wiki's titles, the depth bands are scaled by `VIEW_SCALE`, Help types use that wiki's maintenance categories, and mature topics use `MATURE_CATEGORY_LANG`. `MINIMUM` is scaled per language (`MINIMUM_SCALE`, `GUIDE_MINIMUM`).
+Korean, Arabic and Hindi have no Wikivoyage, so their builds have no travel sets and their readers browse the English guides, as the live site does. Other languages use the same pipeline: the English vital-article lists and topic root categories are followed through interlanguage links to that wiki's titles, the depth bands are scaled by `VIEW_SCALE`, Help types use that wiki's maintenance categories, and mature topics use `MATURE_CATEGORY_LANG`. `MINIMUM` is scaled per language (`MINIMUM_SCALE`, `GUIDE_MINIMUM`).
 
 A thin build (fewer cards than `MINIMUM`), a misread table, a failed download, a missing upstream list, or more than 5% broken links among the sampled images that answered (rate-limited checks are ignored) fails the job before anything is uploaded, and the current library keeps serving.
 
@@ -39,7 +39,7 @@ The Worker and the live API serve only what the library can't: other languages, 
 
 R2's free tier includes 10 GB of storage, 1 million writes and 10 million reads a month, and egress is free.
 
-- **Writes:** a build is refused at more than `MAX_FILES` (95,000) shards, so two builds a week for five weeks stay under 1 million. A dump that is already live is never rebuilt unless the run is started with *force*.
+- **Writes:** a build is refused at more than `MAX_FILES` shards (95,000 for English, 40,000 for any other language). Each upload also records its writes in a monthly ledger in the bucket (`usage/writes-<YYYY-MM>.json`: every shard, the manifest and a margin for listings), and an upload that would take the month past `WRITE_LIMIT` (900,000) is refused. A typical month is about 270,000 writes for English and 450,000 for the others. A dump that is already live is never rebuilt unless the run is started with *force*.
 - **Storage:** a build is refused at more than `MAX_BYTES` (4.5 GB), and an upload that would leave the bucket above `STORAGE_LIMIT` (9 GB) is refused, so the swap's brief second copy stays under 10 GB. Only one build per language is kept.
 - **Reads:** shards never change and are cached for a year, and the manifest for 5 minutes. With the cache rule below, most downloads never reach R2.
 - **Early warning:** the daily *Usage check* workflow (`scripts/usage-check.mjs`) compares yesterday's Worker requests (free: 100,000 a day) and this month's R2 storage and operations with the free allowances, and opens an issue once any passes half. It needs a `CF_ANALYTICS_TOKEN` secret: a Cloudflare API token with only *Account Analytics: Read*. Until it is set the check is skipped.

@@ -96,3 +96,10 @@ test('sharing an article sends the link alone so apps show its preview',async()=
  assert.equal(JSON.stringify(shared),'[{"url":"https://wikiscroll.com/?a=w1"}]');
  assert.doesNotMatch(app,/WSShareCard|files:/);
 });
+
+test('settings choices share one hover and settings opens at the top',()=>{
+ const css=fs.readFileSync(new URL('../src/styles/settings.css',import.meta.url),'utf8');
+ for (const sel of ['.reading-size-choices button:not(.on):hover','.help-type-grid button:hover','.depth-step:not(.active):hover','.sp-about-links .about-link:hover']) assert.ok(css.includes(sel),sel);
+ assert.match(app,/getElementById\('settingsPanel'\)\.scrollTop = 0/);
+ assert.match(app,/#burgerMenu \.burger-inner'\); if \(inner\) inner\.scrollTop = 0/);
+});

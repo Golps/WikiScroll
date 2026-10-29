@@ -96,6 +96,18 @@ test('menu buttons announce whether their panel is open', () => {
   assert.match(html, /id="feed" role="main"/, 'the feed is the page\'s main landmark');
 });
 
+test('screen readers skip the Save and Skip labels that only show mid-swipe', () => {
+  const labels = app.match(/<div class="swipe-ind[^>]*>/g);
+  assert.equal(labels.length, 2);
+  for (const label of labels) assert.match(label, /aria-hidden="true"/, label);
+});
+
+test('the card library connection opens while the scripts download', () => {
+  // The library is fetched without credentials, so only a crossorigin connection can serve it.
+  const head = html.slice(0, html.indexOf('/lang.js'));
+  assert.match(head, /<link rel="preconnect" href="https:\/\/cards\.wikiscroll\.com" crossorigin>/);
+});
+
 test('light theme secondary text and destructive actions meet 4.5:1 contrast', () => {
   const luminance = hex => { const [r, g, b] = [0, 2, 4].map(i => parseInt(hex.slice(i + 1, i + 3), 16) / 255).map(v => v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4); return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
   const ratio = (a, b) => { const [x, y] = [luminance(a), luminance(b)].sort((p, q) => q - p); return (x + 0.05) / (y + 0.05); };

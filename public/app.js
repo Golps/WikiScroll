@@ -2688,6 +2688,7 @@ function cartoTileURL(isDark,key=CARTO_BASEMAP_KEY) {
 let mapInstance = null;
 let mapMarker = null;
 let mapRequest = 0;
+let mapUserMoved = false;
 
 // Wikivoyage records each destination's own coordinates, so "Paris (Texas)"
 // is pinned in Texas. Free-text geocoding is only a fallback, and it keeps the
@@ -2802,9 +2803,10 @@ async function openMap(article) {
         detectRetina:true, maxZoom: 19, subdomains: 'abcd', attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
       }).addTo(mapInstance);
       L.control.zoom({ position: 'bottomright' }).addTo(mapInstance);
-    } else {
-      mapInstance.setView([geo.lat, geo.lng], 5, { animate: !window.matchMedia('(prefers-reduced-motion: reduce)').matches, duration: .6 });
     }
+    mapUserMoved = false;
+    mapInstance.invalidateSize({ pan: false });
+    mapInstance.setView([geo.lat, geo.lng], 5, { animate: false });
 
     // Custom marker
     const markerIcon = L.divIcon({
@@ -2815,12 +2817,17 @@ async function openMap(article) {
     });
     if (mapMarker) mapMarker.remove();
     mapMarker = L.marker([geo.lat, geo.lng], { icon: markerIcon }).addTo(mapInstance);
-    mapMarker.bindPopup(`<strong>${esc(article.title)}</strong>${geo.display ? `<br><span style="font-size:12px;opacity:.7">${esc(geo.display.split(',').slice(0,3).join(','))}</span>` : ''}`).openPopup();
+    mapMarker.bindPopup(`<strong>${esc(article.title)}</strong>${geo.display ? `<br><span style="font-size:12px;opacity:.7">${esc(geo.display.split(',').slice(0,3).join(','))}</span>` : ''}`, { autoPan: false }).openPopup();
 
-    // Multiple invalidateSize calls to handle CSS transition timing
-    setTimeout(() => mapInstance.invalidateSize(), 100);
-    setTimeout(() => mapInstance.invalidateSize(), 350);
-    setTimeout(() => mapInstance.invalidateSize(), 700);
+    // The panel is still opening, so measure again as it settles and keep the pin
+    // in the middle until the reader moves the map. An animated pan here would be
+    // cut short by the resize and leave the pin off-centre.
+    const recentre = () => {
+      if (request !== mapRequest || mapUserMoved) return;
+      mapInstance.invalidateSize({ pan: false });
+      mapInstance.setView([geo.lat, geo.lng], mapInstance.getZoom(), { animate: false });
+    };
+    [100, 350, 700].forEach(ms => setTimeout(recentre, ms));
   } catch (e) {
     console.warn('Map render failed:', e);
     loading.querySelector('.map-loading-text').textContent = 'Map failed to render';
@@ -2839,6 +2846,7 @@ document.getElementById('mapOverlay').addEventListener('click', ev => {
 
 // Prevent browser zoom on map (trackpad pinch-to-zoom sends wheel+ctrlKey)
 const mapContainer = document.querySelector('.map-container');
+['pointerdown', 'wheel', 'keydown'].forEach(type => document.getElementById('mapCanvas').addEventListener(type, () => { mapUserMoved = true; }, { passive: true }));
 mapContainer.addEventListener('wheel', ev => {
   if (ev.ctrlKey) ev.preventDefault();
 }, { passive: false });

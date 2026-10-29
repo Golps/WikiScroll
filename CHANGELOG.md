@@ -4,6 +4,7 @@ Releases of this repository. Each entry describes what changed in the code; [doc
 
 ## Unreleased
 
+- The first-launch hint drops its pill: the hand and line of text sit on a soft fade from the header, which keeps them readable over any photo.
 - Settings hover is consistent: Reading text sizes, Help types, depth labels and the About links brighten on hover like the Help Wikipedia choices (mouse only). Settings now always opens at the top instead of where it was last scrolled.
 - The About card shows its gestures as three centred, animated icons (swipe left to skip, swipe right to save, Spacebar or long-press for Ambient Mode) instead of one line of text. "Ambient Mode" is now translated in Settings too.
 - Reword the Mature topics setting to "Show articles on adult and sensitive subjects."

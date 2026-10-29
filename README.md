@@ -167,7 +167,7 @@ Group saved articles into named collections, and share one as a link. The link o
 | **Sharing** | Article links get a proper preview in messaging apps. Collections are shared as a snapshot of up to 30 articles, verified again when the link is opened. |
 | **Languages** | 15 content languages, and the interface translated into all of them. Each reader downloads only their own language. Arabic and Hebrew get a right-to-left layout. |
 | **Input** | Touch swipes, double-tap to save, pull to refresh, two-finger trackpad swipes, and keyboard shortcuts. Desktop text selection and image dragging retain their native behavior. |
-| **Install and offline** | Installable as a Progressive Web App. The app shell and recently viewed images are cached, so saved articles and cached content work offline. A bundled English starter pool covers openings with no connection. New discoveries and maps need a connection. |
+| **Install and offline** | Installable as a Progressive Web App. The app shell and recently viewed images are cached, so saved articles and cached content work offline. A bundled backup pool in every language covers openings with no connection. New discoveries and maps need a connection. |
 | **Appearance** | Dark theme by default, with a light theme. Responsive layouts for phones, tablets and wide desktops. |
 
 <details>
@@ -214,7 +214,7 @@ flowchart LR
   end
   subgraph Browser
     UI["public/app.js<br>feed, gestures, library"]
-    POOL[("Bundled starter pool<br>~1,800 English cards")]
+    POOL[("Bundled backup pool<br>~11,500 cards, 15 languages")]
   end
   subgraph Worker["Cloudflare Worker (worker/)"]
     API["/api/articles · /api/topics<br>/api/travel · /api/today"]
@@ -242,7 +242,7 @@ Every layer has a fallback, so a reader never sees an empty screen:
 1. **Card library** (normal path). A failed download is retried a minute later; a language whose library isn't uploaded yet is retried after 30 minutes.
 2. **Cloudflare Worker and the live Wikipedia API.** Serves "On this day", live travel search, and anything the library can't (for example, a failed download). It caches batches at the edge and keeps serving yesterday's cards during a Wikimedia outage.
 3. **Wikimedia directly from the browser,** if the Worker itself can't be reached.
-4. **The bundled starter pool.** About 1,800 English cards shipped with the site and refreshed weekly, used for offline openings and outages.
+4. **The bundled backup pool.** About 11,500 cards in all 15 languages, sampled from the library and shipped with the site, used for offline openings and outages. Each device saves a few shards for its own language.
 
 A build that comes out thin, misreads a table, or finds too many broken image links fails before anything is uploaded, and the current library keeps serving.
 
@@ -266,7 +266,7 @@ Astro handles the parts that benefit from reusable templates without adding a cl
 | **Styles** | Ordered CSS modules compiled into one hashed stylesheet | `src/styles/reader.css` |
 | **Reader** | Card navigation, preloading from the card library, image inspection, maps, languages and on-device libraries | `public/` |
 | **Card library** | Weekly build from Wikimedia dumps into sharded sets in R2, with storage and write guards | `scripts/build-library.mjs`, `.github/workflows/card-library.yml` |
-| **Starter pool** | Weekly refresh of the bundled offline and outage cards | `scripts/build-starter.mjs`, `public/data/starter/` |
+| **Backup pool** | Weekly resample of the bundled offline and outage cards from the library | `scripts/build-starter.mjs`, `public/data/starter/` |
 | **Worker** | Live fallback batches, topic/depth/help filtering, travel search, On this day and share previews | `worker/` |
 | **Offline shell** | Generated HTML/CSS cache identity, saved reading and cached assets | `scripts/astro-offline.mjs`, `public/sw.js` |
 | **Checks** | Regression tests and serialized production builds | `test/`, `scripts/build.mjs` |

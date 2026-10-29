@@ -128,15 +128,20 @@ test('starter pool shards refresh from the network and fall back to any cached s
  result=await sw.request('/data/starter/wiki-en-5-000.json',{navigate:false});
  assert.equal(result.response.status,503,'never a shard of another depth');
 });
-test('install keeps one random shard of every starter set for offline openings',async()=>{
+test('install keeps the starter index, and the page’s language sets each get one random shard',async()=>{
  const cache=cacheStore(),handlers=new Map(),fetched=[];
  const scope={URL,Response,setTimeout,clearTimeout,caches:{open:async()=>cache,keys:async()=>[]},
   self:{location:new URL(origin),addEventListener:(name,handler)=>handlers.set(name,handler),skipWaiting:()=>{}},
-  fetch:async request=>{const path=new URL(typeof request==='string'?request:request.url,origin).pathname;fetched.push(path);return path==='/data/starter/index.json'?Response.json({v:1,sets:{'wiki-en-1':3,'wiki-en-2':0,'how-en':2}}):new Response('ok');}};
+  fetch:async request=>{const path=new URL(typeof request==='string'?request:request.url,origin).pathname;fetched.push(path);return path==='/data/starter/index.json'?Response.json({v:1,sets:{'wiki-en-1':3,'wiki-de-1':2,'wiki-de-2':0,'how-de':2,'how-en':2}}):Response.json([]);}};
  cache.addAll=async()=>{};cache.add=async request=>{const r=await scope.fetch(request);await cache.put(request,r);};
  vm.runInNewContext(code,scope,{filename:'sw.js'});
  let work;handlers.get('install')({waitUntil:p=>{work=p;}});await work;
- const shards=fetched.filter(p=>/-\d{3}\.json$/.test(p));
- assert.equal(shards.length,2);assert.ok(shards.some(p=>/^\/data\/starter\/wiki-en-1-00[0-2]\.json$/.test(p)));assert.ok(shards.some(p=>/^\/data\/starter\/how-en-00[01]\.json$/.test(p)));
+ assert.deepEqual(fetched,['/data/starter/index.json'],'install downloads no shards');
  assert.ok(await cache.match('/data/starter/index.json'));
+ const send=async sets=>{let done;handlers.get('message')({data:{type:'starter-sets',sets},waitUntil:p=>{done=p;}});await done;};
+ await send(['wiki-de-1','wiki-de-2','how-de','../x','wiki-en-1x']);
+ const shards=fetched.filter(p=>/-\d{3}\.json$/.test(p));
+ assert.equal(shards.length,2);assert.ok(shards.some(p=>/^\/data\/starter\/wiki-de-1-00[01]\.json$/.test(p)));assert.ok(shards.some(p=>/^\/data\/starter\/how-de-00[01]\.json$/.test(p)),'only the named, existing sets; never English');
+ const before=fetched.length;await send(['wiki-de-1','how-de']);
+ assert.equal(fetched.length,before,'a set this device already holds is not downloaded again');
 });

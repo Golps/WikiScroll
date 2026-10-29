@@ -2,11 +2,14 @@
 // Cards keep the feed's {id, src, title, body, img, url, desc} shape and are
 // grouped by source, language and depth, then shuffled and packed into small
 // shards so each visitor loads one random slice instead of one fixed list.
-// Cards come from this week's card library on cards.wikiscroll.com (built
-// from the Wikimedia dumps a few hours earlier); the live API is the fallback
-// when the library can't be read.
+// Cards come from the card library on cards.wikiscroll.com, for all 15
+// library languages. A language is resampled only when its library build
+// changes (English weekly, the others about every 3 weeks), which keeps the
+// weekly commit and the repository's growth small. English falls back to the
+// live API when its library can't be read; another language keeps its
+// previous pool.
 // Run by .github/workflows/starter-pool.yml; it never runs during a deploy.
-//   node scripts/build-starter.mjs [output directory]
+//   node scripts/build-starter.mjs [output directory] [--all]
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import {averageViews,lagDays,completePageviews,DEPTH_BANDS} from '../worker/pageviews.js';
@@ -20,6 +23,18 @@ export const SHARD_SIZE = 60, SHARDS_PER_SET = 5, TARGET = SHARD_SIZE * SHARDS_P
 // A set below this many cards fails the build, so a bad week keeps last week's pool.
 export const MINIMUM = 120;
 export const SETS = ['wiki-en-1','wiki-en-2','wiki-en-3','wiki-en-4','wiki-en-5','how-en'];
+// The reader's library languages (LIBRARY_LANGS in public/app.js), and the
+// ones with their own Wikivoyage (VOYAGE_LANGS); the rest browse English guides.
+export const LANGS = ['en','es','fr','de','it','pt','ru','ja','zh','ar','hi','ko','he','nl','pl'];
+export const VOYAGE = new Set(['en','es','fr','de','it','pt','ru','ja','zh','he','nl','pl']);
+// English keeps 5 shards per set; other languages keep 2 (120 cards), which
+// is plenty for an outage and keeps the whole pool near 13 MB.
+export const LANG_TARGET = {en: TARGET}, OTHER_TARGET = SHARD_SIZE * 2;
+export const targetFor = lang => LANG_TARGET[lang] || OTHER_TARGET;
+// Below this a language keeps its previous pool (English falls back to the live API).
+export const minimumFor = lang => lang === 'en' ? MINIMUM : SHARD_SIZE;
+export const setsFor = lang => [1, 2, 3, 4, 5].map(depth => `wiki-${lang}-${depth}`).concat(VOYAGE.has(lang) ? [`how-${lang}`] : []);
+const langOf = set => set.match(/^(?:wiki|how)-([a-z]{2,3})(?:-|$)/)?.[1];
 const BODY_CHARS = 600;
 const BAD_TITLE = /^(list of|lists of|index of|outline of|timeline of|glossary of|wikipedia:|template:|category:|portal:|draft:|module:|file:|help:|special:)/i;
 const strip = s => String(s ?? '').replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
@@ -38,9 +53,10 @@ export function toCard(page, src) {
     url: page.fullurl || `https://${host}/wiki/${encodeURIComponent(page.title.replace(/ /g, '_'))}`, ...(desc ? {desc} : {}),
     ...(src === 'wiki' && isMature({title: page.title, description: desc}) ? {mature: 1} : {})};
 }
-export function validCard(card, src) {
+export function validCard(card, src, lang = 'en') {
+  const host = `${lang}.wiki${src === 'how' ? 'voyage' : 'pedia'}.org`;
   return !!card && new RegExp(`^${src === 'how' ? 'v' : 'w'}[1-9]\\d{0,11}$`).test(card.id) && card.src === src && typeof card.title === 'string' && card.title.length > 0 && !BAD_TITLE.test(card.title)
-    && typeof card.body === 'string' && card.body.length >= (src === 'how' ? 40 : 80) && /^https:\/\/en\.wiki(pedia|voyage)\.org\/wiki\//.test(card.url)
+    && typeof card.body === 'string' && card.body.length >= (src === 'how' ? 40 : lang === 'en' ? 80 : 40) && typeof card.url === 'string' && card.url.startsWith(`https://${host}/wiki/`)
     && (src === 'how' ? !card.img || /^https:\/\/(upload|thumb)\.wikimedia\.org\//.test(card.img) : /^https:\/\/(upload|thumb)\.wikimedia\.org\//.test(card.img));
 }
 // Random-sample depths only; Popular and Known come from the vital lists.
@@ -152,27 +168,41 @@ async function voyageCards(http, taken, maxRounds = 60) {
 
 // Random whole shards of each library set until the set is full. Every card
 // still passes validCard, and `taken` keeps each card in one set.
-export const LIBRARY = 'https://cards.wikiscroll.com/v1/en/';
+export const LIBRARY = 'https://cards.wikiscroll.com/v1/';
 async function libraryJSON(url) {
   try {
     const response = await fetch(url, {headers: {'User-Agent': 'WikiScroll-starter-pool/1.0 (https://wikiscroll.com; contact@wikiscroll.com)'}, signal: AbortSignal.timeout(20000)});
     return response.ok ? await response.json() : null;
   } catch { return null; }
 }
-export async function libraryPool(fetchJSON = libraryJSON, base = LIBRARY) {
-  const manifest = await fetchJSON(base + 'current.json');
-  if (manifest?.v !== 1 || typeof manifest.base !== 'string' || !manifest.sets) return null;
-  const taken = new Set(), sets = {};
-  for (const set of SETS) {
+// Returns {build, sets}, {build, unchanged: true} when the library build is
+// still `unless`, or null when the library can't be read.
+export async function libraryPool(fetchJSON = libraryJSON, lang = 'en', {root = LIBRARY, unless = null} = {}) {
+  const base = `${root}${lang}/`, manifest = await fetchJSON(base + 'current.json');
+  if (manifest?.v !== 1 || typeof manifest.base !== 'string' || !/^[\w-]+\/$/.test(manifest.base) || typeof manifest.build !== 'string' || !manifest.sets) return null;
+  if (unless && manifest.build === unless) return {build: manifest.build, unchanged: true};
+  const taken = new Set(), sets = {}, target = targetFor(lang);
+  for (const set of setsFor(lang)) {
     const src = set.startsWith('how') ? 'how' : 'wiki', cards = [];
     for (const shard of shuffle([...Array(Math.max(0, manifest.sets[set] | 0)).keys()])) {
-      if (cards.length >= TARGET) break;
+      if (cards.length >= target) break;
       const batch = await fetchJSON(`${base}${manifest.base}${set}/${shard}.json`);
-      for (const card of Array.isArray(batch) ? batch : []) if (validCard(card, src) && !taken.has(card.id)) { taken.add(card.id); cards.push(card); }
+      for (const card of Array.isArray(batch) ? batch : []) if (validCard(card, src, lang) && !taken.has(card.id)) { taken.add(card.id); cards.push(card); }
     }
-    sets[set] = cards.slice(0, TARGET);
+    sets[set] = cards.slice(0, target);
   }
   return {sets, build: manifest.build};
+}
+// Sets below their language's minimum. A thin travel set outside English is
+// dropped instead, so that language's readers keep their depth sets.
+export function shortSets(lang, sets) {
+  const short = [];
+  for (const [set, cards] of Object.entries(sets)) {
+    if (cards.length >= minimumFor(lang)) continue;
+    if (lang !== 'en' && set.startsWith('how-')) { delete sets[set]; continue; }
+    short.push(`${set}: ${cards.length}`);
+  }
+  return short;
 }
 
 export async function buildPool(http = client()) {
@@ -185,23 +215,49 @@ export async function buildPool(http = client()) {
   return {sets, calls: http.calls};
 }
 
-export async function writePool(dir, sets, fetchedAt = new Date().toISOString()) {
-  const {files, index} = pack(sets);
+export async function readIndex(dir) {
+  try { const index = JSON.parse(await fs.readFile(path.join(dir, 'index.json'), 'utf8')); return index?.v === 1 && index.sets ? index : null; }
+  catch { return null; }
+}
+// Replaces the shards of every language in `sets` and keeps the others, so a
+// language whose library didn't change (or couldn't be read) keeps its pool.
+export async function writePool(dir, sets, fetchedAt = new Date().toISOString(), builds = {}) {
+  const {files, index} = pack(sets), langs = new Set(Object.keys(sets).map(langOf));
+  const previous = await readIndex(dir) || {sets: {}};
+  const merged = Object.fromEntries(Object.entries(previous.sets).filter(([set]) => !langs.has(langOf(set))));
   await fs.mkdir(dir, {recursive: true});
-  for (const name of await fs.readdir(dir)) if (/^(wiki|how)-en-.*\.json$/.test(name) && !files[name]) await fs.rm(path.join(dir, name));
+  for (const name of await fs.readdir(dir)) if (/^(wiki|how)-.*\.json$/.test(name) && langs.has(langOf(name)) && !files[name]) await fs.rm(path.join(dir, name));
   for (const [name, cards] of Object.entries(files)) await fs.writeFile(path.join(dir, name), JSON.stringify(cards) + '\n');
-  await fs.writeFile(path.join(dir, 'index.json'), JSON.stringify({v: 1, fetchedAt, sets: index}, null, 1) + '\n');
+  Object.assign(merged, index);
+  const sorted = Object.fromEntries(Object.entries(merged).sort(([a], [b]) => a.localeCompare(b)));
+  const allBuilds = {...previous.builds, ...builds};
+  await fs.writeFile(path.join(dir, 'index.json'), JSON.stringify({v: 1, fetchedAt, builds: Object.fromEntries(Object.entries(allBuilds).sort()), sets: sorted}, null, 1) + '\n');
+  return sorted;
+}
+
+// Samples every language whose library build changed (all of them with --all).
+export async function refresh(dir, {all = false, fetchJSON = libraryJSON, live = () => buildPool(), log = console.log} = {}) {
+  const previous = await readIndex(dir), sets = {}, builds = {}, kept = [];
+  let calls = 0;
+  for (const lang of LANGS) {
+    const pool = await libraryPool(fetchJSON, lang, {unless: all ? null : previous?.builds?.[lang]});
+    if (pool?.unchanged) { kept.push(lang); continue; }
+    const short = pool ? shortSets(lang, pool.sets) : ['unreadable'];
+    if (!short.length) { Object.assign(sets, pool.sets); builds[lang] = pool.build; continue; }
+    if (lang !== 'en') { log(`${lang}: library unusable (${short.join(', ')}); keeping its previous pool.`); kept.push(lang); continue; }
+    log(`en: library unusable (${short.join(', ')}); using the live API.`);
+    try { const fallback = await live(); Object.assign(sets, fallback.sets); calls = fallback.calls; builds.en = 'live'; }
+    catch (error) { log(`::warning::en: ${error.message}`); kept.push(lang); }
+  }
+  if (!Object.keys(sets).length) { log('Every language is unchanged; pool kept.'); return null; }
+  const index = await writePool(dir, sets, new Date().toISOString(), builds);
+  log(`Starter pool: resampled ${Object.entries(builds).map(([lang, build]) => `${lang} (${build})`).join(', ')}${kept.length ? `; kept ${kept.join(', ')}` : ''}; ${Object.values(index).reduce((a, b) => a + b, 0)} shards; ${calls} API requests.`);
   return index;
 }
 
 if (process.argv[1] && import.meta.url === new URL(process.argv[1], 'file:').href) {
   try {
-    const dir = process.argv[2] || new URL('../public/data/starter/', import.meta.url).pathname;
-    const library = await libraryPool();
-    const short = library ? Object.entries(library.sets).filter(([, cards]) => cards.length < MINIMUM).map(([set, cards]) => `${set}: ${cards.length}`) : ['unreadable'];
-    if (short.length) console.error(`Card library unusable (${short.join(', ')}); using the live API.`);
-    const {sets, calls} = short.length ? await buildPool() : {sets: library.sets, calls: 0};
-    const index = await writePool(dir, sets);
-    console.log(`Starter pool from ${short.length ? 'the live API' : 'library ' + library.build}: ${Object.entries(index).map(([set, n]) => `${set} ${n} shard(s)`).join(', ')}; ${calls} API requests.`);
+    const dir = process.argv.slice(2).find(arg => !arg.startsWith('--')) || new URL('../public/data/starter/', import.meta.url).pathname;
+    await refresh(dir, {all: process.argv.includes('--all')});
   } catch (error) { console.error(error.message); process.exitCode = 1; }
 }

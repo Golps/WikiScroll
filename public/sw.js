@@ -1,18 +1,33 @@
-const CACHE='wikiscroll-atlas-v133';
-const SHELL=['/images/ui-icons.svg?v=4','/discovery.js?v=52','/about/','/about.css?v=51','/about.js?v=48','/images/wordmark-dark.svg','/images/wordmark-light.svg','/images/favicon.ico?v=42','/images/apple-touch-icon.png?v=42','/images/icon-192.png?v=42','/images/icon-512.png?v=42','/lang.js?v=19','/translations/es.js?v=19','/translations/fr.js?v=19','/translations/de.js?v=19','/translations/it.js?v=19','/translations/pt.js?v=19','/translations/ru.js?v=19','/translations/ja.js?v=19','/translations/zh.js?v=19','/translations/ar.js?v=19','/translations/hi.js?v=19','/translations/ko.js?v=19','/translations/nl.js?v=19','/translations/pl.js?v=19','/translations/he.js?v=19','/i18n.js?v=55','/features.js?v=73','/webmcp.js?v=1','/','/app.js?v=112','/atlas.js?v=57','/manifest.json','/images/icon-192.png','/images/icon-512.png',/* ASTRO_STYLES */];
+const CACHE='wikiscroll-atlas-v134';
+const SHELL=['/images/ui-icons.svg?v=4','/discovery.js?v=52','/about/','/about.css?v=51','/about.js?v=48','/images/wordmark-dark.svg','/images/wordmark-light.svg','/images/favicon.ico?v=42','/images/apple-touch-icon.png?v=42','/images/icon-192.png?v=42','/images/icon-512.png?v=42','/lang.js?v=19','/translations/es.js?v=19','/translations/fr.js?v=19','/translations/de.js?v=19','/translations/it.js?v=19','/translations/pt.js?v=19','/translations/ru.js?v=19','/translations/ja.js?v=19','/translations/zh.js?v=19','/translations/ar.js?v=19','/translations/hi.js?v=19','/translations/ko.js?v=19','/translations/nl.js?v=19','/translations/pl.js?v=19','/translations/he.js?v=19','/i18n.js?v=55','/features.js?v=73','/webmcp.js?v=1','/','/app.js?v=113','/atlas.js?v=57','/manifest.json','/images/icon-192.png','/images/icon-512.png',/* ASTRO_STYLES */];
 // Wikimedia serves article images from both hosts (thumb.wikimedia.org since 2026).
 const IMAGE_HOSTS=new Set(['upload.wikimedia.org','thumb.wikimedia.org']);
-// Offline openings need one shard of each starter set (scripts/build-starter.mjs).
+// Offline openings need one shard of each starter set (scripts/build-starter.mjs)
+// in the reader's language. Install keeps the index; the page names its sets
+// ('starter-sets'), and each set without a cached shard gets one random shard.
 // Each device keeps its own random shard; a missing pool never blocks install.
-async function cacheStarterPool(cache){
+async function cacheStarterIndex(cache){
   try{
-    const response=await fetch('/data/starter/index.json',{cache:'no-store'});if(!response.ok)return;
-    const index=await response.clone().json();await cache.put('/data/starter/index.json',response);
-    await Promise.all(Object.entries(index.sets||{}).filter(([,count])=>count>0).map(([set,count])=>cache.add(`/data/starter/${set}-${String(Math.floor(Math.random()*count)).padStart(3,'0')}.json`).catch(()=>{})));
+    const response=await fetch('/data/starter/index.json',{cache:'no-store'});if(!response.ok)return null;
+    const index=await response.clone().json();await cache.put('/data/starter/index.json',response);return index;
+  }catch{return null;}
+}
+async function cacheStarterSets(sets){
+  try{
+    const cache=await caches.open(CACHE);
+    const held=new Set((await cache.keys()).map(key=>new URL(key.url).pathname.match(/^\/data\/starter\/(.+)-\d{3}\.json$/)?.[1]).filter(Boolean));
+    const missing=sets.filter(set=>typeof set==='string'&&/^(wiki|how)-[a-z]{2,3}(-[1-5])?$/.test(set)&&!held.has(set)).slice(0,6);
+    if(!missing.length)return;
+    const index=await cacheStarterIndex(cache)||await cache.match('/data/starter/index.json').then(r=>r?.json()).catch(()=>null);
+    const wanted=missing.filter(set=>(index?.sets?.[set]|0)>0);
+    await Promise.all(wanted.map(set=>cache.add(`/data/starter/${set}-${String(Math.floor(Math.random()*index.sets[set])).padStart(3,'0')}.json`).catch(()=>{})));
   }catch{}
 }
+self.addEventListener('message',event=>{
+  if(event.data?.type==='starter-sets'&&Array.isArray(event.data.sets))event.waitUntil?.(cacheStarterSets(event.data.sets));
+});
 self.addEventListener('install',event=>{
-  event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(SHELL).then(()=>cacheStarterPool(cache))).then(()=>self.skipWaiting()));
+  event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(SHELL).then(()=>cacheStarterIndex(cache))).then(()=>self.skipWaiting()));
 });
 self.addEventListener('activate',event=>{
   event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k.startsWith('wikiscroll-')&&k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim()));

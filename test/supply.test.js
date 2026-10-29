@@ -17,7 +17,7 @@ function starterPool(path,onShard,sets=Object.fromEntries(Object.keys(SET_BASE).
   if(path==='/data/starter/index.json')return Response.json({v:1,sets});
   const [,set,shard]=path.match(/^\/data\/starter\/(.+)-(\d{3})\.json$/)||[];
   if(!set||!(sets[set]>Number(shard)))return new Response('',{status:404});
-  onShard();return Response.json(batch(30,SET_BASE[set]+Number(shard)*100,set==='how-en'?'how':'wiki'));
+  onShard();return Response.json(batch(30,(SET_BASE[set]??(set.startsWith('how-')?60000:Number(set.at(-1))*10000))+Number(shard)*100,set.startsWith('how-')?'how':'wiki'));
 }
 // The card library on cards.wikiscroll.com: `sets` maps each set to its shard count.
 // Other languages' libraries are in `languages`; one missing there is not built yet.
@@ -359,6 +359,17 @@ test('starter cards come from the reader’s own depth set and a random shard of
   const voyage=harness();voyage.run("curMode='how';");voyage.context.navigator.onLine=false;
   const f=voyage.run('startStartupFallback(fillGeneration)');await voyage.fire(0);await f;
   assert.match(voyage.starterPaths[0],/^\/data\/starter\/how-en-00[01]\.json$/);
+});
+test('other library languages draw their own starter sets, and travel follows the reader’s Wikivoyage language',async()=>{
+  const sets={'wiki-en-3':2,'how-en':2,'wiki-fr-3':2,'wiki-fr-4':2,'how-fr':2,'wiki-ko-3':2};
+  const run=async settings=>{const h=harness();h.context.fetch=path=>starterPool(path,()=>h.starterPaths.push(path),sets);h.run(settings);h.context.navigator.onLine=false;const f=h.run('startStartupFallback(fillGeneration)');await h.fire(0);await f;return h;};
+  assert.match((await run("curLang='fr';depthLevel=4;")).starterPaths[0],/^\/data\/starter\/wiki-fr-4-00[01]\.json$/);
+  assert.match((await run("curLang='fr';curMode='how';")).starterPaths[0],/^\/data\/starter\/how-fr-00[01]\.json$/);
+  assert.match((await run("curLang='ko';curMode='how';")).starterPaths[0],/^\/data\/starter\/how-en-00[01]\.json$/,'no Korean Wikivoyage: English guides, as online');
+  const thin=await run("curLang='fr';depthLevel=5;");
+  assert.deepEqual(thin.starterPaths,[],'offline, a missing depth never borrows another depth or language');
+  const unknown=await run("curLang='sv';depthLevel=3;");
+  assert.deepEqual(unknown.starterPaths,[],'a language without a library never gets English cards');
 });
 test('a depth without its own shards borrows Balanced cards only during an outage',async()=>{
   const sets={'wiki-en-3':1,'how-en':1};

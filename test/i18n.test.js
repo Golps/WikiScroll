@@ -109,3 +109,12 @@ test('the gesture coach is translated in every language',()=>{
  assert.ok(strings.length>=7,strings.join(' | '));
  for(const lang of Object.keys(w.WS_TRANSLATIONS))for(const text of strings)assert.notEqual(api.translate(text,lang),text,lang+': '+text);
 });
+
+test('the About card gestures are translated in every language',()=>{
+ const w=harness(),api=w.WSI18n;
+ const html=fs.readFileSync(new URL('../dist/index.html',import.meta.url),'utf8');
+ const strings=new Set();
+ for(const block of html.split('class="about-gestures"').slice(1))for(const m of block.slice(0,block.indexOf('sp-about-contact')).matchAll(/>([^<>]*\p{L}[^<>]*)</gu))strings.add(m[1].trim());
+ assert.deepEqual([...strings].sort(),['Ambient Mode','Long-press','Spacebar','Swipe left','Swipe right','to save','to skip']);
+ for(const lang of Object.keys(w.WS_TRANSLATIONS))for(const text of strings)assert.notEqual(api.translate(text,lang),text,lang+': '+text);
+});

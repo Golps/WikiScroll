@@ -42,3 +42,25 @@ body.light .ws-icon[data-ui-icon="dim-images"] { --ui-icon-color:#396f8a; }
   .sp-about-links .privacy-link-btn:hover,
   body.light .sp-about-links .privacy-link-btn:hover { color: var(--ink) !important; }
 }
+
+/* About card gesture guide: three equal, centred columns under a thin rule.
+   Each icon moves in its own direction while Settings is open. */
+.about-gestures { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 18px 0 16px; padding-top: 16px; border-top: 1px solid var(--rule); }
+/* Columns keep their physical order in right-to-left languages so the left swipe stays on the left. */
+.about-gestures { direction: ltr; }
+.rtl-ui .about-gesture p { direction: rtl; }
+.about-gesture { display: flex; flex-direction: column; align-items: center; gap: 10px; min-width: 0; text-align: center; }
+.about-gesture p { margin: 0; font: 400 12px/1.35 var(--sans); color: var(--muted); overflow-wrap: anywhere; }
+.about-gesture strong { display: block; font-size: 13px; font-weight: 600; color: var(--ink); }
+.ag-ico { width: 34px; height: 34px; overflow: visible; fill: none; stroke: var(--ink); stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+.ag-flip { transform: scaleX(-1); }
+.ag-track { stroke: var(--accent); stroke-width: 1.7; }
+:is(#settingsPanel.open, #burgerMenu.open) .about-gesture:is([data-gesture="left"], [data-gesture="right"]) .ag-move { animation: ag-swipe 2.6s .3s infinite cubic-bezier(.45, 0, .25, 1); }
+:is(#settingsPanel.open, #burgerMenu.open) .about-gesture:is([data-gesture="left"], [data-gesture="right"]) .ag-track { animation: ag-track 2.6s .3s infinite cubic-bezier(.45, 0, .25, 1); transform-origin: 12px -.8px; }
+:is(#settingsPanel.open, #burgerMenu.open) [data-gesture="space"] .ag-move { animation: ag-key 2.6s .3s infinite ease-in-out; transform-origin: 12px 12px; }
+:is(#settingsPanel.open, #burgerMenu.open) [data-gesture="press"] .ag-track { animation: ag-press 2.6s .3s infinite ease-out; transform-origin: 9.6px 4.6px; }
+@keyframes ag-swipe { 0%, 100% { transform: none; } 30%, 45% { transform: translateX(3.2px) rotate(6deg); } }
+@keyframes ag-track { 0%, 100% { transform: scaleX(.86); opacity: .55; } 30%, 45% { transform: scaleX(1.06); opacity: 1; } }
+@keyframes ag-key { 0%, 100% { transform: none; } 18%, 34% { transform: translateY(1.2px) scale(.97); } }
+@keyframes ag-press { 0% { transform: scale(.6); opacity: 0; } 25% { opacity: 1; } 60%, 100% { transform: scale(1.15); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .about-gesture .ag-move, .about-gesture .ag-track { animation: none !important; } }

@@ -34,7 +34,7 @@ import readline from 'node:readline';
 import {once} from 'node:events';
 import {randomDepths} from './build-starter.mjs';
 import {vitalTitles} from '../worker/vital.js';
-import {isDisambiguation, isPhrasebook, PHRASEBOOK_CATEGORY} from '../worker/travel.js';
+import {isDisambiguation, isPhrasebook, PHRASEBOOK_CATEGORY, fold, TRAVEL_TERMS, TRAVEL_STYLES} from '../worker/travel.js';
 import {imageURL} from '../worker/supply.js';
 import {voyagePhoto} from '../worker/voyage-images.js';
 import {guideReadable} from '../worker/extracts.js';
@@ -65,19 +65,24 @@ export const SLICE_CAP = 40_000, COMBO_CAP = 10_000;
 // A set below this many cards fails the build, so a bad week keeps last week's library.
 // English minima. Popular and Known follow the English lists through
 // interlanguage links, so most of them carry over; the random depths and
-// travel guides scale with each wiki's size.
+// travel guides scale with each wiki's size. Smaller wikis have few rarely read
+// articles once views are scaled (Chinese: about 4,500), so their floor for
+// that depth only rules out a misread.
 const EN_MINIMUM = {1: 500, 2: 3000, 3: 50000, 4: 50000, 5: 50000};
+const RARE_MINIMUM = 1000;
 export const MINIMUM_SCALE = {en: 1, de: 0.4, fr: 0.4, es: 0.3}, GUIDE_MINIMUM = {en: 10000, de: 5000, fr: 1500, es: 500};
-export const MINIMUM = Object.fromEntries([...DEPTHS.map(d => [`wiki-${LANG}-${d}`, Math.round(EN_MINIMUM[d] * (d <= 2 ? (LANG === 'en' ? 1 : 0.8) : MINIMUM_SCALE[LANG] ?? 0.1))]), [`how-${LANG}`, GUIDE_MINIMUM[LANG] ?? 100]]);
-// R2's free tier allows 1M writes and 10 GB a month. Two builds a week (English
-// and one other language) for five weeks must fit the writes, and one build
-// plus the next one during the swap must fit the storage, so a build over
-// either limit is refused before any upload. The workflow also checks the
-// whole bucket against its storage limit before each upload.
-export const MAX_FILES = 95_000, MAX_BYTES = 4.5e9;
+export const MINIMUM = Object.fromEntries([...DEPTHS.map(d => [`wiki-${LANG}-${d}`, d === 5 && !(LANG in MINIMUM_SCALE) ? RARE_MINIMUM : Math.round(EN_MINIMUM[d] * (d <= 2 ? (LANG === 'en' ? 1 : 0.8) : MINIMUM_SCALE[LANG] ?? 0.1))]), [`how-${LANG}`, GUIDE_MINIMUM[LANG] ?? 100]]);
+// R2's free tier allows 1M writes and 10 GB a month. One build plus the next
+// one during the swap must fit the storage, and no single build may take a
+// large share of the writes, so a build over either limit is refused before
+// any upload. The workflow also checks the whole bucket against its storage
+// limit and the month's writes against its write limit before each upload.
+export const MAX_FILES = LANG === 'en' ? 95_000 : 40_000, MAX_BYTES = 4.5e9;
 // The category walk reaches hundreds of thousands of categories; far fewer
 // means the tree was misread, so the build stops before reading articles.
-export const MIN_TOPIC_CATEGORIES = 5000;
+export const MIN_TOPIC_CATEGORIES = LANG === 'en' ? 5000 : 500;
+// Likewise for lead images in page_props; smaller wikis have far fewer pages.
+export const MIN_LEAD_IMAGES = LANG === 'en' ? 1e6 : 20_000;
 // Share of answered image links that may fail in the sample before a build is refused.
 export const MAX_BROKEN_IMAGES = 0.05;
 const UA = 'WikiScroll-card-library/1.0 (https://wikiscroll.com; contact@wikiscroll.com)';
@@ -172,17 +177,19 @@ const need = (columns, ...names) => { for (const name of names) if (!(name in co
 
 // Only four of page_props' many properties matter for a card.
 export async function readPageProps(lines) {
-  const props = {free: new Map(), any: new Map(), desc: new Map(), disambiguation: new Set()};
+  const props = emptyProps();
   await readTable(lines, (row, c) => {
     const page = row[c.pp_page], name = row[c.pp_propname], value = row[c.pp_value];
     if (name === 'page_image_free') props.free.set(page, value);
     else if (name === 'page_image') props.any.set(page, value);
     else if (name === 'wikibase-shortdesc') props.desc.set(page, value);
     else if (name === 'disambiguation') props.disambiguation.add(page);
+    // Wikivoyage's breadcrumb: the region or country a guide sits in.
+    else if (name === 'geocrumb-is-in' && /^\d+$/.test(String(value))) props.parent.set(page, Number(value));
   });
   return props;
 }
-export const emptyProps = () => ({free: new Map(), any: new Map(), desc: new Map(), disambiguation: new Set()});
+export const emptyProps = () => ({free: new Map(), any: new Map(), desc: new Map(), disambiguation: new Set(), parent: new Map()});
 
 // Category tree edges (child category page ID → parent title) and talk pages
 // in the photo-request category. Parent titles come from linktarget when the
@@ -357,7 +364,61 @@ export function voyageCard(pageid, doc, props) {
   const phrasebooks = PHRASEBOOK_CATEGORY[LANG] ? bare(PHRASEBOOK_CATEGORY[LANG]) : null;
   const page = {title: doc.title, categories: (Array.isArray(doc.category) ? doc.category : []).filter(c => c === phrasebooks)};
   if (isPhrasebook(page) || /^(?:travel topics?|itineraries)(?:[ :/]|$)/i.test(doc.title || '')) return null;
-  return libraryCard(pageid, doc, props, 'how', `${LANG}.wikivoyage.org`);
+  const card = libraryCard(pageid, doc, props, 'how', `${LANG}.wikivoyage.org`);
+  const styles = card ? guideStyles(card) : [];
+  return card && styles.length ? {...card, styles} : card;
+}
+
+// Trip styles a guide's title or introduction names, with the words the live
+// travel search uses (TRAVEL_TERMS), so the library can stand in for it.
+const STYLE_WORDS = TRAVEL_STYLES.map((style, i) => {
+  // Whole words, except in scripts written without spaces.
+  const words = (TRAVEL_TERMS[LANG] || TRAVEL_TERMS.en)[i].split(' OR ').map(word => fold(word).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+    .map(word => /[\u3040-\u30ff\u3400-\u9fff\uac00-\ud7af]/u.test(word) ? word : `(?<![\\p{L}\\p{N}])${word}(?![\\p{L}\\p{N}])`);
+  return [style, new RegExp(words.join('|'), 'u')];
+});
+export function guideStyles(card) {
+  const text = fold(card.title + ' ' + card.body);
+  return STYLE_WORDS.filter(([, words]) => words.test(text)).map(([style]) => style);
+}
+
+// The travel place index: the stand-in for travel search when it is down.
+// Every guide counts toward each place above it in Wikivoyage's breadcrumbs
+// (geocrumb-is-in), so "Japan" finds Kyoto through Kansai. Places are keyed by
+// their folded title (worker/travel.js fold), and also by the title without a
+// "(…)" qualifier when no other place has that name. The keys are spread over
+// hashed files so a lookup downloads one small file.
+export const PLACE_CAP = 300, PLACE_KEYS_PER_FILE = 150;
+export function placeHash(key, files) {
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < key.length; i++) hash = Math.imul(hash ^ key.charCodeAt(i), 0x01000193) >>> 0;
+  return hash % files;
+}
+export function placeIndex({titles, parents, cards}, random = Math.random) {
+  const members = new Map();
+  for (const [pageid, card] of cards) {
+    let id = pageid;
+    const seen = new Set();
+    for (let hop = 0; id && !seen.has(id) && hop < 12; hop++) {
+      seen.add(id);
+      if (titles.has(id)) { let list = members.get(id); if (!list) members.set(id, list = []); list.push(card); }
+      id = parents.get(id);
+    }
+  }
+  const keys = new Map(), base = new Map();
+  for (const [id, list] of members) {
+    const title = titles.get(id), key = fold(title);
+    // The place's own guide first, then a random sample of the guides inside it.
+    const own = list.filter(card => card === cards.get(id)), rest = list.filter(card => card !== cards.get(id));
+    for (let i = rest.length - 1; i > 0; i--) { const j = Math.floor(random() * (i + 1)); [rest[i], rest[j]] = [rest[j], rest[i]]; }
+    keys.set(key, {title, cards: [...own, ...rest].slice(0, PLACE_CAP), size: list.length});
+    const bare = fold(title.replace(/\s*\([^)]*\)$/, ''));
+    if (bare !== key && (!base.has(bare) || base.get(bare).size < list.length)) base.set(bare, keys.get(key));
+  }
+  for (const [key, entry] of base) if (!keys.has(key)) keys.set(key, entry);
+  const files = Math.max(1, Math.ceil(keys.size / PLACE_KEYS_PER_FILE)), out = Array.from({length: files}, () => ({}));
+  for (const [key, entry] of keys) out[placeHash(key, files)][key] = {title: entry.title, cards: entry.cards};
+  return {files: out, places: members.size, keys: keys.size};
 }
 // PageImages skips Wikivoyage's banners, so about a quarter of guides arrive
 // without a photo. Their own {{pagebanner}} file comes first, as on the live
@@ -467,20 +528,23 @@ export async function buildLibrary({lines, props, dailyTotal, levels, reach = ne
     if (sets.length) stats.cards++;
     for (const [set, variant] of sets) await buckets.add(set, variant);
   }
+  const voyageTitles = new Map(), guides = new Map();
   if (voyage) {
     read = cirrusReader();
     for await (const line of voyage.lines) {
       const entry = read(line);
+      if (entry?.doc.namespace === 0 && typeof entry.doc.title === 'string') voyageTitles.set(entry.pageid, entry.doc.title);
       const card = entry && voyageCard(entry.pageid, entry.doc, voyage.props);
       if (!card) continue;
       const filled = fillGuidePhoto(card, entry.doc, gaps);
       if (filled === 'banner') stats.guideBanners++; else if (filled === 'wikipedia') stats.guideWikipedia++; else if (!card.img) stats.guidesWithout++;
-      stats.guides++; await buckets.add(`how-${LANG}`, card);
+      stats.guides++; guides.set(entry.pageid, card); await buckets.add(`how-${LANG}`, card);
     }
   }
   await buckets.close();
   const report = SETS.map(set => `${set}: ${buckets.counts[set]}`).join(', ');
-  const short = Object.entries(MINIMUM).filter(([set, min]) => buckets.counts[set] < min).map(([set]) => `${set}: ${buckets.counts[set]}`);
+  // A language without Wikivoyage (Korean, Arabic, Hindi) reads English guides.
+  const short = Object.entries(MINIMUM).filter(([set]) => voyage || !set.startsWith('how-')).filter(([set, min]) => buckets.counts[set] < min).map(([set]) => `${set}: ${buckets.counts[set]}`);
   if (short.length) throw Error('Too few cards, keeping the current library. ' + short.join(', ') + '\nAll sets: ' + report);
   const sets = {}, root = path.join(outDir, build);
   let files = 0, bytes = 0;
@@ -488,8 +552,20 @@ export async function buildLibrary({lines, props, dailyTotal, levels, reach = ne
     const packed = await packSet(tmpDir, set, root, SHARD_SIZE, capFor(set));
     sets[set] = packed.count; files += packed.count; bytes += packed.bytes;
   }
+  let places = 0;
+  if (guides.size) {
+    const index = placeIndex({titles: voyageTitles, parents: voyage.props.parent, cards: guides});
+    await fsp.mkdir(path.join(root, 'places'), {recursive: true});
+    for (const [i, entries] of index.files.entries()) {
+      const body = zlib.gzipSync(JSON.stringify(entries) + '\n', {level: 9});
+      await fsp.writeFile(path.join(root, 'places', i + '.json'), body);
+      files++; bytes += body.length;
+    }
+    places = index.files.length;
+    stats.places = index.places; stats.placeKeys = index.keys;
+  }
   if (files > MAX_FILES || bytes > MAX_BYTES) throw Error(`Build too large for the free tier (${files} files, ${(bytes / 1e9).toFixed(2)} GB), keeping the current library.\nAll sets: ${report}`);
-  const manifest = {v: 1, build, builtAt: new Date().toISOString(), base: build + '/', shardSize: SHARD_SIZE, source, sets};
+  const manifest = {v: 1, build, builtAt: new Date().toISOString(), base: build + '/', shardSize: SHARD_SIZE, source, sets, ...(places ? {places} : {})};
   await fsp.writeFile(path.join(outDir, 'current.json'), zlib.gzipSync(JSON.stringify(manifest) + '\n'));
   return {manifest, ...stats, files, bytes, counts: buckets.counts};
 }
@@ -596,7 +672,7 @@ if (process.argv[1] && import.meta.url === new URL(process.argv[1], 'file:').hre
     // page_image holds only non-free lead images; free ones are page_image_free.
     const leadImages = props.free.size + props.any.size;
     log(`Page properties: ${props.free.size} free and ${props.any.size} other lead images, ${props.desc.size} descriptions, ${props.disambiguation.size} disambiguation pages`);
-    if (leadImages < 1e6) throw Error(`Only ${leadImages} lead images in page_props: the table was misread, keeping the current library.`);
+    if (leadImages < MIN_LEAD_IMAGES) throw Error(`Only ${leadImages} lead images in page_props: the table was misread, keeping the current library.`);
     log('Reading the category tree');
     const targets = option('linktarget') ? await readLinkTargets(sqlLines(option('linktarget'))) : null;
     const links = await readCategoryLinks(sqlLines(option('categorylinks')), targets);
@@ -632,6 +708,7 @@ if (process.argv[1] && import.meta.url === new URL(process.argv[1], 'file:').hre
     const per = test => SETS.filter(test).reduce((sum, s) => sum + result.manifest.sets[s], 0), starts = prefix => s => s.startsWith(prefix);
     console.log(`Card library ${LANG} ${build}: ${result.pages} pages read, ${result.cards} articles in at least one set (${result.unknown} without readership), ${result.guides} travel guides (photos added from ${result.guideBanners} banners and ${result.guideWikipedia} Wikipedia articles; ${result.guidesWithout} still without one).`);
     console.log(`${result.files} shards, ${(result.bytes / 1e9).toFixed(2)} GB: depth sets ${per(starts('wiki-'))}, topic sets ${per(s => s.startsWith('topic-') && !s.includes('-help-'))}, topic Help sets ${per(s => s.includes('-help-'))}, Help sets ${per(starts('help-'))}, travel ${per(starts('how-'))} shards.`);
+    if (result.places) console.log(`Travel place index: ${result.places} places (${result.placeKeys} names) in ${result.manifest.places} files.`);
     console.log('Cards per set: ' + SETS.map(set => `${set} ${result.counts[set]}`).join(', ') + `. Average daily views used: ${Math.round(dailyTotal)}.`);
     console.log(`Image check: ${images.ok} of ${images.checked} sampled images loaded (status counts ${JSON.stringify(images.statuses)}).` + (images.broken.length ? ' Broken: ' + images.broken.join(', ') : ''));
     // Rate-limited or unreachable checks prove nothing either way; links that

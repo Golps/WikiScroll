@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
+import {placeIndex} from '../scripts/build-library.mjs';
 
 const source = fs.readFileSync(new URL('../public/app.js', import.meta.url), 'utf8');
 const supply = source.slice(source.indexOf('// ── PREFETCH QUEUE'), source.indexOf('// ── FEED GEOMETRY'));
@@ -20,17 +21,19 @@ function starterPool(path,onShard,sets=Object.fromEntries(Object.keys(SET_BASE).
 }
 // The card library on cards.wikiscroll.com: `sets` maps each set to its shard count.
 // Other languages' libraries are in `languages`; one missing there is not built yet.
-function cardLibrary(url,sets,log,languages={}){
+function cardLibrary(url,sets,log,languages={},places=null){
   const lang=url.match(/^https:\/\/cards\.wikiscroll\.com\/v1\/([a-z]+)\//)?.[1];
   if(lang!=='en')sets=languages[lang];
-  if(url===`https://cards.wikiscroll.com/v1/${lang}/current.json`)return sets?Response.json({v:1,build:'20261025',base:'20261025/',sets}):new Response('',{status:lang==='en'?503:404});
+  if(url===`https://cards.wikiscroll.com/v1/${lang}/current.json`)return sets?Response.json({v:1,build:'20261025',base:'20261025/',sets,...(places?{places:places.length}:{})}):new Response('',{status:lang==='en'?503:404});
+  const file=url.match(/\/20261025\/places\/(\d+)\.json$/)?.[1];
+  if(file!==undefined){log.push('places/'+file);return places?.[file]?Response.json(places[file]):new Response('',{status:404});}
   const [,set,shard]=url.match(/^https:\/\/cards\.wikiscroll\.com\/v1\/[a-z]+\/20261025\/(.+)\/(\d+)\.json$/)||[];
   if(!set||!(sets?.[set]>Number(shard)))return new Response('',{status:404});
   log.push((lang==='en'?'':lang+':')+set+'/'+shard);
   const how=set.startsWith('how-'),base=10000*(1+Object.keys(sets).indexOf(set))+Number(shard)*100;
   return Response.json(batch(100,base,how?'how':'wiki').map(a=>set.includes('help')?{...a,needs:['citations']}:a));
 }
-function harness({librarySets=undefined,languages={}}={}) {
+function harness({librarySets=undefined,languages={},places=null}={}) {
   const storage = new Map(), timers = new Map(), requests = [];
   const nodes = [], feed = {querySelectorAll:() => nodes, addEventListener() {}};
   let timerId=0, selectedIndex=0, directCalls=0, starterRequests=0;const starterPaths=[],shards=[];
@@ -49,7 +52,7 @@ function harness({librarySets=undefined,languages={}}={}) {
     lsSet:(key,value)=>storage.set(key,JSON.stringify(value)),
     getCurrentFeedCard:()=>nodes[selectedIndex]||null,
     renderCard:a=>nodes.push({dataset:{id:a.id}}),
-    fetch:async path=>path.startsWith('https://')?cardLibrary(path,librarySets,shards,languages):starterPool(path,()=>{starterRequests++;starterPaths.push(path);}),
+    fetch:async path=>path.startsWith('https://')?cardLibrary(path,librarySets,shards,languages,places):starterPool(path,()=>{starterRequests++;starterPaths.push(path);}),
     workerRequest:()=>new Promise(resolve=>requests.push(resolve)),
     directRequest:async()=>{directCalls++;return [];},
   });
@@ -423,7 +426,7 @@ test('the Worker serves when the library is unreachable or lacks the language', 
   let h=harness({librarySets:null});
   let filling=h.run('fillQueue()');await settle();
   assert.equal(h.requests.length,1,'manifest failure falls back');h.requests[0]([]);await filling;
-  h=harness({librarySets:LIBRARY_SETS});h.change("curLang='it';");
+  h=harness({librarySets:LIBRARY_SETS});h.change("curLang='xx';");
   filling=h.run('fillQueue()');assert.equal(h.requests.length,1);assert.equal(h.shards.length,0);h.requests[0]([]);await filling;
   // A library language whose first build isn't uploaded yet waits a while before asking again.
   h=harness({librarySets:LIBRARY_SETS});h.change("curLang='fr';");
@@ -439,4 +442,38 @@ test('each library language draws from its own build', async () => {
   assert.ok(h.shards.length>0&&h.shards.every(s=>s.startsWith('de:wiki-de-')),h.shards.join());
   assert.equal(h.requests.length,0);assert.equal(h.directCalls,0);
   assert.equal(h.run("libraryFor('en').drawn.size"),0,'English draws are kept apart');
+});
+
+// ── Travel place index ───────────────────────────────────────────────────────
+const guide=(id,title,styles=[])=>({...article(id,'how'),title,...(styles.length?{styles}:{})});
+const PLACES=placeIndex({
+  titles:new Map([[1,'Japan'],[2,'Kyoto'],[3,'Osaka'],[4,'Tuscany'],[5,'Florence']]),
+  parents:new Map([[2,1],[3,1],[5,4]]),
+  cards:new Map([[2,guide(2,'Kyoto',['culture'])],[3,guide(3,'Osaka',['city'])],[5,guide(5,'Florence',['culture'])]]),
+},()=>0).files;
+
+test('the place index stands in for travel search, alternating between places', async () => {
+  const h=harness({librarySets:LIBRARY_SETS,places:PLACES});
+  h.change("curMode='how';travelFilters={place:'Japan or Tuscany',style:''};");
+  const cards=await h.run('fetchLibraryTravel(fillGeneration)');
+  assert.deepEqual([...cards].map(a=>a.title),['Osaka','Florence','Kyoto']);
+  assert.equal(h.run('travelExhausted'),true,'every guide of these places is served');
+  assert.equal(h.requests.length,0);assert.equal(h.directCalls,0);
+});
+
+test('a trip style narrows the stand-in to guides tagged with it', async () => {
+  const h=harness({librarySets:LIBRARY_SETS,places:PLACES});
+  h.change("curMode='how';travelFilters={place:'japan',style:'culture'};");
+  assert.deepEqual([...await h.run('fetchLibraryTravel(fillGeneration)')].map(a=>a.title),['Kyoto']);
+});
+
+test('a place the index does not know leaves travel to the live search', async () => {
+  const h=harness({librarySets:LIBRARY_SETS,places:PLACES});
+  h.change("curMode='how';travelFilters={place:'Atlantis',style:''};");
+  assert.equal(await h.run('fetchLibraryTravel(fillGeneration)'),null);
+  assert.equal(h.run('libraryTravel.key'),'','the next refill tries the live search again');
+  // An older library without a place index cannot stand in either.
+  const old=harness({librarySets:LIBRARY_SETS});
+  old.change("curMode='how';travelFilters={place:'Japan',style:''};");
+  assert.equal(await old.run('fetchLibraryTravel(fillGeneration)'),null);
 });

@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import zlib from 'node:zlib';
 import crypto from 'node:crypto';
-import {readLocalFiles,MIN_LOCAL_FILES,thumbURL,sqlRows,readTable,readPageProps,readLinkTargets,readCategoryLinks,readPages,topicCategories,cirrusReader,libraryCard,voyageCard,cardNeeds,cardSets,dailyViews,vitalLevels,buildLibrary,averageDailyViews,emptyProps,shorten,SETS,TOPICS,HELP,SHARD_SIZE,MINIMUM,MAX_FILES,MAX_BYTES,SLICE_CAP,BODY_CHARS,translateTitles,localRoots} from '../scripts/build-library.mjs';
+import {readLocalFiles,MIN_LOCAL_FILES,thumbURL,sqlRows,readTable,readPageProps,readLinkTargets,readCategoryLinks,readPages,topicCategories,cirrusReader,libraryCard,voyageCard,cardNeeds,cardSets,dailyViews,vitalLevels,buildLibrary,averageDailyViews,emptyProps,shorten,SETS,TOPICS,HELP,SHARD_SIZE,MINIMUM,MAX_FILES,MAX_BYTES,SLICE_CAP,BODY_CHARS,translateTitles,localRoots,placeIndex,placeHash,guideStyles,PLACE_CAP} from '../scripts/build-library.mjs';
 import {roots,bands} from '../worker/topics.js';
 import {availableHelpTypes} from '../worker/needs.js';
 
@@ -222,4 +222,31 @@ test('topic roots become the linked local categories', async () => {
   const local = await localRoots('de', fetchJSON);
   assert.deepEqual(Object.keys(local), Object.keys(roots));
   for (const list of Object.values(local)) for (const root of list) assert.match(root, /^[^:]+ \(de\)$/, 'namespace dropped');
+});
+
+test('the place index files each guide under every place above it', () => {
+  const card = (id, title) => ({id: 'v' + id, src: 'how', title, body: 'x'});
+  const titles = new Map([[1, 'Japan'], [2, 'Kansai'], [3, 'Kyoto'], [4, 'Georgia (country)'], [5, 'Tbilisi']]);
+  const parents = new Map([[2, 1], [3, 2], [5, 4]]);
+  const cards = new Map([[2, card(2, 'Kansai')], [3, card(3, 'Kyoto')], [5, card(5, 'Tbilisi')]]);
+  const {files, places, keys} = placeIndex({titles, parents, cards}, () => 0);
+  const all = Object.assign({}, ...files), find = key => files[placeHash(key, files.length)][key];
+  assert.deepEqual(find('japan').cards.map(c => c.title).sort(), ['Kansai', 'Kyoto'], 'a region page without its own card still lists its guides');
+  assert.equal(find('kansai').cards[0].title, 'Kansai', 'the place itself comes first');
+  assert.deepEqual(find('georgia').cards.map(c => c.title), ['Tbilisi'], 'the name without its qualifier');
+  assert.equal(find('georgia (country)').title, 'Georgia (country)');
+  assert.equal(places, 5);assert.equal(keys, Object.keys(all).length);
+  const many = new Map(Array.from({length: PLACE_CAP + 50}, (_, i) => [100 + i, card(100 + i, 'Town ' + i)]));
+  const big = placeIndex({titles: new Map([[1, 'Japan'], ...[...many.keys()].map(id => [id, 'Town ' + id])]), parents: new Map([...many.keys()].map(id => [id, 1])), cards: many});
+  assert.equal(big.files[placeHash('japan', big.files.length)].japan.cards.length, PLACE_CAP);
+});
+
+test('guides carry the trip styles their introduction names', () => {
+  assert.deepEqual(guideStyles({title: 'Lake Example', body: 'A national park with hiking trails and a museum.'}), ['nature', 'culture']);
+  assert.deepEqual(guideStyles({title: 'Example', body: 'Parking is scarce.'}), [], 'whole words only');
+});
+
+test('Wikivoyage breadcrumbs are read from page properties', async () => {
+  const props = await readPageProps(table('page_props', ['pp_page', 'pp_propname', 'pp_value', 'pp_sortkey'], [[5, 'geocrumb-is-in', '4', null], [6, 'geocrumb-is-in', '', null]]));
+  assert.deepEqual([...props.parent], [[5, 4]]);
 });

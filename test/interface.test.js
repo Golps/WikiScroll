@@ -218,7 +218,7 @@ test('filtered travel sends the place as typed, skips empty pages and keeps the 
   const requests = [];
   const pages = [{articles: [], next: 30}, {articles: [], next: 60}, {articles: [{id: 'v1'}, {id: 'v2'}], next: null, suggestion: 'Japan'}];
   const c = vm.createContext({HELP_TYPE_IDS,helpTypes:[...HELP_TYPE_IDS],
-    workerCooldownUntil:0,feedSeen:new Set(),supplyControllers:new Set(),AbortController,Date,setTimeout:(fn,ms)=>ms===800?fn():1,clearTimeout(){},retryAfterMillis:()=>5000,
+    workerCooldownUntil:0,libraryTravel:{key:''},fetchLibraryTravel:async()=>null,feedSeen:new Set(),supplyControllers:new Set(),AbortController,Date,setTimeout:(fn,ms)=>ms===800?fn():1,clearTimeout(){},retryAfterMillis:()=>5000,
     fillGeneration: 1, travelFilters: {place: 'Japan, Tuscany', style: 'coast'}, travelOffset: 0, travelExhausted: false, travelSuggestion: '',
     articles: [{id: 'v2'}], queue: [], voyageLang: () => 'en', URLSearchParams, AbortSignal: {timeout: () => undefined},
     fetch: async url => { requests.push(new URL(url, 'https://wikiscroll.com').searchParams); return {ok: true, json: async () => pages.shift()}; },
@@ -238,7 +238,7 @@ test('an incomplete travel page is asked for again before the search moves on or
   // Last page: two guides' text was late twice, then everything arrives.
   const pages = [{articles: [{id: 'v1'}], next: null, retry: 0}, {articles: [{id: 'v1'}], next: null, retry: 0}, {articles: [{id: 'v1'}, {id: 'v2'}, {id: 'v3'}], next: null}];
   const c = vm.createContext({HELP_TYPE_IDS,helpTypes:[...HELP_TYPE_IDS],
-    workerCooldownUntil:0,feedSeen:new Set(),supplyControllers:new Set(),AbortController,Date,setTimeout:(fn,ms)=>ms===800?fn():1,clearTimeout(){},retryAfterMillis:()=>5000,
+    workerCooldownUntil:0,libraryTravel:{key:''},fetchLibraryTravel:async()=>null,feedSeen:new Set(),supplyControllers:new Set(),AbortController,Date,setTimeout:(fn,ms)=>ms===800?fn():1,clearTimeout(){},retryAfterMillis:()=>5000,
     fillGeneration: 1, travelFilters: {place: 'Elba', style: ''}, travelOffset: 0, travelExhausted: false, travelSuggestion: '', travelRetries: 0,
     articles: [], queue: [], voyageLang: () => 'en', URLSearchParams, AbortSignal: {timeout: () => undefined},
     fetch: async url => { requests.push(new URL(url, 'https://wikiscroll.com').searchParams.get('offset')); return {ok: true, json: async () => pages.shift()}; },
@@ -316,7 +316,7 @@ test('search snippets start from the page description, not the About dialog', ()
 
 test('travel skips previously seen guides after their DOM cards have been pruned',async()=>{
  const features=read('features.js'),pages=[{articles:[{id:'v1'}],next:30},{articles:[{id:'v2'}],next:null}],requests=[];
- const c=vm.createContext({HELP_TYPE_IDS,helpTypes:[...HELP_TYPE_IDS],workerCooldownUntil:0,feedSeen:new Set(['v1']),supplyControllers:new Set(),AbortController,Date,setTimeout:()=>1,clearTimeout(){},fillGeneration:0,travelFilters:{place:'Japan'},travelOffset:0,travelExhausted:false,travelRetries:0,articles:[],queue:[],voyageLang:()=> 'en',URLSearchParams,fetch:async url=>{requests.push(url);return {ok:true,json:async()=>pages.shift()};}});
+ const c=vm.createContext({HELP_TYPE_IDS,helpTypes:[...HELP_TYPE_IDS],workerCooldownUntil:0,libraryTravel:{key:''},fetchLibraryTravel:async()=>null,feedSeen:new Set(['v1']),supplyControllers:new Set(),AbortController,Date,setTimeout:()=>1,clearTimeout(){},fillGeneration:0,travelFilters:{place:'Japan'},travelOffset:0,travelExhausted:false,travelRetries:0,articles:[],queue:[],voyageLang:()=> 'en',URLSearchParams,fetch:async url=>{requests.push(url);return {ok:true,json:async()=>pages.shift()};}});
  vm.runInContext(slice(features,'async function fetchFilteredTravel(','// When a travel filter runs out'),c);
  assert.deepEqual((await c.fetchFilteredTravel()).map(a=>a.id),['v2']);assert.equal(requests.length,2);assert.equal(c.travelExhausted,true);
 });
@@ -330,4 +330,15 @@ test('activating either source returns focus to the feed, including reselecting 
  node('wBtn').click();assert.equal(focused,'feed');assert.equal(c.curMode,'wiki');assert.equal(resets,1);
  focused='hBtn';node('hBtn').click();assert.equal(focused,'feed');assert.equal(c.curMode,'how');assert.equal(resets,2);
  focused='hBtn';node('hBtn').click();assert.equal(focused,'feed');assert.equal(resets,2,'reselecting the source restores navigation without fetching again');
+});
+
+test('a failed travel search falls back to the card library and stays there for this filter', async () => {
+ const features=read('features.js');let live=0,stand=0;
+ const c=vm.createContext({HELP_TYPE_IDS,helpTypes:[...HELP_TYPE_IDS],workerCooldownUntil:0,libraryTravel:{key:''},feedSeen:new Set(),supplyControllers:new Set(),AbortController,Date,setTimeout:()=>1,clearTimeout(){},fillGeneration:0,travelFilters:{place:'Japan'},travelOffset:0,travelExhausted:false,travelRetries:0,articles:[],queue:[],voyageLang:()=>'en',URLSearchParams,workerSourceKey:()=>'how|en',noteWorkerCooldown:async()=>{},
+  fetchLibraryTravel:async()=>{stand++;c.libraryTravel.key='k';return [{id:'v9'}];},
+  fetch:async()=>{live++;return {ok:false,status:503};}});
+ vm.runInContext(slice(features,'// When the live search can','// When a travel filter runs out'),c);
+ assert.deepEqual((await c.fetchFilteredTravel()).map(a=>a.id),['v9']);
+ await c.fetchFilteredTravel();
+ assert.equal(live,1,'the live search is not asked again for this filter');assert.equal(stand,2);
 });

@@ -4,6 +4,7 @@ Releases of this repository. Each entry describes what changed in the code; [doc
 
 ## Unreleased
 
+- Add a travel place index to the card library: each Wikivoyage place lists the guides inside it, with trip-style tags, and stands in for travel search when it fails.
 - Reword the Mature topics setting to "Show articles on adult and sensitive subjects."
 - Build card libraries for German, French and Spanish alongside English: one builder for every language, English weekly and the others in turn, each in its own job, with a 9 GB storage guard before any upload. The reader draws from each language's own library and falls back to the Worker for a language whose library isn't up yet. The "You're all caught up" card is translated.
 - Sample the bundled starter pool from the card library instead of hundreds of live API calls; the API remains the fallback when the library can't be read.

@@ -21,21 +21,25 @@ function renderCollectionShare(){
  const preview=document.createElement('a');preview.textContent='Preview collection';preview.href='/collection?c='+encoded;preview.target='_blank';preview.rel='noopener';preview.className='collection-preview';
  box.append(note,button);if(!button.disabled)box.append(preview);
 }
+// When the live search can't answer, the card library's place index stands
+// in (fetchLibraryTravel in app.js) and keeps serving this filter.
+const travelFromLibrary=async generation=>(await fetchLibraryTravel(generation))||[];
 async function fetchFilteredTravel(){
  const generation=fillGeneration,lang=voyageLang();
+ if(libraryTravel.key)return travelFromLibrary(generation);
  // The Worker reads the place as typed: "Japan, Tuscany" means either place.
  const params=()=>new URLSearchParams({lang,place:String(travelFilters.place||'').trim().slice(0,80),style:travelFilters.style||'',offset:String(travelOffset)});
  // A page of results can hold no guides about the place while later pages do,
  // so look a little further before leaving it to the next refill.
  for(let page=0;page<3&&!travelExhausted&&generation===fillGeneration;page++){
-  if(Date.now()<workerCooldownUntil)return [];
+  if(Date.now()<workerCooldownUntil)return travelFromLibrary(generation);
   const controller=new AbortController();supplyControllers.add(controller);
   const timer=setTimeout(()=>controller.abort(),10000);
   let data;try{const response=await fetch('/api/travel?'+params(),{signal:controller.signal,cache:'no-store'});
    if(generation!==fillGeneration)return [];
-   if(!response.ok){if(response.status===429||response.status===503)await noteWorkerCooldown(response,generation,workerSourceKey('how',lang));return [];}
+   if(!response.ok){if(response.status===429||response.status===503)await noteWorkerCooldown(response,generation,workerSourceKey('how',lang));if(response.status>=500||response.status===429)return travelFromLibrary(generation);return [];}
    data=await response.json();
-  }catch{return [];}finally{clearTimeout(timer);supplyControllers.delete(controller);}
+  }catch{if(generation!==fillGeneration)return [];return travelFromLibrary(generation);}finally{clearTimeout(timer);supplyControllers.delete(controller);}
   if(generation!==fillGeneration||!data)return [];
   // An incomplete page (some guides' text was late, or more guides need their
   // opening text than one answer may read: 8, worker/extracts.js) is asked for

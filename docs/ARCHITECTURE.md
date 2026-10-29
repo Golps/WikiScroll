@@ -9,7 +9,7 @@ WikiScroll has two parts, deployed together as a single Cloudflare Worker with s
 1. **An Astro-built static front end** (`src/` + `public/` → `dist/`). Astro components generate HTML at build time; ordered CSS modules are bundled into one content-hashed stylesheet and classic browser scripts are copied as static files. No Astro client router, hydration runtime or server adapter is added. The existing Worker continues to own APIs and request handling. The browser holds all user data (saved articles, collections, history, settings) in `localStorage`, with IndexedDB as a second copy of saved articles.
 2. **A Worker** (`worker/`). It answers a few JSON endpoints that turn Wikimedia's APIs into ready-to-read cards. It verifies metadata for shared links and collections, and serves prebuilt preview artwork. It has no database: its only state is Cloudflare's edge cache, in-memory maps for coalescing requests, and rate-limit bindings.
 
-English feeds read first from a third, static part: the prebuilt card library in R2 at `cards.wikiscroll.com`, which the browser downloads directly (rebuilt weekly from Wikimedia's dumps). The Worker path below is its fallback, and serves the other languages. See [CARD-LIBRARY.md](CARD-LIBRARY.md).
+Feeds in all 15 languages read first from a third, static part: the prebuilt card library in R2 at `cards.wikiscroll.com`, which the browser downloads directly (rebuilt from Wikimedia's weekly dumps: English every week, the other languages in rotation about every three weeks). The Worker path below is its fallback, and also serves live travel search and "On this day". See [CARD-LIBRARY.md](CARD-LIBRARY.md).
 
 The diagram below shows ordinary preloading. Online Wikipedia and unfiltered Wikivoyage openings include a per-draw random key and bypass completed shared batches; they reuse source metadata and coalesce retries of that exact draw. Topic and Help openings follow the same rule. Offline openings use an exact-settings local reserve or eligible starter content.
 
@@ -80,7 +80,7 @@ The browser asks the Worker for batches and keeps a reserve queued ahead of the 
 | Path | Purpose |
 |---|---|
 | `test/` | `node --test` suites for the Worker modules, plus browser logic extracted from `public/*.js` and run in `node:vm` sandboxes. |
-| `scripts/` | `deploy.sh` (token-scoped deployment), `build.mjs` + `astro-offline.mjs` (static build and offline stylesheet integration), `build-branding.mjs` (regenerates icons and renders the outlined share image), `build-starter.mjs` (the bundled starter pool), `build-library.mjs` (the prebuilt English card library in R2; see [CARD-LIBRARY.md](CARD-LIBRARY.md)). |
+| `scripts/` | `deploy.sh` (token-scoped deployment), `build.mjs` + `astro-offline.mjs` (static build and offline stylesheet integration), `build-branding.mjs` (regenerates icons and renders the outlined share image), `build-starter.mjs` (the bundled starter pool), `build-library.mjs` (the prebuilt card libraries for all 15 languages in R2; see [CARD-LIBRARY.md](CARD-LIBRARY.md)). |
 | `branding/` | Logo sources and the approved raster social artwork. |
 | `wrangler.jsonc` | Worker configuration: static assets, rate-limit bindings and observability. |
 | `docs/` | This documentation and the images used in the README. |

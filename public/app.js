@@ -1634,15 +1634,9 @@ document.getElementById('likedList').addEventListener('click', ev => {
   else if (btn.dataset.collect) openCollectionChooser(btn.dataset.collect);
   else if (btn.dataset.unlike)   removeLike(btn.dataset.unlike);
   else if (btn.dataset.uncollect) removeFromCollection(activeCollection, btn.dataset.uncollect);
-  else if (btn.dataset.shareUrl) doShare(savedArticle(btn.dataset.shareId) || {url: btn.dataset.shareUrl, title: btn.dataset.shareTitle, id: btn.dataset.shareId});
+  else if (btn.dataset.shareUrl) doShare({url: btn.dataset.shareUrl, title: btn.dataset.shareTitle, id: btn.dataset.shareId});
   if (btn.id === 'deleteCollBtn' && activeCollection !== null) deleteCollection(activeCollection);
   if (btn.id === 'undoDeleteBtn') undoDeleteCollection();
-});
-// Start the share image on press so it is usually ready by the click.
-function savedArticle(id) { return [...liked.values()].find(x => x.id === id); }
-document.getElementById('likedList').addEventListener('pointerdown', ev => {
-  const id = ev.target.closest('[data-share-id]')?.dataset.shareId, a = id && savedArticle(id);
-  if (a) window.WSShareCard?.prepare(a);
 });
 document.getElementById('collTabs').addEventListener('click', ev => {
   const tab = ev.target.closest('.coll-tab'); if (!tab) return;
@@ -1672,15 +1666,9 @@ function deepLinkUrl(a) {
 async function doShare(a) {
   // Share the Worker deep link so messaging apps can render its article preview.
   const shareUrl = a.id ? deepLinkUrl(a) : (a.url || 'https://wikiscroll.com');
-  // With the branded image when it is already drawn: waiting for it would
-  // outlast the tap that browsers require before opening the share sheet.
-  const card = a.id ? window.WSShareCard?.ready(a) : null;
-  if (a.id && a.title) window.WSShareCard?.prepare(a);
+  // The link alone: messaging apps then show its preview with the article
+  // photo, which reads better than a separate attached image.
   if (navigator.share) {
-    if (card && navigator.canShare?.({files:[card]})) {
-      try { await navigator.share({files:[card], url:shareUrl}); return; }
-      catch (error) { if (error?.name === 'AbortError') return; }
-    }
     try { await navigator.share({url:shareUrl}); return; }
     catch (error) { if (error?.name === 'AbortError') return; }
   }
@@ -2180,19 +2168,29 @@ document.getElementById('ambientClose').addEventListener('click', closeAmbient);
 //          per-move curCard() forced full layout every event — that was the
 //          stutter under the finger).
 //
-//   FLIGHT One physics loop drives the card's X AND the feed's scroll Y with
-//          the same easing clock — the next card rises into place while the
-//          old one flies out. No black gap, because the vertical advance is
-//          part of the same motion, not an afterthought. The loop starts from
-//          your exact drag position/rotation and its ease-out launches faster
-//          than finger speed (the Tinder "accelerate away" release feel).
-//          Landing is exact (scrollTop === next card's offset), so re-enabling
-//          scroll-snap never causes a correction jump.
+//   FLIGHT The outgoing card's X and the next card's rise share one easing
+//          curve — the next card rises into place while the old one flies
+//          out, so there is no black gap. Both run as Web Animations on
+//          transforms only, which the compositor plays at the display's full
+//          rate (120 Hz on ProMotion iPhones, where requestAnimationFrame is
+//          held to 60). The feed's scrollTop stays put until landing, then
+//          moves to the next card's exact offset in the same frame the
+//          animations are removed, so re-enabling scroll-snap never causes a
+//          correction jump. The flight starts from your exact drag position
+//          and its ease-out launches faster than finger speed.
 (function() {
   const feed = document.getElementById('feed');
   const HAS_TOUCH = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
   const reducedMotion = window.matchMedia ? matchMedia('(prefers-reduced-motion: reduce)') : null;
-  let flyLock = false, flightRaf = 0, flightCard = null;
+  let flyLock = false, flightRaf = 0, flightCard = null, flightNext = null, flightAnims = [];
+  const EASE_OUT = 'cubic-bezier(.33,1,.68,1)'; // easeOutCubic
+  const animate = (el, frames, options) => typeof el?.animate === 'function' ? el.animate(frames, options) : null;
+  function stopFlightAnims() {
+    for (const anim of flightAnims) anim.cancel();
+    flightAnims = [];
+    if (flightNext) flightNext.style.contentVisibility = '';
+    flightNext = null;
+  }
 
   // Release velocity — last 5 pointer samples (captures throw speed, not drag average)
   let velSamples = [];
@@ -2242,15 +2240,16 @@ document.getElementById('ambientClose').addEventListener('click', closeAmbient);
     if (Math.abs(feed.scrollTop - d.cardTop) > feed.clientHeight * 0.5) {
       const c = d.card; dragEndInternal();
       springBack(c);
-      return;
     }
-    const rot = Math.max(-16, Math.min(16, d.dx * 0.035));
-    d.card.style.transform = `translate3d(${d.dx}px,0,0) rotate(${rot}deg)`;
-    setIndicators(d.card, d.dx);
   }
+  // The card follows each touch event as it arrives (a transform write never
+  // forces layout), so the drag isn't held to requestAnimationFrame's rate.
   function dragMove(dx) {
     if (!d || !d.live) return;
     d.dx = dx;
+    const rot = Math.max(-16, Math.min(16, dx * 0.035));
+    d.card.style.transform = `translate3d(${dx}px,0,0) rotate(${rot}deg)`;
+    setIndicators(d.card, dx);
     if (!d.raf) d.raf = requestAnimationFrame(dragFrame);
   }
   function dragEndInternal() {
@@ -2279,6 +2278,7 @@ document.getElementById('ambientClose').addEventListener('click', closeAmbient);
     card.style.scrollSnapAlign = '';
     card.style.pointerEvents = '';
     card.style.willChange = '';
+    card.style.zIndex = '';
     for (const cls of ['like-ind', 'skip-ind']) {
       const indicator = ind(card, cls);
       if (indicator) { indicator.style.opacity = '0'; indicator.style.transform = ''; }
@@ -2298,6 +2298,7 @@ document.getElementById('ambientClose').addEventListener('click', closeAmbient);
   }
   function cancelMotion() {
     if (flightRaf) cancelAnimationFrame(flightRaf);
+    stopFlightAnims();
     restoreCard(flightCard);
     if (d) restoreCard(d.card);
     dragEndInternal();
@@ -2407,42 +2408,49 @@ document.getElementById('ambientClose').addEventListener('click', closeAmbient);
     }
 
     card.style.transition = 'none';
-    card.style.willChange = 'transform';
+    card.style.zIndex = '2'; // the outgoing card flies over the incoming one
     feed.style.scrollSnapType = 'none';
     feed.style.webkitScrollSnapType = 'none';
     feed.style.overflowY = 'hidden';
+    // The next card starts just off screen; render it before it rises.
+    nextCard.style.contentVisibility = 'visible';
+    flightNext = nextCard;
 
-    const t0 = performance.now();
-    const holdMs = hold * 1000, durMs = dur * 1000;
+    const holdMs = hold * 1000, durMs = dur * 1000, total = holdMs + durMs;
+    const rise = endScroll - startScroll;
     const stampRot = dir > 0 ? -16 : 16;
+    const tilt = x => Math.max(-16, Math.min(16, x * 0.035)).toFixed(2);
+    const at = (x, y) => `translate3d(${x}px,${y}px,0) rotate(${tilt(x)}deg)`;
+    const timing = {duration: total, fill: 'forwards'};
+    // Phase 1 (hold) — the stamp moment: the card winds up while the stamp pops in.
+    // Phase 2 — the flight: card X and the next card's rise on one curve.
+    const fly = hold
+      ? [{transform: at(startX, 0), easing: EASE_OUT}, {transform: at(windX, 0), offset: holdMs / total, easing: EASE_OUT}, {transform: at(endX, -rise)}]
+      : [{transform: at(startX, 0), easing: EASE_OUT}, {transform: at(endX, -rise)}];
+    const lift = hold
+      ? [{transform: 'translate3d(0,0,0)'}, {transform: 'translate3d(0,0,0)', offset: holdMs / total, easing: EASE_OUT}, {transform: `translate3d(0,${-rise}px,0)`}]
+      : [{transform: 'translate3d(0,0,0)', easing: EASE_OUT}, {transform: `translate3d(0,${-rise}px,0)`}];
+    flightAnims = [animate(card, fly, timing), animate(nextCard, lift, timing)];
+    if (stamp && hold) {
+      flightAnims.push(animate(stamp, [
+        {opacity: stampFrom, transform: `rotate(${stampRot}deg) scale(1.28)`},
+        {opacity: 1, transform: `rotate(${stampRot}deg) scale(1)`},
+      ], {duration: holdMs, easing: EASE_OUT, fill: 'forwards'}));
+    }
+    flightAnims = flightAnims.filter(Boolean);
+
+    // This loop only watches for the landing; it writes nothing per frame.
+    const t0 = performance.now();
     function frame(now) {
       if (generation !== fillGeneration || !card.isConnected || !nextCard.isConnected) { cancelMotion(); return; }
-      const el = now - t0;
-      // Phase 1 — the stamp moment: card winds up, stamp pops in and settles
-      if (el < holdMs) {
-        const hp = el / holdMs;
-        const he = 1 - Math.pow(1 - hp, 3);
-        const x = startX + (windX - startX) * he;
-        card.style.transform = `translate3d(${x}px,0,0) rotate(${(x * 0.035).toFixed(2)}deg)`;
-        if (stamp) {
-          stamp.style.opacity = (stampFrom + (1 - stampFrom) * Math.min(1, hp * 1.6)).toFixed(3);
-          stamp.style.transform = `rotate(${stampRot}deg) scale(${(1.28 - 0.28 * he).toFixed(3)})`;
-        }
-        flightRaf = requestAnimationFrame(frame);
-        return;
-      }
-      if (stamp && hold) { stamp.style.opacity = '1'; stamp.style.transform = `rotate(${stampRot}deg)`; }
-      // Phase 2 — the flight: card X and feed Y on one easing clock
-      const t = Math.min(1, (el - holdMs) / durMs);
-      const e = 1 - Math.pow(1 - t, 3); // easeOutCubic
-      const fx = hold ? windX : startX;
-      const x = fx + (endX - fx) * e;
-      const rot = Math.max(-16, Math.min(16, x * 0.035));
-      card.style.transform = `translate3d(${x}px,0,0) rotate(${rot}deg)`;
-      if (nextCard) feed.scrollTop = startScroll + (endScroll - startScroll) * e;
-      if (t < 1) { flightRaf = requestAnimationFrame(frame); return; }
-      // Landed — exactly on the next card's offset, so snap won't correct
+      const finished = flightAnims.length
+        ? flightAnims.every(anim => anim.playState === 'finished')
+        : now - t0 >= total;
+      if (!finished && now - t0 < total + 500) { flightRaf = requestAnimationFrame(frame); return; }
+      // Landed — move to the next card's exact offset in the same frame the
+      // transforms come off, so nothing visibly moves and snap won't correct.
       feed.scrollTop = feedCardTop(nextCard);
+      stopFlightAnims();
       restoreCard(card);
       flightRaf = requestAnimationFrame(() => {
         if (generation !== fillGeneration) { cancelMotion(); return; }
@@ -2920,7 +2928,7 @@ function markViewed(card) {
   _viewedIds.add(id);
   bumpStat(id.startsWith('v') ? 'how' : 'wiki');
   const a = articles.find(x => x.id === id);
-  if (a) { trackHistory(a); window.WSShareCard?.soon(a); }
+  if (a) trackHistory(a);
 }
 function trackScrollView() {
   const feed = document.getElementById('feed');

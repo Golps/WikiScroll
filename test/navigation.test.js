@@ -9,7 +9,7 @@ const geometry = source.slice(source.indexOf('// ── FEED GEOMETRY'), source.
 const navigationStart = source.indexOf('(function() {', source.indexOf('// rAF-driven swipe engine'));
 const navigation = source.slice(navigationStart, source.indexOf('// ── KEYBOARD BAR', navigationStart));
 
-function harness(count, height = 700) {
+function harness(count, height = 700, anims = null) {
   const handlers = {document: new Map(), window: new Map(), feed: new Map()};
   const listen = scope => (type, callback) => {
     const list = handlers[scope].get(type) || [];
@@ -19,7 +19,8 @@ function harness(count, height = 700) {
     const names = new Set();
     return {add: name => names.add(name), remove: name => names.delete(name), contains: name => names.has(name)};
   };
-  const element = () => ({style: {}, classList: classList(), offsetWidth: 1});
+  const element = () => ({style: {}, classList: classList(), offsetWidth: 1,
+    ...(anims && {animate(frames, options) { const anim = {el: this, frames, options, playState: 'running', cancel() { this.playState = 'idle'; this.cancelled = true; }}; anims.push(anim); return anim; }})});
   let cards = [], now = 0, nextRaf = 1, ensureCalls = 0, supply = 0;
   const raf = new Map(), likes = [];
   const feed = {
@@ -167,6 +168,26 @@ test('a reset cancels old animation frames before they can move a new feed', () 
   assert.equal(h.current(), 'w1000');
   assert.equal(h.feed.scrollTop, 0);
   assert.equal(h.pendingFrames, 0);
+  assert.equal(vm.runInContext('feedMotionLocked', h.context), false);
+});
+
+test('the swipe flight runs as compositor animations and lands in one frame', () => {
+  const anims = [], h = harness(3, 700, anims);
+  h.key('ArrowLeft'); h.step(10); h.step(10);
+  const [fly, lift] = anims;
+  assert.equal(fly.el, h.cards[0]); assert.equal(lift.el, h.cards[1]);
+  assert.match(fly.frames.at(-1).transform, /translate3d\(-1200px,-700px,0\)/);
+  assert.match(lift.frames.at(-1).transform, /translate3d\(0,-700px,0\)/);
+  assert.equal(h.feed.scrollTop, 0, 'no scroll writes during the flight');
+  assert.equal(h.cards[0].style.transform, undefined, 'no per-frame transform writes');
+  assert.equal(h.cards[1].style.contentVisibility, 'visible');
+  for (const anim of anims) anim.playState = 'finished';
+  h.step(10);
+  assert.equal(h.feed.scrollTop, 700);
+  assert.ok(anims.every(anim => anim.cancelled), 'transforms come off as the scroll lands');
+  assert.equal(h.cards[1].style.contentVisibility, '');
+  h.step(10);
+  assert.equal(h.current(), 'w2');
   assert.equal(vm.runInContext('feedMotionLocked', h.context), false);
 });
 

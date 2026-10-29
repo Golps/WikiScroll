@@ -1,6 +1,7 @@
 name: Starter pool
-# Refreshes the bundled outage/offline cards in public/data/starter/ each week.
-# A thin or failed fetch fails the job and keeps the current pool.
+# Refreshes the bundled outage/offline cards in public/data/starter/ each week,
+# resampling each language whose card library was rebuilt since the last run.
+# A language whose library is thin or unreadable keeps its current pool.
 on:
   schedule:
     - cron: '17 6 * * 1'

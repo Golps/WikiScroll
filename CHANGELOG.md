@@ -4,6 +4,7 @@ Releases of this repository. Each entry describes what changed in the code; [doc
 
 ## Unreleased
 
+- Grow the offline backup pool from 1,800 English cards to about 11,500 cards in all 15 languages, with travel guides in each language that has Wikivoyage (Korean, Arabic and Hindi readers get English guides) and the library's mature-topic flags. Each language is resampled only when its library is rebuilt, which keeps the weekly commit small. A device now saves one shard per set of its own language for offline use, instead of every English set at install.
 - Build card libraries for all 15 languages: English weekly and five others each week in turn, mature-topic category rules for every language, travel guides only where Wikivoyage exists, and a monthly write ledger that refuses any upload past 900,000 writes.
 - Add a travel place index to the card library: each Wikivoyage place lists the guides inside it, with trip-style tags, and stands in for travel search when it fails.
 - The first-launch hint drops its pill: the hand and line of text sit on a soft fade from the header, which keeps them readable over any photo.

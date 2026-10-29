@@ -762,9 +762,16 @@ function acceptSupply(batch,gen,randomize=true) {
   if(added){refillAttempts=0;preloadQueueImages();persistFeedReserve();}
   return added;
 }
-// The starter pool (scripts/build-starter.mjs) is grouped by source and depth
-// and split into shards; each visit draws one random shard of its set.
+// The starter pool (scripts/build-starter.mjs) is grouped by source, language
+// and depth and split into shards; each visit draws one random shard of its set.
 const starterShards=new Map();
+function starterSets(lang=curLang){return [1,2,3,4,5].map(depth=>`wiki-${lang}-${depth}`).concat(`how-${voyageLang(lang)}`);}
+// The service worker keeps one shard of each of this language's sets for
+// offline openings; it fetches only the sets it doesn't hold yet.
+function warmStarterPool(){
+  if(!LIBRARY_LANGS.has(curLang))return;
+  navigator.serviceWorker?.ready?.then(registration=>registration.active?.postMessage({type:'starter-sets',sets:starterSets()})).catch(()=>{});
+}
 async function starterJSON(path){
   const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),4000);
   try {const response=await fetch(path,{signal:controller.signal});return response.ok?await response.json():null;}
@@ -772,12 +779,13 @@ async function starterJSON(path){
 }
 function loadStarterLibrary(gen,outage=false) {
   // Never silently replace language, topic, or destination choices with English random cards.
-  if((curMode==='how'?voyageLang():curLang)!=='en'||curMode==='wiki'&&(curTopics.size||helpOnly())||curMode==='how'&&(travelFilters.place||travelFilters.style))return Promise.resolve([]);
-  const wanted=curMode==='how'?'how-en':'wiki-en-'+depthLevel;
+  const lang=curMode==='how'?voyageLang():curLang;
+  if(!LIBRARY_LANGS.has(lang)||curMode==='wiki'&&(curTopics.size||helpOnly())||curMode==='how'&&(travelFilters.place||travelFilters.style))return Promise.resolve([]);
+  const wanted=curMode==='how'?'how-'+lang:`wiki-${lang}-${depthLevel}`;
   if(!starterShards.has(wanted))starterShards.set(wanted,(async()=>{
     const sets=(await starterJSON('/data/starter/index.json'))?.sets||{};
     // A depth without its own shards borrows Balanced cards only during an outage.
-    const set=sets[wanted]>0?wanted:outage&&curMode==='wiki'&&sets['wiki-en-3']>0?'wiki-en-3':null;
+    const set=sets[wanted]>0?wanted:outage&&curMode==='wiki'&&sets[`wiki-${lang}-3`]>0?`wiki-${lang}-3`:null;
     if(!set)return null;
     const cards=await starterJSON(`/data/starter/${set}-${String(Math.floor(Math.random()*sets[set])).padStart(3,'0')}.json`);
     return Array.isArray(cards)?cards:null;
@@ -1359,6 +1367,7 @@ async function boot() {
       }
     }
     await Promise.all([fallback,supply]);
+    warmStarterPool();
     if(gen!==fillGeneration)return;
     ensureFeedAhead();
     // A server-requested pause is a failed attempt, not active loading. Show
@@ -1881,6 +1890,7 @@ function syncLangOptions() {
 function setLang(c) {
   if (!LANGS.some(l => l.c === c)) return;
   curLang = c;
+  warmStarterPool();
   loadToday();
   applyLangUI();
   syncActivityDisplay();

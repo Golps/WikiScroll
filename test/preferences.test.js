@@ -15,7 +15,7 @@ test('saved topics are restored to selected and accessible state on both surface
  assert.match(fn('loadPersistedState','function saveLiked'),/new Set\(savedTopics.filter[^]*?syncTopicUI\(\)/);
 });
 test('language switch updates a deep-link language so refresh cannot revert the selection',()=>{
- let replaced;let saves=0,resets=0;const context=vm.createContext({LANGS:[{c:'en'},{c:'es'}],curLang:'en',location:{href:'https://wikiscroll.com/?a=w123&lang=en'},URL,window:{history:{replaceState:(_,__,url)=>replaced=url.href}},applyLangUI(){},loadToday(){},saveSettings(){saves++;},syncActivityDisplay(){},resetFeed(){resets++;}});
+ let replaced;let saves=0,resets=0;const context=vm.createContext({LANGS:[{c:'en'},{c:'es'}],curLang:'en',location:{href:'https://wikiscroll.com/?a=w123&lang=en'},URL,window:{history:{replaceState:(_,__,url)=>replaced=url.href}},applyLangUI(){},loadToday(){},warmStarterPool(){},saveSettings(){saves++;},syncActivityDisplay(){},resetFeed(){resets++;}});
  vm.runInContext(fn('setLang',"document.getElementById('langBtn')"),context);
  vm.runInContext('setLang("es")',context);assert.equal(context.curLang,'es');assert.equal(replaced,'https://wikiscroll.com/?a=w123&lang=es');assert.equal(resets,1);assert.equal(saves,1);
  vm.runInContext('setLang("bogus")',context);assert.equal(context.curLang,'es');assert.equal(resets,1);

@@ -4,6 +4,9 @@ Releases of this repository. Each entry describes what changed in the code; [doc
 
 ## Unreleased
 
+- Reword the Mature topics setting to "Show articles on adult and sensitive subjects."
+- Build card libraries for German, French and Spanish alongside English: one builder for every language, English weekly and the others in turn, each in its own job, with a 9 GB storage guard before any upload. The reader draws from each language's own library and falls back to the Worker for a language whose library isn't up yet. The "You're all caught up" card is translated.
+- Sample the bundled starter pool from the card library instead of hundreds of live API calls; the API remains the fallback when the library can't be read.
 - Make the left/right swipe as smooth as the display allows (120 Hz on ProMotion iPhones): the card flight runs as compositor animations instead of per-frame script, and the drag follows each touch directly.
 - Share an article as its link alone again, so messages show the link preview with the article photo. The on-device share image is removed.
 - Shrink the first-launch gesture coach to one small pill under the header. It shows the scroll tip first and changes in place to the swipe tip after the first scroll, so it no longer covers the card or its Save and Share buttons.

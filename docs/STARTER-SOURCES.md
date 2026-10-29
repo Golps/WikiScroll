@@ -1,8 +1,8 @@
 # Starter pool sources
 
-`public/data/starter/` holds the bundled outage and offline cards. `scripts/build-starter.mjs` builds it from the English Wikipedia and Wikivoyage Action APIs, and `.github/workflows/starter-pool.yml` reruns it every week. `index.json` records when the pool was fetched and how many shards each set has.
+`public/data/starter/` holds the bundled outage and offline cards. `scripts/build-starter.mjs` samples it from this week's [card library](CARD-LIBRARY.md) on `cards.wikiscroll.com`, taking random whole shards of the matching library set, and `.github/workflows/starter-pool.yml` reruns it every Monday a few hours after the library build. If the library can't be read or a set comes up short, it falls back to the English Wikipedia and Wikivoyage Action APIs, as described below. `index.json` records when the pool was fetched and how many shards each set has.
 
-| Set | Source |
+| Set | Source (library sets match the live API fallback) |
 |---|---|
 | `wiki-en-1` Popular | Vital articles, level 3 |
 | `wiki-en-2` Known | Vital articles, level 4 (excluding level 3) |

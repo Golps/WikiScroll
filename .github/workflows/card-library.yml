@@ -1,8 +1,9 @@
 name: Card library
-# Builds the English prebuilt card library from Wikimedia's weekly
-# search-index dump and uploads it to the R2 bucket behind cards.wikiscroll.com.
-# A thin, failed or oversized build fails the job and the current library
-# keeps serving. Upload runs only when the R2 secrets are set.
+# Builds the prebuilt card libraries from Wikimedia's weekly search-index dump
+# and uploads them to the R2 bucket behind cards.wikiscroll.com. English is
+# rebuilt every week and one other language in turn, each in its own job. A
+# thin, failed or oversized build fails its job and that language's current
+# library keeps serving. Upload runs only when the R2 secrets are set.
 on:
   schedule:
     # The search-index dump is published on Sundays around 12:00 UTC.
@@ -19,26 +20,68 @@ on:
         description: Rebuild even if this dump is already live
         type: boolean
         default: false
+      languages:
+        description: Languages to build, separated by spaces (en de fr es)
+        type: string
+        default: en
 permissions:
   contents: read
-concurrency:
-  group: wikiscroll-card-library
-  cancel-in-progress: false
 env:
   UA: 'WikiScroll-card-library/1.0 (https://wikiscroll.com; contact@wikiscroll.com)'
   DUMPS: https://dumps.wikimedia.org
   AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
   AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
   AWS_DEFAULT_REGION: auto
+  # Other languages take turns, one a week, so the weekly writes stay small.
+  ROTATION: de fr es
+  # No upload may leave the bucket above this, which keeps a swap's brief
+  # second copy inside R2's free 10 GB.
+  STORAGE_LIMIT: '9000000000'
   # R2 accepts only the checksums S3 requires.
   AWS_REQUEST_CHECKSUM_CALCULATION: when_required
   AWS_RESPONSE_CHECKSUM_VALIDATION: when_required
   R2_ENDPOINT: ${{ secrets.R2_ACCOUNT_ID && format('https://{0}.r2.cloudflarestorage.com', secrets.R2_ACCOUNT_ID) || '' }}
   R2_BUCKET: ${{ secrets.R2_BUCKET }}
 jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      languages: ${{ steps.pick.outputs.languages }}
+    steps:
+      - id: pick
+        env:
+          WANTED: ${{ inputs.languages }}
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            read -ra turn <<< "$ROTATION"
+            week=$((10#$(date -u +%V)))
+            WANTED="en ${turn[$((week % ${#turn[@]}))]}"
+          fi
+          list=()
+          for lang in $WANTED; do
+            if ! [[ "$lang" =~ ^[a-z]{2,3}$ ]]; then echo "Not a language code: $lang" >&2; exit 1; fi
+            if [[ " ${list[*]-} " != *" $lang "* ]]; then list+=("$lang"); fi
+          done
+          if [ "${#list[@]}" -eq 0 ]; then echo "No languages to build." >&2; exit 1; fi
+          json=$(printf '"%s",' "${list[@]}"); echo "languages=[${json%,}]" >> "$GITHUB_OUTPUT"
+          echo "Building: ${list[*]}"
   build:
+    needs: plan
     runs-on: ubuntu-latest
     timeout-minutes: 345
+    strategy:
+      fail-fast: false
+      matrix:
+        lang: ${{ fromJSON(needs.plan.outputs.languages) }}
+    # One build per language at a time; different languages build side by side.
+    concurrency:
+      group: wikiscroll-card-library-${{ matrix.lang }}
+      cancel-in-progress: false
+    env:
+      LANG_CODE: ${{ matrix.lang }}
+      WIKI: ${{ matrix.lang }}wiki
+      VOYAGE: ${{ matrix.lang }}wikivoyage
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
@@ -50,13 +93,13 @@ jobs:
           package-manager-cache: false
       - name: Install parallel bzip2
         run: sudo apt-get install -y -qq lbzip2
-      - name: Find the newest complete English dump
+      - name: Find the newest complete dump
         id: dump
         run: |
           set -euo pipefail
           base="$DUMPS/other/cirrus_search_index"
           for date in $(curl -fsSL -A "$UA" "$base/" | grep -oE 'href="[0-9]{8}/"' | grep -oE '[0-9]{8}' | sort -r | head -n 3); do
-            files=$(curl -fsSL -A "$UA" "$base/$date/index_name=enwiki_content/" | grep -oE 'href="[^"]+\.json\.bz2"' | sed -E 's/^href="(.*)"$/\1/' | sed -E 's#^.*/##' | sort -V || true)
+            files=$(curl -fsSL -A "$UA" "$base/$date/index_name=${WIKI}_content/" | grep -oE 'href="[^"]+\.json\.bz2"' | sed -E 's/^href="(.*)"$/\1/' | sed -E 's#^.*/##' | sort -V || true)
             if [ -n "$files" ]; then
               echo "date=$date" >> "$GITHUB_OUTPUT"
               # A forced rebuild of a live dump gets its own folder: shards are cached
@@ -67,7 +110,7 @@ jobs:
               exit 0
             fi
           done
-          echo "No complete enwiki_content dump found." >&2; exit 1
+          echo "No complete ${WIKI}_content dump found." >&2; exit 1
       - name: Skip a dump that is already live
         id: live
         run: |
@@ -76,8 +119,8 @@ jobs:
           # Fails the job on a wrong key or bucket before hours of building.
           aws s3api head-bucket --bucket "$R2_BUCKET" --endpoint-url "$R2_ENDPOINT"
           echo "R2 access confirmed."
-          if [ "${{ inputs.force }}" != "true" ] && aws s3api head-object --bucket "$R2_BUCKET" --key v1/en/current.json --endpoint-url "$R2_ENDPOINT" > /dev/null 2>&1; then
-            live=$(aws s3 cp "s3://$R2_BUCKET/v1/en/current.json" - --endpoint-url "$R2_ENDPOINT" | gunzip | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{const m=JSON.parse(s);console.log(m.source?.cirrus||m.build)}catch{}})')
+          if [ "${{ inputs.force }}" != "true" ] && aws s3api head-object --bucket "$R2_BUCKET" --key "v1/$LANG_CODE/current.json" --endpoint-url "$R2_ENDPOINT" > /dev/null 2>&1; then
+            live=$(aws s3 cp "s3://$R2_BUCKET/v1/$LANG_CODE/current.json" - --endpoint-url "$R2_ENDPOINT" | gunzip | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{const m=JSON.parse(s);console.log(m.source?.cirrus||m.build)}catch{}})')
             if [ "$live" = "${{ steps.dump.outputs.date }}" ]; then echo "skip=true" >> "$GITHUB_OUTPUT"; echo "Dump ${{ steps.dump.outputs.date }} is already live."; fi
           fi
       - name: Make room on the runner
@@ -89,13 +132,13 @@ jobs:
         run: |
           set -euo pipefail
           get() { curl -fsSL --retry 8 --retry-all-errors --retry-delay 10 -C - -A "$UA" -o "$2" "$1"; }
-          for table in page_props page categorylinks; do get "$DUMPS/enwiki/latest/enwiki-latest-$table.sql.gz" "$RUNNER_TEMP/$table.sql.gz"; done
-          # The image table names files uploaded to English Wikipedia itself (optional).
-          if curl -fsIL -A "$UA" "$DUMPS/enwiki/latest/enwiki-latest-image.sql.gz" > /dev/null; then get "$DUMPS/enwiki/latest/enwiki-latest-image.sql.gz" "$RUNNER_TEMP/image.sql.gz"; fi
+          for table in page_props page categorylinks; do get "$DUMPS/$WIKI/latest/$WIKI-latest-$table.sql.gz" "$RUNNER_TEMP/$table.sql.gz"; done
+          # The image table names files uploaded to this Wikipedia itself (optional).
+          if curl -fsIL -A "$UA" "$DUMPS/$WIKI/latest/$WIKI-latest-image.sql.gz" > /dev/null; then get "$DUMPS/$WIKI/latest/$WIKI-latest-image.sql.gz" "$RUNNER_TEMP/image.sql.gz"; fi
           # Newer dumps name category targets through linktarget instead of cl_to.
-          if curl -fsIL -A "$UA" "$DUMPS/enwiki/latest/enwiki-latest-linktarget.sql.gz" > /dev/null; then get "$DUMPS/enwiki/latest/enwiki-latest-linktarget.sql.gz" "$RUNNER_TEMP/linktarget.sql.gz"; fi
-          get "$DUMPS/enwikivoyage/latest/enwikivoyage-latest-page_props.sql.gz" "$RUNNER_TEMP/voyage_props.sql.gz"
-          base="$DUMPS/other/cirrus_search_index/${{ steps.dump.outputs.date }}/index_name=enwikivoyage_content"
+          if curl -fsIL -A "$UA" "$DUMPS/$WIKI/latest/$WIKI-latest-linktarget.sql.gz" > /dev/null; then get "$DUMPS/$WIKI/latest/$WIKI-latest-linktarget.sql.gz" "$RUNNER_TEMP/linktarget.sql.gz"; fi
+          get "$DUMPS/$VOYAGE/latest/$VOYAGE-latest-page_props.sql.gz" "$RUNNER_TEMP/voyage_props.sql.gz"
+          base="$DUMPS/other/cirrus_search_index/${{ steps.dump.outputs.date }}/index_name=${VOYAGE}_content"
           : > "$RUNNER_TEMP/voyage.ndjson"
           for file in $(curl -fsSL -A "$UA" "$base/" | grep -oE 'href="[^"]+\.json\.bz2"' | sed -E 's/^href="(.*)"$/\1/' | sed -E 's#^.*/##' | sort -V); do
             get "$base/$file" "$RUNNER_TEMP/voyage-part.json.bz2"; lbzip2 -dc "$RUNNER_TEMP/voyage-part.json.bz2" >> "$RUNNER_TEMP/voyage.ndjson"; rm -f "$RUNNER_TEMP/voyage-part.json.bz2"
@@ -105,7 +148,7 @@ jobs:
         if: steps.live.outputs.skip != 'true'
         run: |
           set -euo pipefail
-          base="$DUMPS/other/cirrus_search_index/${{ steps.dump.outputs.date }}/index_name=enwiki_content"
+          base="$DUMPS/other/cirrus_search_index/${{ steps.dump.outputs.date }}/index_name=${WIKI}_content"
           mkdir -p "$RUNNER_TEMP/library"
           linktarget=(); if [ -f "$RUNNER_TEMP/linktarget.sql.gz" ]; then linktarget=(--linktarget "$RUNNER_TEMP/linktarget.sql.gz"); fi
           images=(); if [ -f "$RUNNER_TEMP/image.sql.gz" ]; then images=(--images "$RUNNER_TEMP/image.sql.gz"); fi
@@ -124,7 +167,7 @@ jobs:
               if [ -n "$fetch" ]; then wait "$fetch"; fi
             done
           } \
-            | node --max-old-space-size=12288 scripts/build-library.mjs --build "${{ steps.dump.outputs.build }}" \
+            | node --max-old-space-size=12288 scripts/build-library.mjs --lang "$LANG_CODE" --build "${{ steps.dump.outputs.build }}" \
                 --page-props "$RUNNER_TEMP/page_props.sql.gz" --page "$RUNNER_TEMP/page.sql.gz" --categorylinks "$RUNNER_TEMP/categorylinks.sql.gz" "${linktarget[@]}" "${images[@]}" \
                 --voyage "$RUNNER_TEMP/voyage.ndjson" --voyage-props "$RUNNER_TEMP/voyage_props.sql.gz" \
                 --out "$RUNNER_TEMP/library" --tmp "$RUNNER_TEMP" \
@@ -133,15 +176,22 @@ jobs:
         if: steps.live.outputs.skip != 'true' && env.R2_ENDPOINT != '' && inputs.upload != false
         run: |
           set -euo pipefail
-          build="${{ steps.dump.outputs.build }}"
+          build="${{ steps.dump.outputs.build }}" prefix="v1/$LANG_CODE"
+          # Listing an empty prefix (a language's first build) exits non-zero; it counts as 0.
+          total() { { aws s3 ls "s3://$R2_BUCKET/$1" --recursive --summarize --endpoint-url "$R2_ENDPOINT" || true; } | awk '/Total Size:/{n=$3} END{print n+0}'; }
+          # Storage guard: the bucket without this language's current build, plus the new build.
+          used=$(total "") ours=$(total "$prefix/") new=$(du -sb "$RUNNER_TEMP/library" | cut -f1)
+          after=$((${used:-0} - ${ours:-0} + new))
+          echo "Storage after this upload: $(awk -v b="$after" 'BEGIN{printf "%.2f", b/1e9}') GB of the $(awk -v b="$STORAGE_LIMIT" 'BEGIN{printf "%.1f", b/1e9}') GB limit." | tee -a "$GITHUB_STEP_SUMMARY"
+          if [ "$after" -gt "$STORAGE_LIMIT" ]; then echo "Not uploading: the bucket would pass the storage limit. The current library keeps serving." >&2; exit 1; fi
           aws configure set default.s3.max_concurrent_requests 32
           # Shards never change once uploaded; the manifest is re-read every few minutes.
-          aws s3 sync "$RUNNER_TEMP/library/$build" "s3://$R2_BUCKET/v1/en/$build" --endpoint-url "$R2_ENDPOINT" --only-show-errors \
+          aws s3 sync "$RUNNER_TEMP/library/$build" "s3://$R2_BUCKET/$prefix/$build" --endpoint-url "$R2_ENDPOINT" --only-show-errors \
             --content-type application/json --content-encoding gzip --cache-control 'public, max-age=31536000, immutable'
-          aws s3 cp "$RUNNER_TEMP/library/current.json" "s3://$R2_BUCKET/v1/en/current.json" --endpoint-url "$R2_ENDPOINT" --only-show-errors \
+          aws s3 cp "$RUNNER_TEMP/library/current.json" "s3://$R2_BUCKET/$prefix/current.json" --endpoint-url "$R2_ENDPOINT" --only-show-errors \
             --content-type application/json --content-encoding gzip --cache-control 'public, max-age=300'
           # Only one build stays stored, which keeps the library inside R2's free 10 GB.
-          for old in $(aws s3 ls "s3://$R2_BUCKET/v1/en/" --endpoint-url "$R2_ENDPOINT" | awk '$1=="PRE"{print $2}' | tr -d /); do
-            if [ "$old" != "$build" ]; then aws s3 rm "s3://$R2_BUCKET/v1/en/$old" --recursive --endpoint-url "$R2_ENDPOINT" --only-show-errors; fi
+          for old in $(aws s3 ls "s3://$R2_BUCKET/$prefix/" --endpoint-url "$R2_ENDPOINT" | awk '$1=="PRE"{print $2}' | tr -d /); do
+            if [ "$old" != "$build" ]; then aws s3 rm "s3://$R2_BUCKET/$prefix/$old" --recursive --endpoint-url "$R2_ENDPOINT" --only-show-errors; fi
           done
-          echo "Library $build is live." | tee -a "$GITHUB_STEP_SUMMARY"
+          echo "Library $LANG_CODE $build is live." | tee -a "$GITHUB_STEP_SUMMARY"

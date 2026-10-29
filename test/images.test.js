@@ -51,6 +51,15 @@ test('a library image linked to the wrong upload folder tries the other one',()=
  Object.defineProperty(img,'src',{set(v){src=v;},get(){return src;}});
  h.handlers.get('error')({target:img});assert.equal(src,'https://upload.wikimedia.org/wikipedia/commons/thumb/2/2d/Chameleon.jpg/960px-Chameleon.jpg');
 });
+test('a photo linked to any wiki’s own upload folder tries Commons',()=>{
+ // Commons files with a local description page were once linked to the wiki's folder.
+ for(const folder of ['wikipedia/zh','wikipedia/ar','wikipedia/pl','wikivoyage/de']){
+  const h=harness(),img=new h.Image();let src=`https://upload.wikimedia.org/${folder}/thumb/9/9f/River.jpg/500px-River.jpg`;
+  Object.assign(img,{dataset:{fallback:'media',imageRetried:'1',imageSmaller:'1'},isConnected:true,getAttribute:()=>src,remove(){}});
+  Object.defineProperty(img,'src',{set(v){src=v;},get(){return src;}});
+  h.handlers.get('error')({target:img});assert.equal(src,'https://upload.wikimedia.org/wikipedia/commons/thumb/9/9f/River.jpg/500px-River.jpg',folder);
+ }
+});
 test('a hung image releases its background slot after the deadline',()=>{
  const h=harness();h.run('preloadQueueImages()');h.tick(15000);
  assert.equal(h.run('imageLoads'),4);assert.equal(h.started.length,8);

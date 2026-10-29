@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import zlib from 'node:zlib';
 import crypto from 'node:crypto';
-import {readLocalFiles,MIN_LOCAL_FILES,thumbURL,sqlRows,readTable,readPageProps,readLinkTargets,readCategoryLinks,readPages,topicCategories,cirrusReader,libraryCard,voyageCard,guideBanner,guidePhotoGaps,fillGuidePhoto,cardNeeds,cardSets,dailyViews,vitalLevels,buildLibrary,averageDailyViews,emptyProps,shorten,SETS,TOPICS,HELP,SHARD_SIZE,MINIMUM,MAX_FILES,MAX_BYTES,SLICE_CAP,BODY_CHARS,translateTitles,localRoots,placeIndex,placeHash,guideStyles,PLACE_CAP} from '../scripts/build-library.mjs';
+import {readLocalFiles,trustedUploads,thumbURL,sqlRows,readTable,readPageProps,readLinkTargets,readCategoryLinks,readPages,topicCategories,cirrusReader,libraryCard,voyageCard,guideBanner,guidePhotoGaps,fillGuidePhoto,cardNeeds,cardSets,dailyViews,vitalLevels,buildLibrary,averageDailyViews,emptyProps,shorten,SETS,TOPICS,HELP,SHARD_SIZE,MINIMUM,MAX_FILES,MAX_BYTES,SLICE_CAP,BODY_CHARS,translateTitles,localRoots,placeIndex,placeHash,guideStyles,PLACE_CAP} from '../scripts/build-library.mjs';
 import {roots,bands} from '../worker/topics.js';
 import {availableHelpTypes} from '../worker/needs.js';
 
@@ -232,7 +232,14 @@ test('the image table names real local uploads, not File: pages that describe Co
  assert.deepEqual([...names].sort(),['Film_poster.jpg','Local_photo.png']);
  const p=props();p.free.set(5,'Panther_chameleon.jpg');p.local=names;
  assert.match(libraryCard(5,{namespace:0,title:'Panther chameleon',opening_text:text},p).img,/\/wikipedia\/commons\/thumb\//,'a free image with only a local description page stays on Commons');
- assert.ok(MIN_LOCAL_FILES>=100000);
+});
+test('the image table is trusted at any size once its names have File: pages here',()=>{
+ const pages=new Set(['Film_poster.jpg','Local_photo.png','Featured_Commons_picture.jpg']),few=new Set(['Film_poster.jpg','Local_photo.png']);
+ assert.equal(trustedUploads(few,pages),few,'a wiki with few uploads of its own');
+ assert.equal(trustedUploads(new Set(),new Set(['Commons_notes.jpg'])).size,0,'a wiki that uploads nothing');
+ assert.equal(trustedUploads(new Set(),new Set(Array.from({length:5000},(_,i)=>`File_${i}.jpg`))),null,'an empty table beside thousands of File: pages is misread');
+ assert.equal(trustedUploads(new Set(['12345','67890']),pages),null,'names without File: pages are misread');
+ assert.equal(trustedUploads(null,pages),null,'no table');
 });
 
 test('English titles follow interlanguage links, through renames and redirects', async () => {

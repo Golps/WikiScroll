@@ -17,6 +17,18 @@ test('reading size changes persist, refit excerpts and never reset discovery',()
  h.c.setReadingTextSize('bogus');assert.equal(h.c.readingTextSize,'larger');assert.equal(h.events.length,1);
  h.c.setReadingTextSize('standard');assert.equal(h.c.document.body.dataset.readingSize,'standard');
 });
+test('the page itself never becomes a reading-size choice',()=>{
+ // The body carries data-reading-size for the stylesheet; only the buttons are radio choices.
+ const element=(tag,size)=>({tagName:tag.toUpperCase(),dataset:{readingSize:size},classes:new Set(),attrs:{},classList:{toggle(k,on){on?this.owner.classes.add(k):this.owner.classes.delete(k);}},setAttribute(k,v){this.attrs[k]=String(v);}});
+ const body=element('body','large'),buttons=['standard','large','larger'].map(size=>element('button',size));
+ for(const e of [body,...buttons])e.classList.owner=e;
+ const querySelectorAll=selector=>{const tag=/^([a-z]*)\[data-reading-size\]$/.exec(selector);return tag?[body,...buttons].filter(e=>!tag[1]||e.tagName===tag[1].toUpperCase()):[];};
+ const c=vm.createContext({readingTextSize:'large',swipeEnabled:true,ambientEnabled:true,dimImages:false,showMature:false,showImageless:false,kbBarEnabled:true,depthLevel:3,document:{querySelectorAll,getElementById:()=>null},syncHelpUI(){},syncDepthSteps(){}});
+ vm.runInContext(slice('function syncAllToggles(', 'function applyReadingPreferences('),c);
+ c.syncAllToggles();
+ assert.deepEqual(body.attrs,{});assert.equal(body.tabIndex,undefined);assert.equal(body.classes.size,0);
+ assert.deepEqual(buttons.map(b=>b.attrs['aria-checked']),['false','true','false']);assert.deepEqual(buttons.map(b=>b.tabIndex),[-1,0,-1]);
+});
 test('dimming defaults off and does not change reading size or discovery',()=>{
  const h=preferences();h.c.applyReadingPreferences();assert.ok(!h.classes.has('dim-images'));
  h.c.setDimImages(true);assert.ok(h.classes.has('dim-images'));assert.equal(h.saved().dim,true);

@@ -13,7 +13,7 @@ import {completeNeeds,HELP_LANGS} from './needs.js';
 import {todayResponse} from './today.js';
 import {LANGS} from './languages.js';
 import {wantsMarkdown,htmlToMarkdown,markdownResponse} from './markdown.js';
-import {parsePlaces,parseCursor,formatCursor,namesPlace,interleave,fold,isPhrasebook,phrasebookParams,isDisambiguation,TRAVEL_STYLES,travelTerms,createPlaceResolver} from './travel.js';
+import {parsePlaces,parseCursor,formatCursor,namesPlace,interleave,fold,isPhrasebook,phrasebookParams,isDisambiguation,travelStyle,travelTerms,createPlaceResolver} from './travel.js';
 import {isMature} from './mature.js';
 /** WikiScroll Worker: explicit routing, static assets and article unfurls.
  * Handles article requests and social previews.
@@ -269,9 +269,9 @@ async function handle(request,env,ctx,work) {
     if(url.pathname.startsWith('/api/')){
       if(!['GET','HEAD'].includes(request.method))return json({error:'Method not allowed'},405,{'Allow':'GET, HEAD'});
       if(url.pathname==='/api/travel'){
-        const requested=url.searchParams.get('lang')||'en',input=(url.searchParams.get('place')||'').trim(),style=url.searchParams.get('style')||'';
+        const requested=url.searchParams.get('lang')||'en',input=(url.searchParams.get('place')||'').trim(),asked=url.searchParams.get('style')||'',style=travelStyle(asked);
 
-        if(!LANGS.has(requested)||input.length>80||style&&!TRAVEL_STYLES.includes(style))return json({error:'Invalid travel filters'},400);
+        if(!LANGS.has(requested)||input.length>80||asked&&!style)return json({error:'Invalid travel filters'},400);
         // One to three places ("Japan, Tuscany"), each searched on its own so
         // results alternate between them; the cursor keeps one offset per place.
         const places=parsePlaces(input,requested),cursor=parseCursor(url.searchParams.get('offset'),places.length);
@@ -280,7 +280,7 @@ async function handle(request,env,ctx,work) {
         const lang=voyageLang(requested);
         // Many readers ask for the same destination and style: complete result
         // pages are shared from the edge cache for an hour, before any upstream work.
-        const key=new Request(`${url.origin}/api/travel?v=11&lang=${lang}&place=${encodeURIComponent(places.map(fold).join('|'))}&style=${style}&offset=${cursor.map(c=>c??'-').join('.')}`),cache=work.cache;
+        const key=new Request(`${url.origin}/api/travel?v=12&lang=${lang}&place=${encodeURIComponent(places.map(fold).join('|'))}&style=${style}&offset=${cursor.map(c=>c??'-').join('.')}`),cache=work.cache;
         expireJobs(travelPending);
         try{const hit=await cache?.match(key);if(hit)return json(await hit.json(),200,{'X-Cache':'HIT'});}catch{}
         if(travelPending.has(key.url))return replay(await travelPending.get(key.url));

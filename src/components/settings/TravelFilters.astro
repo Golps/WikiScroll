@@ -1,6 +1,6 @@
 ---
 const { index } = Astro.props;
-const placeId = `travelPlace-${index}`, helpId = `travelHelp-${index}`;
+const placeId = `travelPlace-${index}`, helpId = `travelHelp-${index}`, styleId = `travelStyle-${index}`;
 ---
 <form class="travel-filters">
   <h3>Wikivoyage · Travel filters</h3>
@@ -18,6 +18,10 @@ const placeId = `travelPlace-${index}`, helpId = `travelHelp-${index}`;
     </div>
     <input id={placeId} name="place" maxlength="80" placeholder="e.g. Japan, Tuscany">
   </div>
-  <label>Trip style<select name="style"><option value="">Any style</option><option value="nature">Nature &amp; hiking</option><option value="coast">Coasts &amp; islands</option><option value="culture">History &amp; culture</option><option value="city">City breaks</option></select></label>
+  <div class="travel-style">
+    <label id={styleId}>Trip style</label>
+    <input type="hidden" name="style">
+    <button type="button" class="travel-style-pick" aria-haspopup="dialog" aria-labelledby={`${styleId} ${styleId}-name`}><svg class="ws-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="/images/ui-icons.svg?v=5#trip-any"></use></svg><span class="travel-style-name" id={`${styleId}-name`}>Any style</span><span class="travel-style-change">Change ›</span></button>
+  </div>
   <div class="feature-buttons"><button class="feature-action" type="submit">Explore destinations</button><button type="button" class="travel-clear">Clear filters</button></div>
 </form>

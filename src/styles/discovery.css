@@ -147,3 +147,30 @@ body:has(#ambientOverlay.open) .feed-service-status { opacity: 0; visibility: hi
 /* After a tap or click, nothing stays outlined; keyboard focus keeps its ring (see discovery.js). */
 .pointer-input :focus, .pointer-input :focus-visible { outline: none !important; }
 .pointer-input .act:focus-visible { box-shadow: none; }
+/* Trip style: one row in the travel filters (styled with the inputs) that
+   opens a sheet of every style. A bottom sheet on phones, a floating panel
+   on wider screens. */
+.travel-style { margin-bottom: 22px; }
+.travel-filters .travel-style-pick { display: flex; align-items: center; gap: 10px; text-align: start; cursor: pointer; }
+.travel-style-pick .ws-icon { flex: none; width: 20px; height: 20px; color: var(--accent); }
+.travel-style-name { flex: 1; min-width: 0; }
+.travel-style-change { color: var(--muted); font-size: .88em; white-space: nowrap; }
+.trip-sheet { box-sizing: border-box; width: min(440px, 100vw - 32px); max-height: 85dvh; margin: auto; padding: 20px 24px 26px; overflow: auto; color: var(--ink); background: var(--paper); border: 1px solid var(--rule); border-radius: 20px; box-shadow: 0 25px 100px #0005; }
+.trip-sheet::backdrop { backdrop-filter: blur(5px); background: #10171199; }
+.trip-sheet-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+.trip-sheet h2 { margin: 0; font: 400 26px/1.2 var(--serif); }
+.trip-sheet-close { padding: 8px 2px; border: 0; background: none; color: var(--accent); font: 600 15px/1 var(--sans); cursor: pointer; }
+.trip-group h3 { margin: 18px 0 8px; color: var(--muted); font: 400 13px/1.3 var(--sans); }
+.trip-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.trip-chip { display: inline-flex; align-items: center; gap: 7px; padding: 9px 12px; border: 1px solid var(--rule); border-radius: 8px; background: transparent; color: var(--ink); font: 500 15px/1.2 var(--sans); cursor: pointer; }
+.trip-chip .ws-icon { width: 18px; height: 18px; color: var(--muted); }
+.trip-chip[aria-pressed="true"] { background: var(--accent-solid); border-color: var(--accent-solid); color: #fff; }
+.trip-chip[aria-pressed="true"] .ws-icon { color: #fff; }
+.trip-chip[hidden], .trip-group[hidden] { display: none; }
+@media (hover: hover) { .trip-chip:not([aria-pressed="true"]):hover { border-color: var(--accent); } .trip-sheet-close:hover { color: var(--ink); } }
+@media (max-width: 767px) {
+  .trip-sheet { width: 100%; max-width: none; max-height: 80dvh; margin: auto 0 0; padding-bottom: calc(26px + env(safe-area-inset-bottom)); border-width: 1px 0 0; border-radius: 20px 20px 0 0; }
+  .trip-sheet[open] { animation: trip-sheet-in .24s ease-out; }
+}
+@keyframes trip-sheet-in { from { transform: translateY(100%); } }
+@media (prefers-reduced-motion: reduce) { .trip-sheet[open] { animation: none; } }

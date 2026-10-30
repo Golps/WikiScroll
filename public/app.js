@@ -2,7 +2,7 @@ const atlasIcon = {"bookmark": "<svg class=\"atlas-icon\" viewBox=\"0 0 24 24\" 
 // Icons reference one same-origin SVG sheet, cached with the offline shell.
 function uiIcon(name) {
   const key = /^[a-z-]+$/.test(name) ? name : 'discovery';
-  return `<svg class="ws-icon" data-ui-icon="${key}" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="/images/ui-icons.svg?v=4#${key}"></use></svg>`;
+  return `<svg class="ws-icon" data-ui-icon="${key}" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="/images/ui-icons.svg?v=5#${key}"></use></svg>`;
 }
 'use strict';
 
@@ -106,7 +106,14 @@ function matchesHelpTypes(article) { return Array.isArray(article.needs) && arti
 // ── STATE ──────────────────────────────────────────────────────────────────
 let curMode = 'wiki', curLang = 'en';
 let curTopics = new Set();
+// Trip styles, as tagged in the card library (scripts/trip-styles.mjs). Styles
+// saved before the October 2026 revamp map to their closest new style, as in
+// worker/travel.js travelStyle.
+const TRIP_STYLES=['city','town','island','beach','mountain','park','hiking','diving','heritage'],TRIP_STYLES_VERSION=2;
+const TRIP_STYLE_RENAMED={nature:'park',coast:'beach',culture:'heritage'};
+const tripStyle=style=>TRIP_STYLES.includes(style)?style:Object.hasOwn(TRIP_STYLE_RENAMED,String(style))?TRIP_STYLE_RENAMED[style]:'';
 let travelFilters = lsGet('ws_travel_filters') || {place:'',style:''};
+travelFilters={place:String(travelFilters.place||''),style:tripStyle(travelFilters.style)};
 let travelOffset=0, travelExhausted=false, travelSuggestion='', travelContinuing=false, travelRetries=0;
 let ambientEnabled = true;
 let readingTextSize = 'standard', dimImages = false;
@@ -898,12 +905,13 @@ async function fetchLibraryBatch(gen,retried=false){
   const src=curMode;
   return cards.filter(a=>a?.src===src);
 }
-// Travel search's stand-in while /api/travel can't answer (a Wikimedia or
-// Worker failure): the library's place index, where each place lists the
-// guides inside it by Wikivoyage's breadcrumbs, and the trip styles tagged on
-// each guide (scripts/build-library.mjs placeIndex, guideStyles). Once a filter
-// falls back, it stays on the library until the feed is reset, so the two
-// sources never interleave their pages.
+// Trip styles come from the card library first: each style has its own set,
+// and the place index lists the guides inside each place by Wikivoyage's
+// breadcrumbs with their styles (scripts/build-library.mjs placeIndex,
+// scripts/trip-styles.mjs). A place alone searches live, and the place index
+// stands in while /api/travel can't answer (a Wikimedia or Worker failure).
+// Once a filter is on the library it stays there until the feed is reset, so
+// the two sources never interleave their pages.
 const libraryTravel={key:'',cards:null,pos:0};
 // Same as worker/travel.js fold and parsePlaces.
 const travelFold=text=>String(text||'').normalize('NFD').replace(/\p{M}/gu,'').toLowerCase().replace(/[’‘`´]/g,"'").replace(/[-‐–—]/g,' ').replace(/\s+/g,' ').trim();
@@ -930,6 +938,8 @@ async function fetchLibraryTravel(gen){
   const manifest=await libraryManifest(library);
   if(gen!==fillGeneration)return [];
   if(!manifest)return null;
+  // An older library tags guides with the old styles: the live search answers.
+  if(style&&manifest.tripStyles!==TRIP_STYLES_VERSION)return null;
   const key=JSON.stringify([lang,manifest.build,places,style]),fits=card=>card?.src==='how'&&(!style||card.styles?.includes(style));
   if(libraryTravel.key!==key){
     let cards=null;
@@ -954,15 +964,17 @@ async function fetchLibraryTravel(gen){
     if(libraryTravel.pos>=libraryTravel.cards.length)travelExhausted=true;
     return page;
   }
-  // A trip style alone: undrawn travel shards, keeping the guides of that style.
-  const set='how-'+lang,count=manifest.sets[set]||0;
+  // A trip style alone: undrawn shards of that style's own set.
+  const set=`how-${lang}-${style}`;
+  if(!Object.hasOwn(manifest.sets,set))return null;
+  const count=manifest.sets[set];
   for(let tries=0;tries<3;tries++){
     const shard=libraryShard(library,set,count);
     if(shard<0){travelExhausted=true;return [];}
     const cards=await libraryJSON(`${LIBRARY_ROOT}${lang}/${manifest.base}${set}/${shard}.json`,6000);
     if(gen!==fillGeneration)return [];
     if(!Array.isArray(cards)){library.drawn.get(set)?.delete(shard);return null;}
-    const found=cards.filter(fits);
+    const found=cards.filter(card=>card?.src==='how');
     if(found.length)return found;
   }
   return [];

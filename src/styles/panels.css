@@ -186,7 +186,7 @@ button.hi{display:block;width:100%;font:inherit;color:inherit;text-align:start;c
 .collection-dialog .collection-create{background:transparent;color:var(--accent);border:1px solid var(--rule);text-align:center}
 .collection-dialog .collection-create:hover{background:var(--surface-alt);border-color:var(--accent)}
 .collection-start .source-close{background:transparent;border-color:transparent}
-@media(max-width:767px){input:not([type=range]):not([type=checkbox]):not([type=radio]),textarea,select,.coll-new-input,.collection-name-input,.travel-filters input,.travel-filters select,.collection-dialog input{font-size:16px!important}}
+@media(max-width:767px){input:not([type=range]):not([type=checkbox]):not([type=radio]),textarea,select,.coll-new-input,.collection-name-input,.travel-filters input,.travel-filters .travel-style-pick,.collection-dialog input{font-size:16px!important}}
 #likedList .li-btn[data-unlike]{border-color:#d96767;color:#e87070;background:transparent}
 body.light #likedList .li-btn[data-unlike]{border-color:#c23b3b;color:#c23b3b}
 #likedList #deleteCollBtn{color:#f87171}body.light #likedList #deleteCollBtn{color:#c23b3b}

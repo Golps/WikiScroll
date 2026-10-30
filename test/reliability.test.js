@@ -206,7 +206,7 @@ test('travel resolves geographic ancestry instead of confusing Elba with North E
  assert.equal(resolver.belongs('ja',guides[0],jp.get('京都市')),true);
  assert.equal(placeMention('東京都','京都'),false);assert.equal(isDisambiguation({title:'京都',pageprops:{disambiguation:''}}),true);
  assert.deepEqual(parsePlaces('Côte d’Azur'),["Côte d'Azur"]);
- assert.match(travelTerms('ja','nature'),/自然/);assert.doesNotMatch(travelTerms('es','coast'),/beach/);
+ assert.match(travelTerms('ja','park'),/国立公園/);assert.doesNotMatch(travelTerms('es','beach'),/beach/);
  const unavailable=await resolver.resolve('fr',['Paris'],async()=>null);assert.equal(unavailable.has('Paris'),false);
 });
 

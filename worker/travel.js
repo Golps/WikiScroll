@@ -96,23 +96,31 @@ export function formatCursor(parts) {
   return parts.length === 1 ? parts[0] : parts.map(part => part === null ? '-' : part).join('.');
 }
 
+// Trip styles. The card library tags each guide at build time from what the
+// place is (scripts/trip-styles.mjs), and the browser draws a style from those
+// tags. This vocabulary is only the live search's stand-in when the library
+// can't answer, so it names each style plainly.
+export const TRAVEL_STYLES = ['city','town','island','beach','mountain','park','hiking','diving','heritage'];
+// Styles saved before the October 2026 revamp still arrive from old pages and
+// devices: each maps to its closest new style.
+export const LEGACY_STYLES = {nature:'park',coast:'beach',culture:'heritage'};
+export const travelStyle = style => TRAVEL_STYLES.includes(style) ? style : Object.hasOwn(LEGACY_STYLES, style) ? LEGACY_STYLES[style] : '';
 // Search vocabulary belongs to the guide edition, not the interface language.
 export const TRAVEL_TERMS = {
- en:['nature OR hiking OR park','beach OR coast OR island','museum OR history OR culture','city OR urban'],
- es:['naturaleza OR senderismo OR parque','playa OR costa OR isla','museo OR historia OR cultura','ciudad OR urbano'],
- fr:['nature OR randonnée OR parc','plage OR côte OR île','musée OR histoire OR culture','ville OR urbain'],
- de:['Natur OR Wandern OR Park','Strand OR Küste OR Insel','Museum OR Geschichte OR Kultur','Stadt OR urban'],
- it:['natura OR escursionismo OR parco','spiaggia OR costa OR isola','museo OR storia OR cultura','città OR urbano'],
- pt:['natureza OR caminhada OR parque','praia OR costa OR ilha','museu OR história OR cultura','cidade OR urbano'],
- ru:['природа OR поход OR парк','пляж OR побережье OR остров','музей OR история OR культура','город'],
- ja:['自然 OR 登山 OR 公園','海岸 OR ビーチ OR 島','博物館 OR 歴史 OR 文化','都市 OR 市街'],
- zh:['自然 OR 徒步 OR 公园 OR 公園','海滩 OR 海灘 OR 海岸 OR 岛 OR 島','博物馆 OR 博物館 OR 历史 OR 歷史 OR 文化','城市'],
- he:['טבע OR טיולים OR פארק','חוף OR אי','מוזיאון OR היסטוריה OR תרבות','עיר'],
- nl:['natuur OR wandelen OR park','strand OR kust OR eiland','museum OR geschiedenis OR cultuur','stad'],
- pl:['przyroda OR turystyka OR park','plaża OR wybrzeże OR wyspa','muzeum OR historia OR kultura','miasto']
+ en:['city OR metropolis','town OR village','island OR islands','beach OR beaches','mountain OR mountains OR alpine','"national park" OR "nature reserve"','hiking OR trekking OR trail','diving OR snorkeling OR snorkelling','"World Heritage" OR UNESCO'],
+ es:['ciudad OR metrópoli','pueblo OR aldea','isla OR islas','playa OR playas','montaña OR montañas','"parque nacional" OR "reserva natural"','senderismo OR trekking','buceo OR snorkel','"Patrimonio de la Humanidad" OR UNESCO'],
+ fr:['ville OR métropole','village OR bourg','île OR îles','plage OR plages','montagne OR montagnes','"parc national" OR "réserve naturelle"','randonnée OR trekking','plongée OR snorkeling','"patrimoine mondial" OR UNESCO'],
+ de:['Großstadt OR Metropole','Dorf OR Kleinstadt','Insel OR Inseln','Strand OR Strände','Berg OR Gebirge OR Alpen','Nationalpark OR Naturschutzgebiet','Wandern OR Trekking','Tauchen OR Schnorcheln','Welterbe OR UNESCO'],
+ it:['città OR metropoli','paese OR borgo','isola OR isole','spiaggia OR spiagge','montagna OR montagne','"parco nazionale" OR "riserva naturale"','escursionismo OR trekking','immersioni OR snorkeling',"\"patrimonio dell'umanità\" OR UNESCO"],
+ pt:['cidade OR metrópole','vila OR aldeia','ilha OR ilhas','praia OR praias','montanha OR montanhas','"parque nacional" OR "reserva natural"','trilha OR caminhada','mergulho OR snorkel','"Patrimônio Mundial" OR UNESCO'],
+ ru:['город OR мегаполис','деревня OR посёлок','остров OR острова','пляж OR пляжи','горы OR горный','"национальный парк" OR заповедник','поход OR треккинг','дайвинг OR снорклинг','"всемирного наследия" OR ЮНЕСКО'],
+ ja:['都市','町 OR 村','島','ビーチ OR 海水浴','山 OR 山岳','国立公園','ハイキング OR 登山','ダイビング','世界遺産'],
+ zh:['城市','小镇 OR 村','岛 OR 島','海滩 OR 海灘 OR 沙滩','山 OR 山区','国家公园 OR 國家公園','徒步 OR 登山','潜水','世界遗产 OR 世界遺產'],
+ he:['עיר','עיירה OR כפר','אי OR איים','חוף OR חופים','הר OR הרים','"פארק לאומי" OR "שמורת טבע"','טיול OR טיולים','צלילה','"מורשת עולמית"'],
+ nl:['stad OR metropool','dorp OR stadje','eiland OR eilanden','strand OR stranden','berg OR bergen','"nationaal park" OR natuurreservaat','wandelen OR trekking','duiken OR snorkelen','werelderfgoed OR UNESCO'],
+ pl:['miasto OR metropolia','wieś OR miasteczko','wyspa OR wyspy','plaża OR plaże','góry OR górski','"park narodowy" OR rezerwat','szlak OR wędrówki','nurkowanie OR snorkeling','"światowego dziedzictwa" OR UNESCO']
 };
-export const TRAVEL_STYLES = ['nature','coast','culture','city'];
-export const travelTerms = (lang,style) => (TRAVEL_TERMS[lang] || TRAVEL_TERMS.en)[TRAVEL_STYLES.indexOf(style)] || '';
+export const travelTerms = (lang,style) => (TRAVEL_TERMS[lang] || TRAVEL_TERMS.en)[TRAVEL_STYLES.indexOf(travelStyle(style))] || '';
 
 // GeoCrumbs exposes the parent page ID as geocrumb-is-in. Follow those IDs,
 // rather than guessing containment from a passing mention in an introduction.

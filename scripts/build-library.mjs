@@ -9,7 +9,8 @@
 //     --build 20261025 --page-props enwiki-page_props.sql.gz \
 //     --page enwiki-page.sql.gz --categorylinks enwiki-categorylinks.sql.gz \
 //     [--linktarget enwiki-linktarget.sql.gz] \
-//     [--voyage enwikivoyage_content.ndjson --voyage-props enwikivoyage-page_props.sql.gz] \
+//     [--voyage enwikivoyage_content.ndjson --voyage-props enwikivoyage-page_props.sql.gz \
+//      --place-facts place-facts.json.gz] \
 //     [--lang en] --out library
 //
 // Inputs:
@@ -23,8 +24,10 @@
 //   for topics, and talk-page photo requests for Help Wikipedia.
 // - A few small live lookups: the vital-article lists (Popular, Known) and,
 //   for other languages, their titles and topic root categories there via
-//   English Wikipedia's interlanguage links; and the wiki's average daily
-//   pageviews, which turns each page's popularity share into daily views.
+//   English Wikipedia's interlanguage links; the wiki's average daily
+//   pageviews, which turns each page's popularity share into daily views; and
+//   Wikidata facts about each travel guide's place, for its trip styles
+//   (--place-facts keeps them for a week when Wikidata doesn't answer).
 import fs from 'node:fs';
 import fsp from 'node:fs/promises';
 import path from 'node:path';
@@ -34,7 +37,8 @@ import readline from 'node:readline';
 import {once} from 'node:events';
 import {randomDepths} from './build-starter.mjs';
 import {vitalTitles} from '../worker/vital.js';
-import {isDisambiguation, isPhrasebook, PHRASEBOOK_CATEGORY, fold, TRAVEL_TERMS, TRAVEL_STYLES} from '../worker/travel.js';
+import {isDisambiguation, isPhrasebook, PHRASEBOOK_CATEGORY, fold, TRAVEL_STYLES} from '../worker/travel.js';
+import {tripStyles, placeFacts} from './trip-styles.mjs';
 import {imageURL} from '../worker/supply.js';
 import {voyagePhoto} from '../worker/voyage-images.js';
 import {guideReadable} from '../worker/extracts.js';
@@ -53,7 +57,12 @@ export const SETS = [
   // A topic feed filtered to one Help type, so the browser never sifts topic cards.
   ...TOPICS.flatMap(topic => HELP.flatMap(type => DEPTHS.map(d => `topic-${LANG}-${topic}-help-${type}-${d}`))),
   `how-${LANG}`,
+  // One set per trip style, so a style feed draws only its own guides.
+  ...TRAVEL_STYLES.map(style => `how-${LANG}-${style}`),
 ];
+// The trip-style vocabulary the travel cards carry. The browser uses the
+// style sets and tags only from a manifest that names this version.
+export const TRIP_STYLES_VERSION = 2;
 export const SHARD_SIZE = 100, BUCKETS = 64;
 // Matches the live feeds' introductions (exchars 1000); cards fit them to the screen.
 export const BODY_CHARS = 1000;
@@ -369,27 +378,15 @@ export function cardSets(doc, card, localViews, {levels, reach = new Map(), phot
   }
   return sets;
 }
-// Wikivoyage guides: no depth, an optional image, no phrasebooks or travel topics.
-export function voyageCard(pageid, doc, props) {
+// Wikivoyage guides: no depth, an optional image, no phrasebooks or travel
+// topics. facts: Wikidata facts by item (scripts/trip-styles.mjs placeFacts).
+export function voyageCard(pageid, doc, props, facts = new Map()) {
   const phrasebooks = PHRASEBOOK_CATEGORY[LANG] ? bare(PHRASEBOOK_CATEGORY[LANG]) : null;
   const page = {title: doc.title, categories: (Array.isArray(doc.category) ? doc.category : []).filter(c => c === phrasebooks)};
   if (isPhrasebook(page) || /^(?:travel topics?|itineraries)(?:[ :/]|$)/i.test(doc.title || '')) return null;
   const card = libraryCard(pageid, doc, props, 'how', `${LANG}.wikivoyage.org`);
-  const styles = card ? guideStyles(card) : [];
+  const styles = card ? tripStyles(doc, facts.get(doc.wikibase_item), LANG) : [];
   return card && styles.length ? {...card, styles} : card;
-}
-
-// Trip styles a guide's title or introduction names, with the words the live
-// travel search uses (TRAVEL_TERMS), so the library can stand in for it.
-const STYLE_WORDS = TRAVEL_STYLES.map((style, i) => {
-  // Whole words, except in scripts written without spaces.
-  const words = (TRAVEL_TERMS[LANG] || TRAVEL_TERMS.en)[i].split(' OR ').map(word => fold(word).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
-    .map(word => /[\u3040-\u30ff\u3400-\u9fff\uac00-\ud7af]/u.test(word) ? word : `(?<![\\p{L}\\p{N}])${word}(?![\\p{L}\\p{N}])`);
-  return [style, new RegExp(words.join('|'), 'u')];
-});
-export function guideStyles(card) {
-  const text = fold(card.title + ' ' + card.body);
-  return STYLE_WORDS.filter(([, words]) => words.test(text)).map(([style]) => style);
 }
 
 // The travel place index: the stand-in for travel search when it is down.
@@ -398,7 +395,9 @@ export function guideStyles(card) {
 // their folded title (worker/travel.js fold), and also by the title without a
 // "(…)" qualifier when no other place has that name. The keys are spread over
 // hashed files so a lookup downloads one small file.
-export const PLACE_CAP = 300, PLACE_KEYS_PER_FILE = 150;
+// Each place keeps a random sample of PLACE_CAP guides, topped up so every
+// trip style inside it has up to PLACE_STYLE_CAP of its own guides.
+export const PLACE_CAP = 300, PLACE_STYLE_CAP = 60, PLACE_KEYS_PER_FILE = 150;
 export function placeHash(key, files) {
   let hash = 0x811c9dc5;
   for (let i = 0; i < key.length; i++) hash = Math.imul(hash ^ key.charCodeAt(i), 0x01000193) >>> 0;
@@ -421,7 +420,15 @@ export function placeIndex({titles, parents, cards}, random = Math.random) {
     // The place's own guide first, then a random sample of the guides inside it.
     const own = list.filter(card => card === cards.get(id)), rest = list.filter(card => card !== cards.get(id));
     for (let i = rest.length - 1; i > 0; i--) { const j = Math.floor(random() * (i + 1)); [rest[i], rest[j]] = [rest[j], rest[i]]; }
-    keys.set(key, {title, cards: [...own, ...rest].slice(0, PLACE_CAP), size: list.length});
+    const kept = [...own, ...rest].slice(0, PLACE_CAP), counts = new Map();
+    for (const card of kept) for (const style of card.styles || []) counts.set(style, (counts.get(style) || 0) + 1);
+    for (const card of rest.slice(PLACE_CAP - own.length)) {
+      const wanted = (card.styles || []).filter(style => (counts.get(style) || 0) < PLACE_STYLE_CAP);
+      if (!wanted.length) continue;
+      kept.push(card);
+      for (const style of card.styles) counts.set(style, (counts.get(style) || 0) + 1);
+    }
+    keys.set(key, {title, cards: kept, size: list.length});
     const bare = fold(title.replace(/\s*\([^)]*\)$/, ''));
     if (bare !== key && (!base.has(bare) || base.get(bare).size < list.length)) base.set(bare, keys.get(key));
   }
@@ -451,6 +458,15 @@ export async function guidePhotoGaps(voyage) {
   }
   return gaps;
 }
+// Every guide's Wikidata item, for its trip styles.
+export async function voyageItems(voyage) {
+  const items = new Set(), read = cirrusReader();
+  for await (const line of voyage.lines) {
+    const item = read(line)?.doc.wikibase_item;
+    if (typeof item === 'string') items.add(item);
+  }
+  return [...items];
+}
 export function fillGuidePhoto(card, doc, gaps) {
   if (!card || card.img) return false;
   const banner = guideBanner(doc.source_text), file = banner || gaps.get(doc.wikibase_item);
@@ -464,7 +480,8 @@ export function fillGuidePhoto(card, doc, gaps) {
 // Capped sets keep a sample, so fewer buckets do; that keeps open files and
 // compressor memory bounded across hundreds of sets.
 const capFor = set => /-help-/.test(set) ? COMBO_CAP : set.startsWith('topic-') || set.startsWith('help-') ? SLICE_CAP : Infinity;
-export const bucketsFor = set => capFor(set) === Infinity ? BUCKETS : 16;
+const styleSet = set => /^how-[a-z]+-[a-z]+$/.test(set);
+export const bucketsFor = set => styleSet(set) ? 8 : capFor(set) === Infinity ? BUCKETS : 16;
 export function createBuckets(dir) {
   const streams = new Map(), counts = Object.fromEntries(SETS.map(set => [set, 0]));
   const open = (set, bucket) => {
@@ -544,11 +561,12 @@ export async function buildLibrary({lines, props, dailyTotal, levels, reach = ne
     for await (const line of voyage.lines) {
       const entry = read(line);
       if (entry?.doc.namespace === 0 && typeof entry.doc.title === 'string') voyageTitles.set(entry.pageid, entry.doc.title);
-      const card = entry && voyageCard(entry.pageid, entry.doc, voyage.props);
+      const card = entry && voyageCard(entry.pageid, entry.doc, voyage.props, voyage.facts);
       if (!card) continue;
       const filled = fillGuidePhoto(card, entry.doc, gaps);
       if (filled === 'banner') stats.guideBanners++; else if (filled === 'wikipedia') stats.guideWikipedia++; else if (!card.img) stats.guidesWithout++;
       stats.guides++; guides.set(entry.pageid, card); await buckets.add(`how-${LANG}`, card);
+      for (const style of card.styles || []) await buckets.add(`how-${LANG}-${style}`, card);
     }
   }
   await buckets.close();
@@ -575,7 +593,7 @@ export async function buildLibrary({lines, props, dailyTotal, levels, reach = ne
     stats.places = index.places; stats.placeKeys = index.keys;
   }
   if (files > MAX_FILES || bytes > MAX_BYTES) throw Error(`Build too large for the free tier (${files} files, ${(bytes / 1e9).toFixed(2)} GB), keeping the current library.\nAll sets: ${report}`);
-  const manifest = {v: 1, build, builtAt: new Date().toISOString(), base: build + '/', shardSize: SHARD_SIZE, source, sets, ...(places ? {places} : {})};
+  const manifest = {v: 1, build, builtAt: new Date().toISOString(), base: build + '/', shardSize: SHARD_SIZE, source, sets, ...(places ? {places} : {}), ...(guides.size ? {tripStyles: TRIP_STYLES_VERSION} : {})};
   await fsp.writeFile(path.join(outDir, 'current.json'), zlib.gzipSync(JSON.stringify(manifest) + '\n'));
   return {manifest, ...stats, files, bytes, counts: buckets.counts};
 }
@@ -709,6 +727,8 @@ if (process.argv[1] && import.meta.url === new URL(process.argv[1], 'file:').hre
       log('Finding travel guides without a photo');
       voyage.gaps = await guidePhotoGaps(voyage);
       log(`Guides that may take a Wikipedia photo: ${voyage.gaps.size}`);
+      log('Reading Wikidata facts for trip styles');
+      voyage.facts = (await placeFacts(await voyageItems(voyage), {cacheFile: option('place-facts'), userAgent: UA, log})).facts;
     }
     const tmpDir = await fsp.mkdtemp(path.join(option('tmp') || outDir, '.buckets-'));
     log('Reading articles');
@@ -719,6 +739,7 @@ if (process.argv[1] && import.meta.url === new URL(process.argv[1], 'file:').hre
     const per = test => SETS.filter(test).reduce((sum, s) => sum + result.manifest.sets[s], 0), starts = prefix => s => s.startsWith(prefix);
     console.log(`Card library ${LANG} ${build}: ${result.pages} pages read, ${result.cards} articles in at least one set (${result.unknown} without readership), ${result.guides} travel guides (photos added from ${result.guideBanners} banners and ${result.guideWikipedia} Wikipedia articles; ${result.guidesWithout} still without one).`);
     console.log(`${result.files} shards, ${(result.bytes / 1e9).toFixed(2)} GB: depth sets ${per(starts('wiki-'))}, topic sets ${per(s => s.startsWith('topic-') && !s.includes('-help-'))}, topic Help sets ${per(s => s.includes('-help-'))}, Help sets ${per(starts('help-'))}, travel ${per(starts('how-'))} shards.`);
+    if (result.guides) console.log('Trip styles: ' + TRAVEL_STYLES.map(style => `${style} ${result.counts[`how-${LANG}-${style}`]}`).join(', ') + '.');
     if (result.places) console.log(`Travel place index: ${result.places} places (${result.placeKeys} names) in ${result.manifest.places} files.`);
     console.log('Cards per set: ' + SETS.map(set => `${set} ${result.counts[set]}`).join(', ') + `. Average daily views used: ${Math.round(dailyTotal)}.`);
     console.log(`Image check: ${images.ok} of ${images.checked} sampled images loaded (status counts ${JSON.stringify(images.statuses)}).` + (images.broken.length ? ' Broken: ' + images.broken.join(', ') : ''));

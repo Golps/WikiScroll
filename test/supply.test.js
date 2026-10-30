@@ -24,7 +24,7 @@ function starterPool(path,onShard,sets=Object.fromEntries(Object.keys(SET_BASE).
 function cardLibrary(url,sets,log,languages={},places=null){
   const lang=url.match(/^https:\/\/cards\.wikiscroll\.com\/v1\/([a-z]+)\//)?.[1];
   if(lang!=='en')sets=languages[lang];
-  if(url===`https://cards.wikiscroll.com/v1/${lang}/current.json`)return sets?Response.json({v:1,build:'20261025',base:'20261025/',sets,...(places?{places:places.length}:{})}):new Response('',{status:lang==='en'?503:404});
+  if(url===`https://cards.wikiscroll.com/v1/${lang}/current.json`)return sets?Response.json({v:1,build:'20261025',base:'20261025/',sets,...(places?{places:places.length}:{}),...(sets['how-en-heritage']!==undefined||places?{tripStyles:2}:{})}):new Response('',{status:lang==='en'?503:404});
   const file=url.match(/\/20261025\/places\/(\d+)\.json$/)?.[1];
   if(file!==undefined){log.push('places/'+file);return places?.[file]?Response.json(places[file]):new Response('',{status:404});}
   const [,set,shard]=url.match(/^https:\/\/cards\.wikiscroll\.com\/v1\/[a-z]+\/20261025\/(.+)\/(\d+)\.json$/)||[];
@@ -56,7 +56,7 @@ function harness({librarySets=undefined,languages={},places=null}={}) {
     workerRequest:()=>new Promise(resolve=>requests.push(resolve)),
     directRequest:async()=>{directCalls++;return [];},
   });
-  vm.runInContext(`let curMode='wiki',curLang='en',depthLevel=3,curTopics=new Set(),travelFilters={place:'',style:''},helpMode='off',showMature=false,showImageless=false;
+  vm.runInContext(`const TRIP_STYLES_VERSION=2;let curMode='wiki',curLang='en',depthLevel=3,curTopics=new Set(),travelFilters={place:'',style:''},helpMode='off',showMature=false,showImageless=false;
     let queue=[],articles=[],filling=false,hinted=false,fillGeneration=0,fillBudget=null,apiCooldownUntil=0,travelExhausted=false,travelContinuing=false;
     const helpTypeQuery=()=>'',matchesHelpTypes=a=>Array.isArray(a.needs)&&a.needs.some(n=>['sources','citations','unsourced','copyedit','clarify','images','outdated','incomplete','stub'].includes(n));
     const fetchWiki=()=>directRequest(),fetchWikiByTopic=()=>directRequest(),fetchVoyage=()=>directRequest();
@@ -460,7 +460,7 @@ const guide=(id,title,styles=[])=>({...article(id,'how'),title,...(styles.length
 const PLACES=placeIndex({
   titles:new Map([[1,'Japan'],[2,'Kyoto'],[3,'Osaka'],[4,'Tuscany'],[5,'Florence']]),
   parents:new Map([[2,1],[3,1],[5,4]]),
-  cards:new Map([[2,guide(2,'Kyoto',['culture'])],[3,guide(3,'Osaka',['city'])],[5,guide(5,'Florence',['culture'])]]),
+  cards:new Map([[2,guide(2,'Kyoto',['heritage'])],[3,guide(3,'Osaka',['city'])],[5,guide(5,'Florence',['heritage'])]]),
 },()=>0).files;
 
 test('the place index stands in for travel search, alternating between places', async () => {
@@ -474,8 +474,19 @@ test('the place index stands in for travel search, alternating between places', 
 
 test('a trip style narrows the stand-in to guides tagged with it', async () => {
   const h=harness({librarySets:LIBRARY_SETS,places:PLACES});
-  h.change("curMode='how';travelFilters={place:'japan',style:'culture'};");
+  h.change("curMode='how';travelFilters={place:'japan',style:'heritage'};");
   assert.deepEqual([...await h.run('fetchLibraryTravel(fillGeneration)')].map(a=>a.title),['Kyoto']);
+});
+
+test('a trip style alone draws from its own library set, and an older library leaves it to the live search', async () => {
+  const h=harness({librarySets:{...LIBRARY_SETS,'how-en-heritage':1}});
+  h.change("curMode='how';travelFilters={place:'',style:'heritage'};");
+  const cards=await h.run('fetchLibraryTravel(fillGeneration)');
+  assert.equal(cards.length,100);assert.deepEqual(h.shards,['how-en-heritage/0']);
+  assert.deepEqual([...await h.run('fetchLibraryTravel(fillGeneration)')],[]);assert.equal(h.run('travelExhausted'),true,'one shard, then the end card');
+  const old=harness({librarySets:LIBRARY_SETS});
+  old.change("curMode='how';travelFilters={place:'',style:'heritage'};");
+  assert.equal(await old.run('fetchLibraryTravel(fillGeneration)'),null);
 });
 
 test('a place the index does not know leaves travel to the live search', async () => {

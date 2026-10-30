@@ -5,9 +5,10 @@ import os from 'node:os';
 import path from 'node:path';
 import zlib from 'node:zlib';
 import crypto from 'node:crypto';
-import {readLocalFiles,trustedUploads,thumbURL,sqlRows,readTable,readPageProps,readLinkTargets,readCategoryLinks,readPages,topicCategories,cirrusReader,libraryCard,voyageCard,guideBanner,guidePhotoGaps,fillGuidePhoto,cardNeeds,cardSets,dailyViews,vitalLevels,buildLibrary,averageDailyViews,emptyProps,shorten,SETS,TOPICS,HELP,SHARD_SIZE,MINIMUM,MAX_FILES,MAX_BYTES,SLICE_CAP,BODY_CHARS,translateTitles,localRoots,placeIndex,placeHash,guideStyles,PLACE_CAP} from '../scripts/build-library.mjs';
+import {readLocalFiles,trustedUploads,thumbURL,sqlRows,readTable,readPageProps,readLinkTargets,readCategoryLinks,readPages,topicCategories,cirrusReader,libraryCard,voyageCard,guideBanner,guidePhotoGaps,fillGuidePhoto,cardNeeds,cardSets,dailyViews,vitalLevels,buildLibrary,averageDailyViews,emptyProps,shorten,SETS,TOPICS,HELP,SHARD_SIZE,MINIMUM,MAX_FILES,MAX_BYTES,SLICE_CAP,BODY_CHARS,translateTitles,localRoots,placeIndex,placeHash,PLACE_CAP,PLACE_STYLE_CAP,voyageItems} from '../scripts/build-library.mjs';
 import {roots,bands} from '../worker/topics.js';
 import {availableHelpTypes} from '../worker/needs.js';
+import {TRAVEL_STYLES} from '../worker/travel.js';
 
 const text='Lake Example is a freshwater lake in the north of the country, known for its clear water and its many islands. ';
 const props=()=>emptyProps();
@@ -156,7 +157,7 @@ test('travel guides skip phrasebooks and travel topics and need no image',()=>{
 
 test('the set list covers every feed the site offers',()=>{
  assert.deepEqual(TOPICS,Object.keys(roots));assert.deepEqual(HELP,availableHelpTypes('en'));
- assert.equal(SETS.length,5+TOPICS.length*5+HELP.length*5+TOPICS.length*HELP.length*5+1);
+ assert.equal(SETS.length,5+TOPICS.length*5+HELP.length*5+TOPICS.length*HELP.length*5+1+TRAVEL_STYLES.length);
  assert.equal(new Set(SETS).size,SETS.length);
 });
 
@@ -172,7 +173,7 @@ test('a full build shuffles every card into exactly one shard per set and writes
  // Town 0 has its own banner, Town 1 shares a Wikidata item with Wikipedia's article 7,
  // Town 2 has only a default banner and no match, so it stays without a photo.
  const guideExtras={0:{source_text:'{{pagebanner|Town 0 banner.jpg|caption=Harbour}}',wikibase_item:'Q99'},1:{wikibase_item:'Q7'},2:{source_text:'{{pagebanner|Pagebanner default.jpg}}',wikibase_item:'Q404'}};
- const voyage={props:props(),lines:Array.from({length:150},(_,i)=>[JSON.stringify({index:{_id:String(i+1)}}),JSON.stringify({namespace:0,title:'Town '+i,opening_text:text,...guideExtras[i]})]).flat()};
+ const voyage={props:props(),lines:Array.from({length:150},(_,i)=>[JSON.stringify({index:{_id:String(i+1)}}),JSON.stringify({namespace:0,title:'Town '+i,opening_text:text,...guideExtras[i],...(i===3?{wikibase_item:'Q3'}:{})})]).flat(),facts:new Map([['Q3',{kinds:['island']}]])};
  const level3=Array.from({length:550},(_,i)=>`Vital ${i+1}`),level4=Array.from({length:600},(_,i)=>`Vital ${i+1}`);
  const minimum={...MINIMUM};for(const set of Object.keys(MINIMUM))MINIMUM[set]=1;
  try{
@@ -201,6 +202,8 @@ test('a full build shuffles every card into exactly one shard per set and writes
   assert.equal(manifest.sets['wiki-en-1'],5,'550 Level 3 cards make five full shards');
   assert.ok(!seen['wiki-en-2'].has('w1'),'Level 3 articles are Popular, not Known');
   assert.ok(manifest.sets['topic-en-geo-1']>0&&manifest.sets['help-en-detail-4']>0,'topic and Help sets are built');assert.equal(manifest.sets['how-en'],1);
+  assert.equal(manifest.tripStyles,2);assert.equal(manifest.sets['how-en-island'],1);assert.equal(manifest.sets['how-en-city'],0);
+  assert.deepEqual(JSON.parse(zlib.gunzipSync(fs.readFileSync(path.join(out,'20261025','how-en-island','0.json')))).map(c=>[c.title,c.styles]),[['Town 3',['island']]],'a style set holds only its own guides');
   const order=[...seen['wiki-en-3']].map(id=>Number(id.slice(1)));
   assert.ok(order.some((id,i)=>i&&id<order[i-1]),'cards are shuffled, not in dump order');
  }finally{Object.assign(MINIMUM,minimum);fs.rmSync(dir,{recursive:true,force:true});}
@@ -283,9 +286,18 @@ test('the place index files each guide under every place above it', () => {
   assert.equal(big.files[placeHash('japan', big.files.length)].japan.cards.length, PLACE_CAP);
 });
 
-test('guides carry the trip styles their introduction names', () => {
-  assert.deepEqual(guideStyles({title: 'Lake Example', body: 'A national park with hiking trails and a museum.'}), ['nature', 'culture']);
-  assert.deepEqual(guideStyles({title: 'Example', body: 'Parking is scarce.'}), [], 'whole words only');
+test('each place keeps a share of every trip style inside it', () => {
+  const titles = new Map([[1, 'Japan']]), parents = new Map(), cards = new Map();
+  for (let i = 0; i < PLACE_CAP * 2; i++) { const id = 100 + i; titles.set(id, 'Town ' + i); parents.set(id, 1); cards.set(id, {id: 'v' + id, src: 'how', title: 'Town ' + i, body: 'x', ...(i % 20 === 0 ? {styles: ['island']} : {})}); }
+  const index = placeIndex({titles, parents, cards}, Math.random);
+  const japan = index.files[placeHash('japan', index.files.length)].japan.cards;
+  assert.equal(japan.filter(card => card.styles?.includes('island')).length, Math.min(PLACE_STYLE_CAP, PLACE_CAP * 2 / 20), 'rare styles are topped up past the random sample');
+  assert.ok(japan.length > PLACE_CAP && japan.length <= PLACE_CAP + PLACE_STYLE_CAP);
+});
+
+test('every guide item is collected for its Wikidata facts', async () => {
+  const lines = ['{"index":{"_id":1}}', '{"title":"A","namespace":0,"wikibase_item":"Q1"}', '{"index":{"_id":2}}', '{"title":"B","namespace":0}', '{"index":{"_id":3}}', '{"title":"C","namespace":0,"wikibase_item":"Q1"}'];
+  assert.deepEqual(await voyageItems({lines}), ['Q1']);
 });
 
 test('Wikivoyage breadcrumbs are read from page properties', async () => {

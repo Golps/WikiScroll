@@ -216,7 +216,7 @@ test('travel filters are relayed to Wikivoyage and preserve pagination without r
 });
 test('travel filters reject invalid offsets and unknown styles before contacting Wikimedia',async()=>{
  await mocked(()=>{throw Error('unexpected upstream request')},async worker=>{
- for(const query of ['offset=-1&place=Japan','place=Japan&style=__proto__','lang=bogus&place=Japan'])assert.equal((await worker.fetch(new Request('https://wikiscroll.com/api/travel?'+query),env,ctx)).status,400);
+ for(const query of ['offset=-1&place=Japan','place=Japan&style=__proto__','place=Japan&style=toString','lang=bogus&place=Japan'])assert.equal((await worker.fetch(new Request('https://wikiscroll.com/api/travel?'+query),env,ctx)).status,400);
  });
 });
 
@@ -542,7 +542,7 @@ test('a travel guide without an introduction is found through its opening text',
     assert.match(body.articles[0].body,/^Japón está formado por cuatro islas/);
     assert.deepEqual(asked,['2577'],'only the guide without an introduction reads its full text');
   },cache);
-  assert.ok([...cache.entries.keys()].some(k=>k.includes('/api/travel?v=11')),'a complete page is cached');
+  assert.ok([...cache.entries.keys()].some(k=>k.includes('/api/travel?v=12')),'a complete page is cached');
 });
 test('random and searched Wikivoyage feeds leave out phrasebooks in any language',async()=>{
   const seen=[];

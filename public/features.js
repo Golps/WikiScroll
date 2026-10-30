@@ -21,12 +21,16 @@ function renderCollectionShare(){
  const preview=document.createElement('a');preview.textContent='Preview collection';preview.href='/collection?c='+encoded;preview.target='_blank';preview.rel='noopener';preview.className='collection-preview';
  box.append(note,button);if(!button.disabled)box.append(preview);
 }
-// When the live search can't answer, the card library's place index stands
-// in (fetchLibraryTravel in app.js) and keeps serving this filter.
+// A trip style is answered by the card library (fetchLibraryTravel in app.js),
+// which tags every guide by what its place is. A place alone searches live,
+// and when the live search can't answer, the library's place index stands in
+// and keeps serving this filter. The live search answers a style only when the
+// library can't (an older library, an unknown place, a failed download).
 const travelFromLibrary=async generation=>(await fetchLibraryTravel(generation))||[];
 async function fetchFilteredTravel(){
  const generation=fillGeneration,lang=voyageLang();
  if(libraryTravel.key)return travelFromLibrary(generation);
+ if(travelFilters.style){const cards=await fetchLibraryTravel(generation);if(cards||generation!==fillGeneration)return cards||[];}
  // The Worker reads the place as typed: "Japan, Tuscany" means either place.
  const params=()=>new URLSearchParams({lang,place:String(travelFilters.place||'').trim().slice(0,80),style:travelFilters.style||'',offset:String(travelOffset)});
  // A page of results can hold no guides about the place while later pages do,
@@ -59,7 +63,7 @@ async function fetchFilteredTravel(){
 // offers the next step: the same place in any style, all destinations, or new
 // filters. It never switches to unrelated guides on its own, and it never
 // just stops without a word.
-const TRAVEL_STYLE_LABELS={nature:'Nature & hiking',coast:'Coasts & islands',culture:'History & culture',city:'City breaks'};
+const TRAVEL_STYLE_LABELS={city:'Big cities',town:'Small towns',island:'Islands',beach:'Beaches',mountain:'Mountains',park:'National parks',hiking:'Hiking',diving:'Diving',heritage:'World Heritage'};
 function showTravelEnd(){
  const feed=document.getElementById('feed');
  const found=!!feed.querySelector('.card[data-id]');
@@ -100,17 +104,46 @@ function changeFeedThenClose(change){
  change();
  requestAnimationFrame(()=>requestAnimationFrame(()=>{closeAllPanels();closeBurger();}));
 }
+// The trip style is one quiet row in the travel filters; tapping it opens a
+// sheet of every style, grouped, with its icon. Picking one closes the sheet;
+// tapping the chosen style again goes back to any style. The choice applies
+// with the rest of the filters (Explore destinations).
+function showTripStyle(form){
+ const style=form.elements.style.value,pick=form.querySelector('.travel-style-pick');
+ pick.querySelector('.travel-style-name').textContent=TRAVEL_STYLE_LABELS[style]||'Any style';
+ pick.querySelector('use').setAttribute('href','/images/ui-icons.svg?v=5#trip-'+(style||'any'));
+}
+function openTripStyles(form){
+ const dlg=cloneUiTemplate('tripStyleTemplate'),current=form.elements.style.value;
+ // Styles this edition's library has no guide for are left out.
+ const lang=voyageLang(),manifest=libraryFor(lang).manifest,known=manifest?.tripStyles===TRIP_STYLES_VERSION;
+ dlg.querySelectorAll('.trip-chip').forEach(chip=>{
+  const style=chip.dataset.style;
+  chip.setAttribute('aria-pressed',String(style===current));
+  if(style&&known&&manifest.sets[`how-${lang}-${style}`]===0)chip.hidden=true;
+  chip.onclick=()=>{form.elements.style.value=style===current?'':style;showTripStyle(form);dlg.close();};
+ });
+ dlg.querySelectorAll('.trip-group').forEach(group=>{group.hidden=![...group.querySelectorAll('.trip-chip')].some(chip=>!chip.hidden);});
+ dlg.querySelector('.trip-sheet-close').onclick=()=>dlg.close();
+ // A tap on the dimmed page around the sheet closes it too.
+ dlg.addEventListener('click',e=>{if(e.target===dlg)dlg.close();});
+ dlg.addEventListener('keydown',e=>e.stopPropagation());
+ dlg.addEventListener('close',()=>{form.querySelector('.travel-style-pick').focus({preventScroll:true});setTimeout(()=>dlg.remove(),400);});
+ document.body.append(dlg);dlg.showModal();
+ dlg.querySelector('.trip-chip[aria-pressed="true"]')?.focus({preventScroll:true});
+}
 function installTravelFilters(){
  document.querySelectorAll('.travel-filters').forEach(form=>{
  // The ⓘ button shows how place search works, including several places.
  const info=form.querySelector('.travel-info'),help=form.querySelector('.travel-help');
  info.onclick=()=>{help.hidden=!help.hidden;info.setAttribute('aria-expanded',String(!help.hidden));};
- form.elements.place.value=travelFilters.place||'';form.elements.style.value=travelFilters.style||'';
- form.onsubmit=e=>{e.preventDefault();travelFilters={place:form.elements.place.value.trim(),style:form.elements.style.value};lsSet('ws_travel_filters',travelFilters);syncTravel();changeFeedThenClose(()=>{if(curMode!=='how')setMode('how');else resetFeed();});};
+ form.querySelector('.travel-style-pick').onclick=()=>openTripStyles(form);
+ form.onsubmit=e=>{e.preventDefault();travelFilters={place:form.elements.place.value.trim(),style:tripStyle(form.elements.style.value)};lsSet('ws_travel_filters',travelFilters);syncTravel();changeFeedThenClose(()=>{if(curMode!=='how')setMode('how');else resetFeed();});};
  form.querySelector('.travel-clear').onclick=()=>{travelFilters={place:'',style:''};lsSet('ws_travel_filters',travelFilters);syncTravel();if(curMode==='how')changeFeedThenClose(resetFeed);};
  });
+ syncTravel();
 }
-function syncTravel(){document.querySelectorAll('.travel-filters').forEach(f=>{f.elements.place.value=travelFilters.place||'';f.elements.style.value=travelFilters.style||'';});}
+function syncTravel(){document.querySelectorAll('.travel-filters').forEach(f=>{f.elements.place.value=travelFilters.place||'';f.elements.style.value=travelFilters.style||'';showTripStyle(f);});}
 installTravelFilters();
 // Import is a deliberate save action, never triggered just by opening a link.
 const importCode=new URL(location.href).searchParams.get('importCollection');

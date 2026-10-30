@@ -20,6 +20,7 @@ export const CLASSES = {
   mountain: 'Q8502', range: 'Q46831', skiResort: 'Q130003', volcano: 'Q8072', glacier: 'Q35666', hillStation: 'Q1149652',
   beach: 'Q40080', reef: 'Q184358',
   archaeological: 'Q839954', castle: 'Q23413', monastery: 'Q44613', oldTown: 'Q676050',
+  airport: 'Q1248784',
   country: 'Q6256', firstLevel: 'Q10864048', state: 'Q107390', province: 'Q34876',
   sea: 'Q165', ocean: 'Q9430', bay: 'Q39594', gulf: 'Q1322134', lagoon: 'Q187223', strait: 'Q37901'
 };
@@ -66,6 +67,8 @@ export function tripStyles(doc, place, lang = 'en') {
   // Topics ("Hiking in the Nordic countries") are about no place, so a
   // heading alone tags only a guide that is about one.
   const aboutPlace = settlement || park || kinds.size > 0 || typed('city') || Array.isArray(doc.coordinates) && doc.coordinates.length > 0;
+  // An airport is a way in, not a trip (Chubu Centrair sits on an island).
+  if (kinds.has('airport')) return [];
   const styles = new Set();
   if (settlement && (pop >= BIG_CITY || typed('huge'))) styles.add('city');
   if (settlement && !district && pop > 0 && pop < SMALL_TOWN) styles.add('town');

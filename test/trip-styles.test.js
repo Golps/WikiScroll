@@ -21,6 +21,7 @@ test('cities, towns, islands and beaches come from what the place is', () => {
   assert.deepEqual(tripStyles(guide('Kyiv/Podil'), {kinds: ['settlement'], population: 20000}), [], 'a district is not a small town');
   assert.deepEqual(tripStyles(guide('Killarney', {category: ['City articles']}), {kinds: ['town'], population: 14000}), ['town']);
   assert.deepEqual(tripStyles(guide('Boracay'), {kinds: ['island']}), ['island']);
+  assert.deepEqual(tripStyles(guide('Chubu Centrair International Airport'), {kinds: ['airport', 'island']}), []);
   assert.deepEqual(tripStyles(guide('Patong', {heading: ['Beaches']}), {kinds: ['settlement'], population: 20000}), ['town', 'beach']);
   assert.deepEqual(tripStyles(guide('Tallinn', {heading: ['Beaches']}), {kinds: ['city'], population: 450000}), [], 'a city with a beach section is not a beach trip');
   assert.deepEqual(tripStyles(guide('Nha Trang'), {kinds: ['city'], population: 120000, water: ['sea']}), ['beach'], 'a town on the sea');

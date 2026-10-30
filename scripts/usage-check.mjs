@@ -6,6 +6,9 @@
 //   CF_ACCOUNT_ID=… CF_ANALYTICS_TOKEN=… node scripts/usage-check.mjs
 export const LIMITS = {workerRequestsPerDay: 100_000, r2Bytes: 10e9, r2ClassAPerMonth: 1_000_000, r2ClassBPerMonth: 10_000_000};
 export const WARN_AT = 0.5;
+// R2's monthly allowances reset on the account's billing day (UTC), not on the 1st.
+// Shown under Billing > Billable Usage; card-library.yml keeps the same day.
+export const BILLING_DAY = 2;
 // Deletes and aborted uploads are free; reads are Class B; other writes and listings are Class A.
 const FREE = new Set(['DeleteObject', 'DeleteObjects', 'DeleteBucket', 'AbortMultipartUpload']);
 const CLASS_B = new Set(['GetObject', 'HeadObject', 'HeadBucket', 'UsageSummary', 'GetBucketEncryption', 'GetBucketLocation', 'GetBucketCors', 'GetBucketLifecycleConfiguration']);
@@ -40,7 +43,7 @@ const QUERY = `query($account: string!, $dayStart: Time!, $dayEnd: Time!, $month
 
 export function window(now = new Date()) {
   const dayEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
-  return {dayStart: new Date(dayEnd - 864e5).toISOString(), dayEnd: dayEnd.toISOString(), monthStart: new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).toISOString(), now: now.toISOString()};
+  return {dayStart: new Date(dayEnd - 864e5).toISOString(), dayEnd: dayEnd.toISOString(), monthStart: new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - (now.getUTCDate() < BILLING_DAY ? 1 : 0), BILLING_DAY)).toISOString(), now: now.toISOString()};
 }
 
 export function readUsage(account) {

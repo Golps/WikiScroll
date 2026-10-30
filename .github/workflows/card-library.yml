@@ -44,6 +44,9 @@ env:
   PER_WEEK: '5'
   # No upload may take the month's recorded writes past this (WRITE_LEDGER).
   WRITE_LIMIT: '900000'
+  # R2's free writes reset on the account's billing day (UTC), not on the 1st.
+  # It is shown under Billing > Billable Usage; usage-check.mjs keeps the same day.
+  BILLING_DAY: '2'
   # No upload may leave the bucket above this, which keeps a swap's brief
   # second copy inside R2's free 10 GB.
   STORAGE_LIMIT: '9000000000'
@@ -201,8 +204,12 @@ jobs:
           if [ "$after" -gt "$STORAGE_LIMIT" ]; then echo "Not uploading: the bucket would pass the storage limit. The current library keeps serving." >&2; exit 1; fi
           # Write guard: every upload records its writes (each shard, the manifest,
           # the record itself and a margin for the listings) in a monthly ledger
-          # in the bucket, and none may take the month past WRITE_LIMIT.
-          ledger="usage/writes-$(date -u +%Y-%m).json"
+          # in the bucket, and none may take the month past WRITE_LIMIT. The month
+          # is the billing month, which starts on BILLING_DAY and is named for
+          # the calendar month it starts in.
+          month=$(date -u +%Y-%m)
+          if [ "$((10#$(date -u +%d)))" -lt "$BILLING_DAY" ]; then month=$(date -u -d "$month-01 -1 month" +%Y-%m); fi
+          ledger="usage/writes-$month.json"
           recorded() { { aws s3 cp "s3://$R2_BUCKET/$ledger" - --endpoint-url "$R2_ENDPOINT" 2>/dev/null || echo '{}'; } | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{let n=0;try{n=Number(JSON.parse(s).writes)||0}catch{}console.log(n)})'; }
           cost=$(( $(find "$RUNNER_TEMP/library" -type f | wc -l) + 2000 )) written=$(recorded)
           echo "Writes this month: $written recorded, this upload about $cost, limit $WRITE_LIMIT." | tee -a "$GITHUB_STEP_SUMMARY"

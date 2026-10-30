@@ -19,6 +19,10 @@ test('the analytics answer is summed per measure, with storage per bucket',()=>{
  assert.deepEqual(usage,{workerRequests:500,r2Bytes:1.751e9,classA:62_454,classB:900});
 });
 
-test('the window covers all of yesterday and this month so far, in UTC',()=>{
- assert.deepEqual(window(new Date('2026-10-28T14:23:00Z')),{dayStart:'2026-10-27T00:00:00.000Z',dayEnd:'2026-10-28T00:00:00.000Z',monthStart:'2026-10-01T00:00:00.000Z',now:'2026-10-28T14:23:00.000Z'});
+test('the window covers all of yesterday and this billing month so far, in UTC',()=>{
+ assert.deepEqual(window(new Date('2026-10-28T14:23:00Z')),{dayStart:'2026-10-27T00:00:00.000Z',dayEnd:'2026-10-28T00:00:00.000Z',monthStart:'2026-10-02T00:00:00.000Z',now:'2026-10-28T14:23:00.000Z'});
+ // Before the billing day the month started on that day last month, across a year end too.
+ assert.equal(window(new Date('2026-11-01T23:00:00Z')).monthStart,'2026-10-02T00:00:00.000Z');
+ assert.equal(window(new Date('2026-11-02T00:00:00Z')).monthStart,'2026-11-02T00:00:00.000Z');
+ assert.equal(window(new Date('2027-01-01T08:00:00Z')).monthStart,'2026-12-02T00:00:00.000Z');
 });

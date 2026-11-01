@@ -81,10 +81,9 @@ const EN_MINIMUM = {1: 500, 2: 3000, 3: 50000, 4: 50000, 5: 50000};
 const RARE_MINIMUM = 1000;
 export const MINIMUM_SCALE = {en: 1, de: 0.4, fr: 0.4, es: 0.3}, GUIDE_MINIMUM = {en: 10000, de: 5000, fr: 1500, es: 500};
 export const MINIMUM = Object.fromEntries([...DEPTHS.map(d => [`wiki-${LANG}-${d}`, d === 5 && !(LANG in MINIMUM_SCALE) ? RARE_MINIMUM : Math.round(EN_MINIMUM[d] * (d <= 2 ? (LANG === 'en' ? 1 : 0.8) : MINIMUM_SCALE[LANG] ?? 0.1))]), [`how-${LANG}`, GUIDE_MINIMUM[LANG] ?? 100]]);
-// R2's free tier allows 1M writes and 10 GB a month. One build plus the next
-// one during the swap must fit the storage, and no single build may take a
-// large share of the writes, so a build over either limit is refused before
-// any upload. The workflow also checks the whole bucket against its storage
+// One build plus the next one during the swap must fit R2's free storage, and
+// no single build may take a large share of the free writes, so a build over
+// either limit is refused before any upload. The workflow also checks the whole bucket against its storage
 // limit and the month's writes against its write limit before each upload.
 export const MAX_FILES = LANG === 'en' ? 95_000 : 40_000, MAX_BYTES = 4.5e9;
 // The category walk reaches hundreds of thousands of categories; far fewer

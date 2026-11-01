@@ -1,14 +1,13 @@
 // Daily early warning for the free-tier limits: Worker requests per day, and
 // R2 storage and operations per month. Reads Cloudflare's GraphQL analytics
 // with a read-only token and fails (so GitHub opens an issue) when anything
-// passes half of its free allowance. It never changes anything.
+// passes half of its free allowance. It never changes anything. It prints
+// shares of each allowance only, since the run's log is public.
 //
-//   CF_ACCOUNT_ID=… CF_ANALYTICS_TOKEN=… node scripts/usage-check.mjs
-export const LIMITS = {workerRequestsPerDay: 100_000, r2Bytes: 10e9, r2ClassAPerMonth: 1_000_000, r2ClassBPerMonth: 10_000_000};
+//   CF_ACCOUNT_ID=… CF_ANALYTICS_TOKEN=… R2_GUARDS=… node scripts/usage-check.mjs
+import {LIMITS, parseGuards, billingMonth} from './r2-guards.mjs';
+export {LIMITS};
 export const WARN_AT = 0.5;
-// R2's monthly allowances reset on the account's billing day (UTC), not on the 1st.
-// Shown under Billing > Billable Usage; card-library.yml keeps the same day.
-export const BILLING_DAY = 2;
 // Deletes and aborted uploads are free; reads are Class B; other writes and listings are Class A.
 const FREE = new Set(['DeleteObject', 'DeleteObjects', 'DeleteBucket', 'AbortMultipartUpload']);
 const CLASS_B = new Set(['GetObject', 'HeadObject', 'HeadBucket', 'UsageSummary', 'GetBucketEncryption', 'GetBucketLocation', 'GetBucketCors', 'GetBucketLifecycleConfiguration']);
@@ -41,9 +40,11 @@ const QUERY = `query($account: string!, $dayStart: Time!, $dayEnd: Time!, $month
   } }
 }`;
 
-export function window(now = new Date()) {
+// R2's monthly allowances reset on the account's billing day (UTC), not on the
+// 1st; it comes from R2_GUARDS, the same setting the card library's uploads use.
+export function window(billingDay, now = new Date()) {
   const dayEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
-  return {dayStart: new Date(dayEnd - 864e5).toISOString(), dayEnd: dayEnd.toISOString(), monthStart: new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - (now.getUTCDate() < BILLING_DAY ? 1 : 0), BILLING_DAY)).toISOString(), now: now.toISOString()};
+  return {dayStart: new Date(dayEnd - 864e5).toISOString(), dayEnd: dayEnd.toISOString(), monthStart: billingMonth(billingDay, now).start.toISOString(), now: now.toISOString()};
 }
 
 export function readUsage(account) {
@@ -62,13 +63,15 @@ const percent = share => (share * 100).toFixed(1) + '%';
 if (process.argv[1] && import.meta.url === new URL(process.argv[1], 'file:').href) {
   const {CF_ACCOUNT_ID: account, CF_ANALYTICS_TOKEN: token} = process.env;
   if (!account || !token) { console.error('Set CF_ACCOUNT_ID and CF_ANALYTICS_TOKEN.'); process.exit(2); }
+  let billingDay;
+  try { ({billingDay} = parseGuards(process.env.R2_GUARDS)); } catch (error) { console.error(error.message); process.exit(2); }
   const response = await fetch('https://api.cloudflare.com/client/v4/graphql', {method: 'POST', headers: {Authorization: `Bearer ${token}`, 'Content-Type': 'application/json'},
-    body: JSON.stringify({query: QUERY, variables: {account, ...window()}})});
+    body: JSON.stringify({query: QUERY, variables: {account, ...window(billingDay)}})});
   const data = await response.json().catch(() => null);
   const found = data?.data?.viewer?.accounts?.[0];
   // Error text can name the account, so only the HTTP status is reported.
   if (!response.ok || data?.errors?.length || !found) { console.error(`Usage query failed (HTTP ${response.status}).`); process.exit(2); }
   const {rows, warnings} = evaluate(readUsage(found));
-  for (const row of rows) console.log(`${row.name}: ${Math.round(row.value).toLocaleString('en-US')} of ${row.limit.toLocaleString('en-US')} (${percent(row.share)})`);
+  for (const row of rows) console.log(`${row.name}: ${percent(row.share)} of the free allowance`);
   if (warnings.length) { console.error(`Past ${percent(WARN_AT)} of a free limit: ${warnings.map(row => row.name).join(', ')}.`); process.exit(1); }
 }

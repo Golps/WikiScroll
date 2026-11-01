@@ -2,7 +2,8 @@ name: Usage check
 # Daily early warning before any free-tier limit: compares yesterday's Worker
 # requests and this month's R2 storage and operations with the free
 # allowances (scripts/usage-check.mjs). Past half of one, it opens an issue.
-# Needs a read-only CF_ANALYTICS_TOKEN secret; skipped until it is set.
+# Needs a read-only CF_ANALYTICS_TOKEN secret (skipped until it is set) and
+# the R2_GUARDS secret for the billing day.
 on:
   schedule:
     - cron: '23 14 * * *'
@@ -17,6 +18,7 @@ jobs:
     env:
       CF_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
       CF_ANALYTICS_TOKEN: ${{ secrets.CF_ANALYTICS_TOKEN }}
+      R2_GUARDS: ${{ secrets.R2_GUARDS }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

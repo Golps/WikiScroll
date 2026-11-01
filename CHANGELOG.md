@@ -4,7 +4,7 @@ Releases of this repository. Each entry describes what changed in the code; [doc
 
 ## Unreleased
 
-- The card library's upload limits and R2 billing day are set per deployment through one `R2_GUARDS` Actions setting, shared by the upload guards and the daily usage check. A missing or invalid setting stops uploads before the build instead of lifting the guards. Logs and usage issues show each measure as a share of its limit.
+- The card library's upload safeguards are configured per deployment through one `R2_GUARDS` Actions setting, shared with the daily health check. A missing or invalid setting stops uploads before the build.
 - Rebuild the Wikivoyage trip styles. The old four styles were keyword searches over whole guides, so "City breaks" gave Connecticut and "Coasts & islands" gave South Carolina and the Caribbean, and travel topics such as "Public transportation" slipped in. There are now nine styles (big cities, small towns, islands, beaches, mountains, national parks, hiking, diving, World Heritage), tagged in the weekly card library from what each place is: Wikidata facts (type, population, coast, elevation, World Heritage status) and each edition's own article types and section headings. States, provinces and countries are never a city, a town or a beach. A style is drawn at random from its own library set, so readers no longer all get the same first page; the live keyword search remains as the fallback. The native menu is replaced by one row that opens a sheet of styles with icons. Saved old styles carry over to the closest new one.
 - Library photos for Commons files that also have a description page on the reader's own wiki pointed at that wiki's upload folder, where they don't exist, so the card showed the globe instead. In a sample of 23,600 top cards (every Popular card and 800 Known cards per language) this hit 57, in Arabic, Polish, Chinese, Japanese, Hindi, Korean and Spanish. The builder now trusts a wiki's image table at any size when its names match that wiki's File: pages (it required 100,000 files, which only English, German, Italian and Russian reach), and a photo that still fails from any wiki's own folder tries Commons before falling back.
 - Readers asking for the same travel search at the same moment could get an error and a one-minute pause of travel search: the Worker shared one Response between their requests, which Cloudflare Workers refuse to read across requests. They now share a plain copy and each get their own response.
@@ -15,9 +15,9 @@ Releases of this repository. Each entry describes what changed in the code; [doc
 - Turn off the workers.dev and preview addresses, so the site only answers on wikiscroll.com, and keep the starter-pool job's write token out of its install, build and test steps.
 - Open the connection to the card library while the page loads, so the first card's manifest and shard requests don't wait for a new connection.
 - The About page says that articles are prepared regularly from Wikimedia's public data, so recent edits can take a week or more to appear, and that mature topics are hidden by default.
-- Update the README for the card library: a new "How it works" section (weekly build, how the reader draws cards, the fallback chain, usage guards), fresh screenshots and swipe demos of the current interface, and notes on mature topics, guides without photos and library freshness.
+- Update the README for the card library: a new "How it works" section (weekly build, how the reader draws cards, the fallback chain, upload safeguards), fresh screenshots and swipe demos of the current interface, and notes on mature topics, guides without photos and library freshness.
 - Grow the offline backup pool from 1,800 English cards to about 11,500 cards in all 15 languages, with travel guides in each language that has Wikivoyage (Korean, Arabic and Hindi readers get English guides) and the library's mature-topic flags. Each language is resampled only when its library is rebuilt, which keeps the weekly commit small. A device now saves one shard per set of its own language for offline use, instead of every English set at install.
-- Build card libraries for all 15 languages: English weekly and five others each week in turn, mature-topic category rules for every language, travel guides only where Wikivoyage exists, and a monthly write ledger that refuses any upload past the write limit.
+- Build card libraries for all 15 languages: English weekly and five others each week in turn, mature-topic category rules for every language, travel guides only where Wikivoyage exists, and a monthly write ledger checked before every upload.
 - Add a travel place index to the card library: each Wikivoyage place lists the guides inside it, with trip-style tags, and stands in for travel search when it fails.
 - The first-launch hint drops its pill: the hand and line of text sit on a soft fade from the header, which keeps them readable over any photo.
 - Settings hover is consistent: Reading text sizes, Help types, depth labels and the About links brighten on hover like the Help Wikipedia choices (mouse only). Settings now always opens at the top instead of where it was last scrolled.
@@ -34,7 +34,7 @@ Releases of this repository. Each entry describes what changed in the code; [doc
 - After a tap or click, buttons and links no longer stay outlined (for example the About links or a panel's close button); keyboard focus rings return on any key press.
 - One corner scale across the app: 8 px for small controls, 12 px for buttons and cards, 20 px for sheets, full pills for switches and floating indicators; no square controls remain. Switches are rounded with a white knob in both themes, the waiting screen drops its box, and light mode settings use the same text sizes as dark mode.
 - Saved article actions stack each icon over its label so all four buttons line up. Wikivoyage items in Saved and History carry a map icon and their own green, and Remove inside a collection is red like Remove in All.
-- Add a daily usage check that opens an issue when Worker requests or R2 storage or operations pass half of their ceiling.
+- Add a daily health check that opens an issue if Worker or R2 usage looks unusual.
 - Pin workflow actions to exact commits (checkout v5.1.0, setup-node v5.0.0 on Node 24), drop stored Git credentials from jobs that never push, and let Dependabot propose action updates monthly.
 - Pick each library image's upload folder from the image table (files actually uploaded to English Wikipedia) rather than File: pages, many of which describe Commons files; an image that still fails tries the other folder before falling back to text.
 - Hide mature topics (sex, pornography, nudity and graphic abuse) by default, with a Mature topics switch in Settings. Library cards are flagged from Wikipedia's categories; live, starter and On this day cards from their title and description.
@@ -158,9 +158,9 @@ Releases of this repository. Each entry describes what changed in the code; [doc
 - Photos from `thumb.wikimedia.org` are accepted, like those from `upload.wikimedia.org`. Before, the same anniversary article qualified on one host and was dropped on the other.
 - Card photos are requested 960 pixels wide instead of 800. Wikimedia serves thumbnails in standard widths, and 800-pixel requests failed.
 
-### Travel search within the subrequest limit
+### Leaner travel search
 
-- A travel search stays well under the 50-subrequest limit per request. In the worst case (three places, no guide with an introduction), 1.3 made 53 per answer; 1.4 makes 20.
+- A travel search makes far fewer requests. In the worst case (three places, no guide with an introduction), 1.3 made 53 per answer; 1.4 makes 20.
 - The first paragraphs read for a results page are kept at the edge for a day in one entry, so a repeated request continues with the next 8 guides instead of reading the first ones again.
 - Searches for several places ask for 30 results in total, split between them (15 each for two places, 10 each for three).
 - The browser asks for an unfinished page up to 3 times instead of 2. At 8 guides per answer, 4 answers cover a full page of 30.

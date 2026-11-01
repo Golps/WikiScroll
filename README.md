@@ -248,13 +248,13 @@ Every layer has a fallback, so a reader never sees an empty screen:
 
 A build that comes out thin, misreads a table, or finds too many broken image links fails before anything is uploaded, and the current library keeps serving.
 
-### Guarded against runaway usage
+### Served from Cloudflare's edge
 
-The library is built to stay lean and predictable. A bad build or a runaway job can never quietly grow storage or traffic:
+The library is static files in Cloudflare R2, delivered through Cloudflare's global network:
 
-- Card downloads go straight from the edge to the reader and never pass through the Worker. Shards never change once uploaded and are cached for a year, so most reads never reach storage.
-- Every upload is checked first: a build is refused if it has too many files, or if the bucket's storage or the month's recorded writes would pass their configured limits. Only one build per language is kept, and a missing or invalid limit stops uploads instead of lifting them.
-- A daily usage check compares Worker and R2 usage with their ceilings and opens an issue once any passes half, long before anything is at risk.
+- Card downloads go straight from the nearest edge location to the reader, without a round trip through the Worker. Shards never change once uploaded and are cached for a year, so a card usually arrives from a data center close by.
+- Every build is verified before it goes live and swapped in by a single manifest change, so readers never see a half-uploaded library. Each language keeps exactly one live build.
+- A daily health check watches the Worker and the library and opens an issue if anything looks unusual.
 
 [docs/CARD-LIBRARY.md](docs/CARD-LIBRARY.md) has the full build, the set names and the one-time setup. [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) has a map of the code.
 

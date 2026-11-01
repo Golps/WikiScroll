@@ -41,7 +41,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          title='Cloudflare usage past half of its ceiling'
+          title='Cloudflare usage check'
           if [ -n "$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --search "\"$title\" in:title" --json number --jq '.[].number')" ]; then
             gh issue comment --repo "$GITHUB_REPOSITORY" "$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --search "\"$title\" in:title" --json number --jq '.[0].number')" --body-file "$RUNNER_TEMP/usage.txt"
           else

@@ -1,12 +1,12 @@
 // The card library's upload guards (the most an upload may take the month's
-// writes and the bucket's storage to, and the day the R2 month starts) are
-// account settings, so they live in the R2_GUARDS Actions secret instead of
-// this public repository:
+// writes and the bucket's storage to, and the day the R2 month starts) depend
+// on the Cloudflare account, so each deployment sets its own in the R2_GUARDS
+// Actions secret:
 //
 //   {"writeLimit": <writes a month>, "storageLimit": <bytes>, "billingDay": <1-28>}
 //
-// Secrets are masked in public logs. Anything missing or out of range is
-// refused, so a broken setting stops uploads instead of lifting the guards.
+// Anything missing or out of range is refused, so a broken setting stops
+// uploads instead of lifting the guards.
 //
 //   R2_GUARDS='…' node scripts/r2-guards.mjs   prints WRITE_LIMIT=… lines for the shell
 

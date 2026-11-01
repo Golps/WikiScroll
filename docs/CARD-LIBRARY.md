@@ -39,7 +39,7 @@ The Worker and the live API serve only what the library can't: other languages, 
 
 ## Staying inside the free tier
 
-The library is built to fit R2's free allowances. The exact limits and the day the account's R2 month starts are account settings, kept in the `R2_GUARDS` Actions secret rather than in this repository (see [One-time setup](#one-time-setup)). Workflow logs show usage only as a share of each limit.
+The library is built to fit R2's free allowances. Each deployment sets its own limits, and the day its account's R2 month starts, in the `R2_GUARDS` Actions secret (see [One-time setup](#one-time-setup)). Workflow logs show usage as a share of each limit.
 
 - **Writes:** a build is refused at more than `MAX_FILES` shards. Each upload also records its writes in a monthly ledger in the bucket (`usage/writes-<YYYY-MM>.json`: every shard, the manifest and a margin for listings), and an upload that would take the month past the write limit is refused. A dump that is already live is never rebuilt unless the run is started with *force*.
 - **Storage:** a build is refused at more than `MAX_BYTES`, and an upload that would leave the bucket above the storage limit is refused, which leaves room for the swap's brief second copy. Only one build per language is kept.

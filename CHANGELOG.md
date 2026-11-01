@@ -15,7 +15,7 @@ Releases of this repository. Each entry describes what changed in the code; [doc
 - Turn off the workers.dev and preview addresses, so the site only answers on wikiscroll.com, and keep the starter-pool job's write token out of its install, build and test steps.
 - Open the connection to the card library while the page loads, so the first card's manifest and shard requests don't wait for a new connection.
 - The About page says that articles are prepared regularly from Wikimedia's public data, so recent edits can take a week or more to appear, and that mature topics are hidden by default.
-- Update the README for the card library: a new "How it works" section (weekly build, how the reader draws cards, the fallback chain, free-tier guards), fresh screenshots and swipe demos of the current interface, and notes on mature topics, guides without photos and library freshness.
+- Update the README for the card library: a new "How it works" section (weekly build, how the reader draws cards, the fallback chain, usage guards), fresh screenshots and swipe demos of the current interface, and notes on mature topics, guides without photos and library freshness.
 - Grow the offline backup pool from 1,800 English cards to about 11,500 cards in all 15 languages, with travel guides in each language that has Wikivoyage (Korean, Arabic and Hindi readers get English guides) and the library's mature-topic flags. Each language is resampled only when its library is rebuilt, which keeps the weekly commit small. A device now saves one shard per set of its own language for offline use, instead of every English set at install.
 - Build card libraries for all 15 languages: English weekly and five others each week in turn, mature-topic category rules for every language, travel guides only where Wikivoyage exists, and a monthly write ledger that refuses any upload past the write limit.
 - Add a travel place index to the card library: each Wikivoyage place lists the guides inside it, with trip-style tags, and stands in for travel search when it fails.
@@ -34,7 +34,7 @@ Releases of this repository. Each entry describes what changed in the code; [doc
 - After a tap or click, buttons and links no longer stay outlined (for example the About links or a panel's close button); keyboard focus rings return on any key press.
 - One corner scale across the app: 8 px for small controls, 12 px for buttons and cards, 20 px for sheets, full pills for switches and floating indicators; no square controls remain. Switches are rounded with a white knob in both themes, the waiting screen drops its box, and light mode settings use the same text sizes as dark mode.
 - Saved article actions stack each icon over its label so all four buttons line up. Wikivoyage items in Saved and History carry a map icon and their own green, and Remove inside a collection is red like Remove in All.
-- Add a daily usage check that opens an issue when Worker requests or R2 storage or operations pass half of the free allowance.
+- Add a daily usage check that opens an issue when Worker requests or R2 storage or operations pass half of their ceiling.
 - Pin workflow actions to exact commits (checkout v5.1.0, setup-node v5.0.0 on Node 24), drop stored Git credentials from jobs that never push, and let Dependabot propose action updates monthly.
 - Pick each library image's upload folder from the image table (files actually uploaded to English Wikipedia) rather than File: pages, many of which describe Commons files; an image that still fails tries the other folder before falling back to text.
 - Hide mature topics (sex, pornography, nudity and graphic abuse) by default, with a Mature topics switch in Settings. Library cards are flagged from Wikipedia's categories; live, starter and On this day cards from their title and description.
@@ -48,7 +48,7 @@ Releases of this repository. Each entry describes what changed in the code; [doc
 - When the Worker reports a Wikimedia outage on an empty feed, show the device's exact-settings reserve or the bundled English starter set instead of an empty "Waiting for Wikipedia" screen, and log each upstream failure (host, status, pause) for Workers Observability.
 - Extend the outage fallback to every discovery depth and to depth or filter changes made during the pause: use saved cards from another depth or matching topic in the same language before the starter set, keep language, Help-only and travel filters strict, and never save stand-ins as the new feed's reserve.
 - Replace the fixed 66-card starter set with a weekly-refreshed pool of up to 300 cards per depth and 300 travel guides, split into shards so each reader gets a random slice for their own depth; the service worker keeps one shard per set for offline use.
-- Add a weekly card-library build: millions of English cards made from Wikimedia's search-index dump, grouped by depth, shuffled into 100-card shards and uploaded to R2 for `cards.wikiscroll.com`, with guards that keep it inside R2's free tier. It builds a set for every depth, topic, Help type, topic with Help type, and Wikivoyage browsing.
+- Add a weekly card-library build: millions of English cards made from Wikimedia's search-index dump, grouped by depth, shuffled into 100-card shards and uploaded to R2 for `cards.wikiscroll.com`, with storage and write guards. It builds a set for every depth, topic, Help type, topic with Help type, and Wikivoyage browsing.
 - Read every English feed from the card library on `cards.wikiscroll.com`: one random, undrawn 100-card shard per draw, nearer depths from the library when a setting runs thin, and a "You're all caught up" card when every depth is drawn. The Worker and live API serve only other languages, travel search, On this day and library failures.
 - When a card's 960px photo still fails after its retry, try Wikimedia's 500px standard width before showing the text-only card.
 
@@ -83,7 +83,7 @@ Releases of this repository. Each entry describes what changed in the code; [doc
 - Retire old card elements and payloads after each completed swipe, keeping long sessions bounded even when the idle cleanup timer cannot run between gestures.
 
 - Fix topic and Help refills stopping after partial responses. Expire abandoned batch jobs and bound client retries so stale work cannot pin a feed indefinitely.
-- Give each Worker invocation its own bounded upstream queue; share cooldown data across requests without sharing timers or active I/O. Background recovery no longer occupies the foreground refill queue. Preserve depth, Help verification and Free-plan request budgets.
+- Give each Worker invocation its own bounded upstream queue; share cooldown data across requests without sharing timers or active I/O. Background recovery no longer occupies the foreground refill queue. Preserve depth, Help verification and subrequest budgets.
 
 - Improve random-feed supply by sampling 50 candidate pages per draw and retaining partial batches until their slower sibling finishes. Refills resume existing work instead of abandoning late cards or launching a competing fallback; filtering, independent openings and request budgets remain.
 
@@ -158,9 +158,9 @@ Releases of this repository. Each entry describes what changed in the code; [doc
 - Photos from `thumb.wikimedia.org` are accepted, like those from `upload.wikimedia.org`. Before, the same anniversary article qualified on one host and was dropped on the other.
 - Card photos are requested 960 pixels wide instead of 800. Wikimedia serves thumbnails in standard widths, and 800-pixel requests failed.
 
-### Travel search on Cloudflare's Free plan
+### Travel search within the subrequest limit
 
-- A travel search stays well under the Free plan's 50 subrequests per request. In the worst case (three places, no guide with an introduction), 1.3 made 53 per answer; 1.4 makes 20.
+- A travel search stays well under the 50-subrequest limit per request. In the worst case (three places, no guide with an introduction), 1.3 made 53 per answer; 1.4 makes 20.
 - The first paragraphs read for a results page are kept at the edge for a day in one entry, so a repeated request continues with the next 8 guides instead of reading the first ones again.
 - Searches for several places ask for 30 results in total, split between them (15 each for two places, 10 each for three).
 - The browser asks for an unfinished page up to 3 times instead of 2. At 8 guides per answer, 4 answers cover a full page of 30.

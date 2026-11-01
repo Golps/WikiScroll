@@ -81,8 +81,8 @@ const EN_MINIMUM = {1: 500, 2: 3000, 3: 50000, 4: 50000, 5: 50000};
 const RARE_MINIMUM = 1000;
 export const MINIMUM_SCALE = {en: 1, de: 0.4, fr: 0.4, es: 0.3}, GUIDE_MINIMUM = {en: 10000, de: 5000, fr: 1500, es: 500};
 export const MINIMUM = Object.fromEntries([...DEPTHS.map(d => [`wiki-${LANG}-${d}`, d === 5 && !(LANG in MINIMUM_SCALE) ? RARE_MINIMUM : Math.round(EN_MINIMUM[d] * (d <= 2 ? (LANG === 'en' ? 1 : 0.8) : MINIMUM_SCALE[LANG] ?? 0.1))]), [`how-${LANG}`, GUIDE_MINIMUM[LANG] ?? 100]]);
-// One build plus the next one during the swap must fit R2's free storage, and
-// no single build may take a large share of the free writes, so a build over
+// One build plus the next one during the swap must fit the storage limit, and
+// no single build may take a large share of the monthly writes, so a build over
 // either limit is refused before any upload. The workflow also checks the whole bucket against its storage
 // limit and the month's writes against its write limit before each upload.
 export const MAX_FILES = LANG === 'en' ? 95_000 : 40_000, MAX_BYTES = 4.5e9;
@@ -591,7 +591,7 @@ export async function buildLibrary({lines, props, dailyTotal, levels, reach = ne
     places = index.files.length;
     stats.places = index.places; stats.placeKeys = index.keys;
   }
-  if (files > MAX_FILES || bytes > MAX_BYTES) throw Error(`Build too large for the free tier (${files} files, ${(bytes / 1e9).toFixed(2)} GB), keeping the current library.\nAll sets: ${report}`);
+  if (files > MAX_FILES || bytes > MAX_BYTES) throw Error(`Build too large for the upload limits (${files} files, ${(bytes / 1e9).toFixed(2)} GB), keeping the current library.\nAll sets: ${report}`);
   const manifest = {v: 1, build, builtAt: new Date().toISOString(), base: build + '/', shardSize: SHARD_SIZE, source, sets, ...(places ? {places} : {}), ...(guides.size ? {tripStyles: TRIP_STYLES_VERSION} : {})};
   await fsp.writeFile(path.join(outDir, 'current.json'), zlib.gzipSync(JSON.stringify(manifest) + '\n'));
   return {manifest, ...stats, files, bytes, counts: buckets.counts};

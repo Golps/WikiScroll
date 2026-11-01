@@ -29,8 +29,8 @@ export const extractParams = ids => ({prop: 'extracts', exintro: '1', explaintex
 // About 40% of Spanish and Japanese guides, against 2% in English. Such guides
 // used to be dropped, which left place searches nearly empty. For those pages,
 // read the start of the full text instead. TextExtracts returns full text for
-// one page per request, and the Workers Free plan allows 50 subrequests
-// (fetch and Cache API calls together) per request, so at most FALLBACK_MAX
+// one page per request, and the Worker is held to 50 subrequests (fetch and
+// Cache API calls together) per request, so at most FALLBACK_MAX
 // pages per answer are read from Wikivoyage.
 export const FALLBACK_MAX = 8;
 export const fullTextParams = id => ({prop: 'extracts', explaintext: '1', exsectionformat: 'wiki', exchars: '1200', pageids: String(id)});

@@ -580,7 +580,7 @@ test('a travel page whose guides arrived late keeps its place for a retry and is
   },cache);
 });
 
-test('a travel answer stays within the Workers Free subrequest limit, and retries read the next guides',async()=>{
+test('a travel answer stays within the Workers subrequest limit, and retries read the next guides',async()=>{
   // Worst case: three places, 30 results, every guide without an introduction.
   let calls=0;const cache=edgeCache(),count=fn=>async(...a)=>{calls++;return fn(...a);};
   cache.match=count(cache.match.bind(cache));cache.put=count(cache.put.bind(cache));

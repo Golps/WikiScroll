@@ -10,7 +10,7 @@
 //
 //   R2_GUARDS='…' node scripts/r2-guards.mjs   prints WRITE_LIMIT=… lines for the shell
 
-// Cloudflare's published free allowances. A guard may never be set above them.
+// Cloudflare's included usage per account. A guard may never be set above it.
 export const LIMITS = {workerRequestsPerDay: 100_000, r2Bytes: 10e9, r2ClassAPerMonth: 1_000_000, r2ClassBPerMonth: 10_000_000};
 
 const whole = (value, min, max) => Number.isSafeInteger(value) && value >= min && value <= max;
@@ -20,8 +20,8 @@ export function parseGuards(text) {
   try { guards = JSON.parse(String(text ?? '')); } catch { guards = null; }
   const {writeLimit, storageLimit, billingDay} = guards && typeof guards === 'object' ? guards : {};
   // The message never repeats the value, which is masked only as a whole.
-  if (!whole(writeLimit, 1, LIMITS.r2ClassAPerMonth)) throw Error('R2_GUARDS: writeLimit must be a whole number from 1 to the free monthly writes.');
-  if (!whole(storageLimit, 1, LIMITS.r2Bytes)) throw Error('R2_GUARDS: storageLimit must be a whole number of bytes from 1 to the free storage.');
+  if (!whole(writeLimit, 1, LIMITS.r2ClassAPerMonth)) throw Error('R2_GUARDS: writeLimit must be a whole number from 1 to the included monthly writes.');
+  if (!whole(storageLimit, 1, LIMITS.r2Bytes)) throw Error('R2_GUARDS: storageLimit must be a whole number of bytes from 1 to the included storage.');
   // Days 29 to 31 don't exist in every month.
   if (!whole(billingDay, 1, 28)) throw Error('R2_GUARDS: billingDay must be a whole number from 1 to 28.');
   return {writeLimit, storageLimit, billingDay};

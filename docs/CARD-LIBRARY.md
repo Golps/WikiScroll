@@ -37,15 +37,15 @@ A trip style comes from the library first (`fetchLibraryTravel`): a style alone 
 
 The Worker and the live API serve only what the library can't: other languages, a library language whose first build isn't uploaded yet (retried after 30 minutes), place search, On this day, an older library without the reader's set, or a failed download (the library is retried a minute later). The offline starter pool stays the last resort.
 
-## Staying inside the free tier
+## Usage guards
 
-The library is built to fit R2's free allowances. Each deployment sets its own limits, and the day its account's R2 month starts, in the `R2_GUARDS` Actions secret (see [One-time setup](#one-time-setup)). Workflow logs show usage as a share of each limit.
+Every upload is checked against hard limits on storage and writes, so a bad build or a runaway job can't quietly grow the bucket. Each deployment sets its own limits, and the day its account's R2 month starts, in the `R2_GUARDS` Actions secret (see [One-time setup](#one-time-setup)). Workflow logs show usage as a share of each limit.
 
 - **Writes:** a build is refused at more than `MAX_FILES` shards. Each upload also records its writes in a monthly ledger in the bucket (`usage/writes-<YYYY-MM>.json`: every shard, the manifest and a margin for listings), and an upload that would take the month past the write limit is refused. A dump that is already live is never rebuilt unless the run is started with *force*.
 - **Storage:** a build is refused at more than `MAX_BYTES`, and an upload that would leave the bucket above the storage limit is refused, which leaves room for the swap's brief second copy. Only one build per language is kept.
 - **Reads:** shards never change and are cached for a year, and the manifest for 5 minutes. With the cache rule below, most downloads never reach R2.
-- **Fails closed:** if `R2_GUARDS` is missing, malformed or set above a free allowance, the job stops before building and nothing is uploaded (`scripts/r2-guards.mjs`).
-- **Early warning:** the daily *Usage check* workflow (`scripts/usage-check.mjs`) compares yesterday's Worker requests and this month's R2 storage and operations with the free allowances, and opens an issue once any passes half. It needs a `CF_ANALYTICS_TOKEN` secret (a Cloudflare API token with only *Account Analytics: Read*; until it is set the check is skipped) and `R2_GUARDS` for the billing day.
+- **Fails closed:** if `R2_GUARDS` is missing, malformed or set above R2's included usage, the job stops before building and nothing is uploaded (`scripts/r2-guards.mjs`).
+- **Early warning:** the daily *Usage check* workflow (`scripts/usage-check.mjs`) compares yesterday's Worker requests and this month's R2 storage and operations with their ceilings, and opens an issue once any passes half. It needs a `CF_ANALYTICS_TOKEN` secret (a Cloudflare API token with only *Account Analytics: Read*; until it is set the check is skipped) and `R2_GUARDS` for the billing day.
 
 ## One-time setup
 
@@ -61,7 +61,7 @@ The library is built to fit R2's free allowances. Each deployment sets its own l
    ```
    {"writeLimit": <writes>, "storageLimit": <bytes>, "billingDay": <day>}
    ```
-   `writeLimit` is the most writes a billing month may record and `storageLimit` the most bytes the bucket may hold after an upload; keep both safely below R2's free allowances, with room for one build's second copy in storage. `billingDay` (1 to 28) is the day of the month, in UTC, that R2's allowances reset, shown under Billing → Billable Usage. Secrets can't be read back, so keep a private note of the values.
+   `writeLimit` is the most writes a billing month may record and `storageLimit` the most bytes the bucket may hold after an upload; keep both safely below R2's included usage, with room for one build's second copy in storage. `billingDay` (1 to 28) is the day of the month, in UTC, that R2's allowances reset, shown under Billing → Billable Usage. Secrets can't be read back, so keep a private note of the values.
 
 Without the R2 secrets from step 5, the workflow still builds the library and reports its size, but skips the upload. A manual run with *upload* switched off does the same.
 

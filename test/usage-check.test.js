@@ -4,11 +4,11 @@ import {spawnSync} from 'node:child_process';
 import {classify,evaluate,readUsage,window,LIMITS} from '../scripts/usage-check.mjs';
 import {parseGuards,billingMonth} from '../scripts/r2-guards.mjs';
 
-test('R2 operations are split into free, Class A and Class B',()=>{
+test('R2 operations are split into uncounted, Class A and Class B',()=>{
  assert.deepEqual(classify([{action:'PutObject',requests:10},{action:'ListObjects',requests:2},{action:'GetObject',requests:50},{action:'HeadObject',requests:5},{action:'DeleteObject',requests:99}]),{a:12,b:55});
 });
 
-test('only measures at half a free limit or more warn',()=>{
+test('only measures at half a ceiling or more warn',()=>{
  const quiet=evaluate({workerRequests:20_000,r2Bytes:1.8e9,classA:70_000,classB:400_000});
  assert.equal(quiet.warnings.length,0);assert.equal(quiet.rows.length,4);
  const busy=evaluate({workerRequests:LIMITS.workerRequestsPerDay/2,r2Bytes:1.8e9,classA:70_000,classB:9e6});
@@ -30,7 +30,7 @@ test('the window covers all of yesterday and this billing month so far, in UTC',
  assert.equal(window(1,new Date('2026-03-01T00:00:00Z')).monthStart,'2026-03-01T00:00:00.000Z');
 });
 
-test('the guard setting is refused when missing, malformed or above a free allowance',()=>{
+test('the guard setting is refused when missing, malformed or above the included usage',()=>{
  const ok={writeLimit:500_000,storageLimit:5e9,billingDay:15};
  assert.deepEqual(parseGuards(JSON.stringify(ok)),ok);
  for(const bad of [undefined,'','not json','null','[]',JSON.stringify({...ok,writeLimit:undefined}),JSON.stringify({...ok,writeLimit:'500000'}),

@@ -1,7 +1,7 @@
 name: Usage check
-# Daily early warning before any free-tier limit: compares yesterday's Worker
-# requests and this month's R2 storage and operations with the free
-# allowances (scripts/usage-check.mjs). Past half of one, it opens an issue.
+# Daily early warning before any usage ceiling: compares yesterday's Worker
+# requests and this month's R2 storage and operations with Cloudflare's
+# included usage (scripts/usage-check.mjs). Past half of one, it opens an issue.
 # Needs a read-only CF_ANALYTICS_TOKEN secret (skipped until it is set) and
 # the R2_GUARDS secret for the billing day.
 on:
@@ -27,7 +27,7 @@ jobs:
         with:
           node-version-file: .nvmrc
           package-manager-cache: false
-      - name: Compare usage with the free limits
+      - name: Compare usage with its ceilings
         id: usage
         if: env.CF_ANALYTICS_TOKEN != ''
         run: |
@@ -36,12 +36,12 @@ jobs:
           cat "$RUNNER_TEMP/usage.txt" | tee -a "$GITHUB_STEP_SUMMARY"
           echo "status=$status" >> "$GITHUB_OUTPUT"
           [ "$status" -eq 0 ] || [ "$status" -eq 1 ]
-      - name: Open an issue past half of a free limit
+      - name: Open an issue past half of a ceiling
         if: steps.usage.outputs.status == '1'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          title='Usage past half of a free Cloudflare limit'
+          title='Cloudflare usage past half of its ceiling'
           if [ -n "$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --search "\"$title\" in:title" --json number --jq '.[].number')" ]; then
             gh issue comment --repo "$GITHUB_REPOSITORY" "$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --search "\"$title\" in:title" --json number --jq '.[0].number')" --body-file "$RUNNER_TEMP/usage.txt"
           else

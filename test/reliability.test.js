@@ -61,7 +61,7 @@ test('429 cooldown applies to already queued jobs and honors long Retry-After va
  }finally{globalThis.fetch=oldFetch;}
 });
 
-test('every cold topic/depth/help combination stays under Free’s combined operation budget',async()=>{
+test('every cold topic/depth/help combination stays under the combined operation budget',async()=>{
  const oldCache=globalThis.caches;globalThis.caches={default:cache()};
  const counts=[];
  try{
@@ -117,7 +117,7 @@ test('an introduction outage yields retryable failure, not a cached successful e
  }finally{globalThis.caches=oldCache;}
 });
 
-test('standalone Help supplies verified articles at every depth in all four supported editions within the Free budget',async()=>{
+test('standalone Help supplies verified articles at every depth in all four supported editions within the operation budget',async()=>{
  const oldCache=globalThis.caches;globalThis.caches={default:cache()};
  try{
   for(const lang of ['en','de','fr','es'])for(const depth of [1,2,3,4,5]){

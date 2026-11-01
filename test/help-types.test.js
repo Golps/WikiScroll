@@ -49,7 +49,7 @@ function fixture(need='images',lang='en'){
 const env={WORK_LIMIT:{limit:async()=>({success:true})}};
 const background=()=>{const tasks=[];return {waitUntil:p=>tasks.push(p),done:()=>Promise.all(tasks)};};
 const options=(upstream,work)=>({langs:new Set(['en','de']),permit:async()=>true,limited:()=>null,upstream,...(work?{work}:{})});
-test('standalone and topic-narrowed photo requests produce useful batches within the Free operation budget',async()=>{
+test('standalone and topic-narrowed photo requests produce useful batches within the operation budget',async()=>{
  const old=globalThis.caches;globalThis.caches={default:{match:async()=>undefined,put:async()=>{}}};
  try{for(const topic of ['help','tech']){
   const api=await import('../worker/topics.js?photo-types='+topic),ctx=background(),work=createWork(env,ctx,createNetwork()),upstream=fixture();

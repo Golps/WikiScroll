@@ -6,6 +6,7 @@ import path from 'node:path';
 import zlib from 'node:zlib';
 import crypto from 'node:crypto';
 import {readLocalFiles,trustedUploads,thumbURL,sqlRows,readTable,readPageProps,readLinkTargets,readCategoryLinks,readPages,topicCategories,cirrusReader,libraryCard,voyageCard,guideBanner,guidePhotoGaps,fillGuidePhoto,cardNeeds,cardSets,dailyViews,vitalLevels,buildLibrary,averageDailyViews,emptyProps,shorten,SETS,TOPICS,HELP,SHARD_SIZE,MINIMUM,MAX_FILES,MAX_BYTES,SLICE_CAP,BODY_CHARS,translateTitles,localRoots,placeIndex,placeHash,PLACE_CAP,PLACE_STYLE_CAP,voyageItems} from '../scripts/build-library.mjs';
+import {LIMITS} from '../scripts/r2-guards.mjs';
 import {roots,bands} from '../worker/topics.js';
 import {availableHelpTypes} from '../worker/needs.js';
 import {TRAVEL_STYLES} from '../worker/travel.js';
@@ -218,8 +219,8 @@ test('a thin build fails before anything is written for upload',async()=>{
 });
 
 test('free-tier guards leave room for five weekly builds and the weekly swap',()=>{
- assert.ok(MAX_FILES*5<1_000_000/2,'one language takes at most half of R2\'s free 1M writes a month; the workflow\'s write limit guards the total');
- assert.ok(MAX_BYTES*2<10e9,'R2 includes 10 GB; old and new builds overlap during the swap');
+ assert.ok(MAX_FILES*5<LIMITS.r2ClassAPerMonth/2,'five builds take at most half of R2\'s free writes a month; the workflow\'s write limit guards the total');
+ assert.ok(MAX_BYTES*2<LIMITS.r2Bytes,'old and new builds overlap during the swap');
  assert.ok(SLICE_CAP>=SHARD_SIZE*100,'topic and Help slices stay large pools');
 });
 

@@ -251,7 +251,7 @@ A build that comes out thin, misreads a table, or finds too many broken image li
 The library is designed to cost nothing to run, with hard guards against a surprise bill:
 
 - Card downloads go straight to R2 and never pass through the Worker, so they don't count against its daily request limit. Shards never change once uploaded and are cached for a year.
-- Every upload is checked first: a build is refused if it has too many files, or if the bucket's storage or the month's recorded writes would pass limits set below R2's free allowances. Only one build per language is kept.
+- Every upload is checked first: a build is refused if it has too many files, or if the bucket's storage or the month's recorded writes would pass limits set below R2's free allowances. Only one build per language is kept, and a missing or invalid limit stops uploads instead of lifting them.
 - A daily usage check compares Worker and R2 usage with the free allowances and opens an issue once any passes half (it runs once its read-only analytics token is configured).
 
 [docs/CARD-LIBRARY.md](docs/CARD-LIBRARY.md) has the full build, the set names and the one-time setup. [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) has a map of the code.
@@ -265,7 +265,7 @@ Astro handles the parts that benefit from reusable templates without adding a cl
 | **Astro** | Static reader and About pages, shared desktop/mobile settings, accessible collection-dialog templates | `src/pages/`, `src/components/` |
 | **Styles** | Ordered CSS modules compiled into one hashed stylesheet | `src/styles/reader.css` |
 | **Reader** | Card navigation, preloading from the card library, image inspection, maps, languages and on-device libraries | `public/` |
-| **Card library** | Weekly build from Wikimedia dumps into sharded sets in R2, with storage and write guards | `scripts/build-library.mjs`, `.github/workflows/card-library.yml` |
+| **Card library** | Weekly build from Wikimedia dumps into sharded sets in R2, with storage and write guards | `scripts/build-library.mjs`, `scripts/r2-guards.mjs`, `.github/workflows/card-library.yml` |
 | **Backup pool** | Weekly resample of the bundled offline and outage cards from the library | `scripts/build-starter.mjs`, `public/data/starter/` |
 | **Worker** | Live fallback batches, topic/depth/help filtering, travel search, On this day and share previews | `worker/` |
 | **Offline shell** | Generated HTML/CSS cache identity, saved reading and cached assets | `scripts/astro-offline.mjs`, `public/sw.js` |

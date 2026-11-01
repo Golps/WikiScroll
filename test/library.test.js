@@ -218,8 +218,8 @@ test('a thin build fails before anything is written for upload',async()=>{
  }finally{fs.rmSync(dir,{recursive:true,force:true})}
 });
 
-test('free-tier guards leave room for five weekly builds and the weekly swap',()=>{
- assert.ok(MAX_FILES*5<LIMITS.r2ClassAPerMonth/2,'five builds take at most half of R2\'s free writes a month; the workflow\'s write limit guards the total');
+test('upload guards leave room for five weekly builds and the weekly swap',()=>{
+ assert.ok(MAX_FILES*5<LIMITS.r2ClassAPerMonth/2,'five builds take at most half of R2\'s included writes a month; the workflow\'s write limit guards the total');
  assert.ok(MAX_BYTES*2<LIMITS.r2Bytes,'old and new builds overlap during the swap');
  assert.ok(SLICE_CAP>=SHARD_SIZE*100,'topic and Help slices stay large pools');
 });

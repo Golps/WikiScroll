@@ -1,7 +1,7 @@
-// Daily early warning for the free-tier limits: Worker requests per day, and
+// Daily early warning for the usage ceilings: Worker requests per day, and
 // R2 storage and operations per month. Reads Cloudflare's GraphQL analytics
 // with a read-only token and fails (so GitHub opens an issue) when anything
-// passes half of its free allowance. It never changes anything. It prints
+// passes half of its ceiling. It never changes anything. It prints
 // shares of each allowance only, since the run's log is public.
 //
 //   CF_ACCOUNT_ID=… CF_ANALYTICS_TOKEN=… R2_GUARDS=… node scripts/usage-check.mjs
@@ -72,6 +72,6 @@ if (process.argv[1] && import.meta.url === new URL(process.argv[1], 'file:').hre
   // Error text can name the account, so only the HTTP status is reported.
   if (!response.ok || data?.errors?.length || !found) { console.error(`Usage query failed (HTTP ${response.status}).`); process.exit(2); }
   const {rows, warnings} = evaluate(readUsage(found));
-  for (const row of rows) console.log(`${row.name}: ${percent(row.share)} of the free allowance`);
-  if (warnings.length) { console.error(`Past ${percent(WARN_AT)} of a free limit: ${warnings.map(row => row.name).join(', ')}.`); process.exit(1); }
+  for (const row of rows) console.log(`${row.name}: ${percent(row.share)} of its ceiling`);
+  if (warnings.length) { console.error(`Past ${percent(WARN_AT)} of a ceiling: ${warnings.map(row => row.name).join(', ')}.`); process.exit(1); }
 }

@@ -1,6 +1,6 @@
 import {permit} from './security.js';
 
-// A fetch and a Cache API operation consume the same Free-plan allowance.
+// A fetch and a Cache API operation count against the same subrequest limit.
 // Four slots are reserved for cache reads/writes; redirects are never followed.
 export const SUBREQUEST_LIMIT = 48;
 export const FETCH_LIMIT = 44;

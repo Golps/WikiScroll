@@ -17,6 +17,8 @@ Millions of ready-made cards in 15 languages, served from a library rebuilt ever
 
 [How it works](docs/ARCHITECTURE.md) · [Engineering notes](docs/ENGINEERING.md) · [Run it yourself](docs/DEVELOPMENT.md) · [Make it your own](docs/DEVELOPMENT.md#make-it-your-own)
 
+[![Tests](https://github.com/Golps/WikiScroll/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/Golps/WikiScroll/actions/workflows/test.yml) [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 <br>
 
 
@@ -246,13 +248,13 @@ Every layer has a fallback, so a reader never sees an empty screen:
 
 A build that comes out thin, misreads a table, or finds too many broken image links fails before anything is uploaded, and the current library keeps serving.
 
-### Kept inside the free tier
+### Served from Cloudflare's edge
 
-The library is designed to cost nothing to run, with hard guards against a surprise bill:
+The library is static files in Cloudflare R2, delivered through Cloudflare's global network:
 
-- Card downloads go straight to R2 and never pass through the Worker, so they don't count against its daily request limit. Shards never change once uploaded and are cached for a year.
-- Every upload is checked first: a build is refused if it has too many files, or if the bucket's storage or the month's recorded writes would pass limits set below R2's free allowances. Only one build per language is kept, and a missing or invalid limit stops uploads instead of lifting them.
-- A daily usage check compares Worker and R2 usage with the free allowances and opens an issue once any passes half (it runs once its read-only analytics token is configured).
+- Card downloads go straight from the nearest edge location to the reader, without a round trip through the Worker. Shards never change once uploaded and are cached for a year, so a card usually arrives from a data center close by.
+- Every build is verified before it goes live and swapped in by a single manifest change, so readers never see a half-uploaded library. Each language keeps exactly one live build.
+- A daily health check watches the Worker and the library and opens an issue if anything looks unusual.
 
 [docs/CARD-LIBRARY.md](docs/CARD-LIBRARY.md) has the full build, the set names and the one-time setup. [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) has a map of the code.
 
@@ -310,7 +312,7 @@ pnpm test
 > [!NOTE]
 > Wikivoyage maps use [CARTO](https://carto.com/) basemaps and require a key for your own deployment. The map key is configured on the Worker rather than committed in the source. For a public deployment, add your own domain-restricted key and check CARTO's usage terms. See [configuration](docs/DEVELOPMENT.md#configuration).
 
-**Two ways to host it:**
+**Ways to host it:**
 
 - **Cloudflare Workers** (how wikiscroll.com runs): the full app, including topic filters, travel filters, Help Wikipedia, "On this day", shared collection pages and link previews. See [Deploying](docs/DEVELOPMENT.md#deploying).
 - **Your own card library** (optional): the library at `cards.wikiscroll.com` only answers wikiscroll.com, so a fork on another domain uses the Worker and live API until it builds its own. [docs/CARD-LIBRARY.md](docs/CARD-LIBRARY.md#one-time-setup) covers the bucket, domain and GitHub secrets.
@@ -329,7 +331,7 @@ This repository contains the source used to deploy wikiscroll.com. It isn't fini
 - **Coverage varies by language.** Help Wikipedia is available in 4 languages. Category labels on cards are English-only. Wikivoyage covers 12 editions.
 - **Built for wikiscroll.com.** Share links, preview URLs and cache keys use that domain. See [Make it your own](docs/DEVELOPMENT.md#make-it-your-own) before deploying elsewhere.
 - **Library freshness.** Library cards are rebuilt from weekly dumps: up to about a week old in English and a few weeks old in the other languages. A just-edited article shows its older introduction until the next build.
-- **Automated checks.** The project includes 410 regression tests; see [what the tests cover](docs/ENGINEERING.md#testing).
+- **Automated checks.** The project includes more than 400 regression tests; see [what the tests cover](docs/ENGINEERING.md#testing).
 
 ## Forking and contributing
 

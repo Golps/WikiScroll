@@ -18,7 +18,7 @@ The card library is a prebuilt set of Wikipedia and Wikivoyage cards, one librar
    - **Trip styles (`how-en-<style>`):** one set per style in `TRAVEL_STYLES` (`worker/travel.js`): big cities, small towns, islands, beaches, mountains, national parks, hiking, diving and World Heritage. `scripts/trip-styles.mjs` tags each guide by what its place is, never by words in its text: Wikidata facts about the place (what it is, through its "instance of" classes and their parents; its population; the sea it lies on; its elevation; World Heritage status), read from the Wikidata Query Service in a few hundred requests, plus what the edition records itself (article-type and UNESCO categories, and section headings such as "Beaches" or "Diving" in that language). States, provinces and countries are never a city, a town or a beach, and travel topics are about no place. Each guide carries its styles (`styles`). The facts are saved in the bucket (`facts/<lang>/place-facts.json.gz`, outside the public `v1/` folder); if Wikidata doesn't answer, the last saved facts (at most six weeks old) stand in, and without them the build tags from the edition's own categories and headings only. Wikidata never stops a build. The manifest's `tripStyles` (2) marks a library tagged this way.
    - **Travel place index (`places/<n>.json`):** every guide is listed under each place above it in Wikivoyage's breadcrumbs (`geocrumb-is-in` in `page_props`), so Japan lists Kyoto through Kansai. A place keeps its own guide first and then a random sample, up to `PLACE_CAP` (300), topped up so each trip style inside it keeps up to `PLACE_STYLE_CAP` (60) of its own guides. Places are keyed by their folded title, and also by the title without a "(…)" qualifier when no other place has that name. The keys are spread over `manifest.places` files by an FNV-1a hash (`placeHash`), about `PLACE_KEYS_PER_FILE` (150) per file.
    - Every set is shuffled across all of its cards and packed into gzipped shards of 100. Topic and Help sets keep a random sample of up to `SLICE_CAP` (40,000) cards each and topic-with-Help sets up to `COMBO_CAP` (10,000); the depth and travel sets keep every card.
-4. Checks the storage guard: the whole bucket, minus this language's current build, plus the new build must stay at or under the storage limit, or nothing is uploaded. Then it uploads the shards under `v1/<lang>/<dump date>/<set>/<n>.json`, writes `v1/<lang>/current.json`, which points readers at the new build, waits five and a half minutes for the edge-cached manifest to expire, and deletes the previous build. Runs share one concurrency group and languages run one at a time, so two uploads never update the write ledger at once.
+4. Checks the storage guard: the whole bucket, minus this language's current build, plus the new build must pass the storage check, or nothing is uploaded. Then it uploads the shards under `v1/<lang>/<dump date>/<set>/<n>.json`, writes `v1/<lang>/current.json`, which points readers at the new build, waits five and a half minutes for the edge-cached manifest to expire, and deletes the previous build. Runs share one concurrency group and languages run one at a time, so two uploads never update the write ledger at once.
 
 Korean, Arabic and Hindi have no Wikivoyage, so their builds have no travel sets and their readers browse the English guides, as the live site does. Other languages use the same pipeline: the English vital-article lists and topic root categories are followed through interlanguage links to that wiki's titles, the depth bands are scaled by `VIEW_SCALE`, Help types use that wiki's maintenance categories, and mature topics use `MATURE_CATEGORY_LANG`. `MINIMUM` is scaled per language (`MINIMUM_SCALE`, `GUIDE_MINIMUM`).
 
@@ -26,7 +26,7 @@ A thin build (fewer cards than `MINIMUM`), a misread table, a failed download, a
 
 ## How the site reads it
 
-`public/app.js` (`fetchLibraryBatch`) reads `v1/<lang>/current.json` for each language in `LIBRARY_LANGS`, then one random shard of the set that matches the reader's settings, straight from `cards.wikiscroll.com`. These downloads never pass through the Worker, so they don't count against its daily request limit. Every Wikipedia setting and Wikivoyage browsing in those languages come from the library:
+`public/app.js` (`fetchLibraryBatch`) reads `v1/<lang>/current.json` for each language in `LIBRARY_LANGS`, then one random shard of the set that matches the reader's settings, straight from `cards.wikiscroll.com`. These downloads never pass through the Worker. Every Wikipedia setting and Wikivoyage browsing in those languages come from the library:
 
 - Several topics or Help types: each draw picks one of the matching sets at random, so the feed mixes them.
 - Each visit draws a shard only once. When the reader's own depth has no shards left, or never had any (Popular articles rarely need work), the next draw comes from the nearest depth in the library, not from the live API.
@@ -37,15 +37,15 @@ A trip style comes from the library first (`fetchLibraryTravel`): a style alone 
 
 The Worker and the live API serve only what the library can't: other languages, a library language whose first build isn't uploaded yet (retried after 30 minutes), place search, On this day, an older library without the reader's set, or a failed download (the library is retried a minute later). The offline starter pool stays the last resort.
 
-## Staying inside the free tier
+## Upload safeguards
 
-The library is built to fit R2's free allowances. Each deployment sets its own limits, and the day its account's R2 month starts, in the `R2_GUARDS` Actions secret (see [One-time setup](#one-time-setup)). Workflow logs show usage as a share of each limit.
+Every upload is checked before anything is written, so a faulty build can't overwrite or bloat the library. Each deployment sets its own thresholds, and the day its account's R2 month starts, in the `R2_GUARDS` Actions secret (see [One-time setup](#one-time-setup)). Workflow logs show usage as a share of each limit.
 
-- **Writes:** a build is refused at more than `MAX_FILES` shards. Each upload also records its writes in a monthly ledger in the bucket (`usage/writes-<YYYY-MM>.json`: every shard, the manifest and a margin for listings), and an upload that would take the month past the write limit is refused. A dump that is already live is never rebuilt unless the run is started with *force*.
-- **Storage:** a build is refused at more than `MAX_BYTES`, and an upload that would leave the bucket above the storage limit is refused, which leaves room for the swap's brief second copy. Only one build per language is kept.
+- **Writes:** a build is refused at more than `MAX_FILES` shards. Each upload also records its writes in a monthly ledger in the bucket (`usage/writes-<YYYY-MM>.json`: every shard, the manifest and a margin for listings), and an upload that would take the month past the configured threshold is refused. A dump that is already live is never rebuilt unless the run is started with *force*.
+- **Storage:** a build is refused at more than `MAX_BYTES`, and an upload that would leave the bucket above the configured threshold is refused, which leaves room for the swap's brief second copy. Only one build per language is kept.
 - **Reads:** shards never change and are cached for a year, and the manifest for 5 minutes. With the cache rule below, most downloads never reach R2.
-- **Fails closed:** if `R2_GUARDS` is missing, malformed or set above a free allowance, the job stops before building and nothing is uploaded (`scripts/r2-guards.mjs`).
-- **Early warning:** the daily *Usage check* workflow (`scripts/usage-check.mjs`) compares yesterday's Worker requests and this month's R2 storage and operations with the free allowances, and opens an issue once any passes half. It needs a `CF_ANALYTICS_TOKEN` secret (a Cloudflare API token with only *Account Analytics: Read*; until it is set the check is skipped) and `R2_GUARDS` for the billing day.
+- **Fails closed:** if `R2_GUARDS` is missing or malformed, the job stops before building and nothing is uploaded (`scripts/r2-guards.mjs`).
+- **Early warning:** the daily *Usage check* workflow (`scripts/usage-check.mjs`) checks yesterday's Worker requests and this month's R2 storage and operations, and opens an issue if any looks unusual. It needs a `CF_ANALYTICS_TOKEN` secret (a Cloudflare API token with only *Account Analytics: Read*; until it is set the check is skipped) and `R2_GUARDS` for the billing day.
 
 ## One-time setup
 
@@ -61,7 +61,7 @@ The library is built to fit R2's free allowances. Each deployment sets its own l
    ```
    {"writeLimit": <writes>, "storageLimit": <bytes>, "billingDay": <day>}
    ```
-   `writeLimit` is the most writes a billing month may record and `storageLimit` the most bytes the bucket may hold after an upload; keep both safely below R2's free allowances, with room for one build's second copy in storage. `billingDay` (1 to 28) is the day of the month, in UTC, that R2's allowances reset, shown under Billing → Billable Usage. Secrets can't be read back, so keep a private note of the values.
+   `writeLimit` is the most writes a billing month may record and `storageLimit` the most bytes the bucket may hold after an upload; leave room in storage for one build's brief second copy. `billingDay` (1 to 28) is the day of the month, in UTC, that R2's allowances reset, shown under Billing → Billable Usage. Secrets can't be read back, so keep a private note of the values.
 
 Without the R2 secrets from step 5, the workflow still builds the library and reports its size, but skips the upload. A manual run with *upload* switched off does the same.
 

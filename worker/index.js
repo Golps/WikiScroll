@@ -238,7 +238,7 @@ export function renderUnfurl(meta,url,lang) {
 // Opening texts already read for guides without an introduction (extracts.js
 // completeLeadFallback): kept in this isolate and in the edge cache for a day,
 // so a retried travel page makes progress. Subrequest budget per travel answer
-// on the Workers Free plan (50, Cache API calls included): page cache 2,
+// within the 50-subrequest limit (Cache API calls included): page cache 2,
 // All fetches and cache operations share runtime.js's 48-operation ceiling.
 // Stored texts are checked in a small window so geographic ancestry and
 // opening-text retries also have room in the invocation budget.

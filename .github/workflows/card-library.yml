@@ -189,6 +189,7 @@ jobs:
                 "${voyage[@]}" --out "$RUNNER_TEMP/library" --tmp "$RUNNER_TEMP" \
             | tee -a "$GITHUB_STEP_SUMMARY"
       - name: Upload, then switch the site to the new build
+        id: upload
         # Scheduled runs have no inputs. GitHub compares null and false as equal,
         # so the upload choice is read only on a manual run.
         if: steps.live.outputs.skip != 'true' && env.R2_ENDPOINT != '' && (github.event_name != 'workflow_dispatch' || inputs.upload)
@@ -236,3 +237,21 @@ jobs:
             aws s3 cp "$RUNNER_TEMP/place-facts.json.gz" "s3://$R2_BUCKET/facts/$LANG_CODE/place-facts.json.gz" --endpoint-url "$R2_ENDPOINT" --only-show-errors --cache-control no-store
           fi
           echo "Library $LANG_CODE $build is live." | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Check the site serves the new build
+        # A scheduled build that was not uploaded turns the run red instead of
+        # passing quietly, and every upload is read back from the public site.
+        if: steps.live.outputs.skip != 'true' && (github.event_name == 'schedule' || steps.upload.outcome == 'success')
+        run: |
+          set -euo pipefail
+          build="${{ steps.dump.outputs.build }}"
+          if [ "${{ steps.upload.outcome }}" != "success" ]; then
+            echo "::error::Built $LANG_CODE $build but did not upload it. The site still serves the previous build." >&2; exit 1
+          fi
+          # The upload already waited out the manifest's 5-minute edge cache.
+          for try in 1 2 3; do
+            live=$(curl -fsSL --compressed --retry 2 -A "$UA" "https://cards.wikiscroll.com/v1/$LANG_CODE/current.json" \
+              | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{console.log(JSON.parse(s).build||"")}catch{console.log("")}})' || true)
+            if [ "$live" = "$build" ]; then echo "cards.wikiscroll.com serves $LANG_CODE $build." | tee -a "$GITHUB_STEP_SUMMARY"; exit 0; fi
+            [ "$try" = 3 ] || sleep 60
+          done
+          echo "::error::Uploaded $LANG_CODE $build, but the site serves ${live:-nothing readable}." >&2; exit 1

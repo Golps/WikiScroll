@@ -189,7 +189,9 @@ jobs:
                 "${voyage[@]}" --out "$RUNNER_TEMP/library" --tmp "$RUNNER_TEMP" \
             | tee -a "$GITHUB_STEP_SUMMARY"
       - name: Upload, then switch the site to the new build
-        if: steps.live.outputs.skip != 'true' && env.R2_ENDPOINT != '' && inputs.upload != false
+        # Scheduled runs have no inputs. GitHub compares null and false as equal,
+        # so the upload choice is read only on a manual run.
+        if: steps.live.outputs.skip != 'true' && env.R2_ENDPOINT != '' && (github.event_name != 'workflow_dispatch' || inputs.upload)
         run: |
           set -euo pipefail
           build="${{ steps.dump.outputs.build }}" prefix="v1/$LANG_CODE"

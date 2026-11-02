@@ -308,9 +308,20 @@ test('Wikivoyage breadcrumbs are read from page properties', async () => {
 
 test('a scheduled library run uploads; only a manual dry run skips the upload', () => {
   const workflow = fs.readFileSync(new URL('../.github/workflows/card-library.yml', import.meta.url), 'utf8');
-  const upload = workflow.match(/- name: Upload, then switch the site to the new build\n(?:\s*#.*\n)*\s*if: (.+)\n/);
+  const upload = workflow.match(/- name: Upload, then switch the site to the new build\n(?:\s*(?:#.*|id: .*)\n)*\s*if: (.+)\n/);
   assert.ok(upload, 'upload step has a condition');
   // A schedule has no inputs, and GitHub treats null != false as false.
   assert.doesNotMatch(upload[1], /inputs\.upload\s*!=\s*false/);
   assert.match(upload[1], /github\.event_name != 'workflow_dispatch' \|\| inputs\.upload/);
+});
+
+test('a scheduled build that is not uploaded fails, and uploads are read back from the site', () => {
+  const workflow = fs.readFileSync(new URL('../.github/workflows/card-library.yml', import.meta.url), 'utf8');
+  assert.match(workflow, /- name: Upload, then switch the site to the new build\n\s+id: upload\n/);
+  const check = workflow.match(/- name: Check the site serves the new build\n(?:\s*#.*\n)*\s*if: (.+)\n\s*run: \|\n([\s\S]*?)(?=\n {6}- |\n\S|$)/);
+  assert.ok(check, 'the check step follows the upload');
+  assert.match(check[1], /github\.event_name == 'schedule' \|\| steps\.upload\.outcome == 'success'/);
+  assert.match(check[1], /steps\.live\.outputs\.skip != 'true'/);
+  assert.match(check[2], /steps\.upload\.outcome \}\}" != "success"[\s\S]*exit 1/);
+  assert.match(check[2], /cards\.wikiscroll\.com\/v1\/\$LANG_CODE\/current\.json/);
 });

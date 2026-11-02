@@ -305,3 +305,12 @@ test('Wikivoyage breadcrumbs are read from page properties', async () => {
   const props = await readPageProps(table('page_props', ['pp_page', 'pp_propname', 'pp_value', 'pp_sortkey'], [[5, 'geocrumb-is-in', '4', null], [6, 'geocrumb-is-in', '', null]]));
   assert.deepEqual([...props.parent], [[5, 4]]);
 });
+
+test('a scheduled library run uploads; only a manual dry run skips the upload', () => {
+  const workflow = fs.readFileSync(new URL('../.github/workflows/card-library.yml', import.meta.url), 'utf8');
+  const upload = workflow.match(/- name: Upload, then switch the site to the new build\n(?:\s*#.*\n)*\s*if: (.+)\n/);
+  assert.ok(upload, 'upload step has a condition');
+  // A schedule has no inputs, and GitHub treats null != false as false.
+  assert.doesNotMatch(upload[1], /inputs\.upload\s*!=\s*false/);
+  assert.match(upload[1], /github\.event_name != 'workflow_dispatch' \|\| inputs\.upload/);
+});

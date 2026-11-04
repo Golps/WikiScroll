@@ -1,0 +1,80 @@
+name: Astro update
+# Checks npm once a day for a newer Astro release in the current major version
+# and, once it has been out for a few days (scripts/astro-update.mjs), pins it,
+# runs the full test suite and build, and pushes to main, which Cloudflare
+# Workers Builds deploys. A new major version opens an issue instead.
+on:
+  schedule:
+    - cron: '43 15 * * *'
+  workflow_dispatch:
+permissions:
+  contents: write
+  issues: write
+concurrency:
+  group: wikiscroll-astro-update
+  cancel-in-progress: false
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Dependencies install and tests run before the push, so the write
+          # token stays out of the Git settings and only the push step gets it.
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          # pnpm is installed in a later step.
+          package-manager-cache: false
+      - name: Look for a new release
+        id: check
+        run: node scripts/astro-update.mjs | tee -a "$GITHUB_OUTPUT"
+      - name: Install pnpm
+        if: steps.check.outputs.update != ''
+        run: npm install --global pnpm@11.25.0
+      - name: Pin the new release
+        if: steps.check.outputs.update != ''
+        env:
+          VERSION: ${{ steps.check.outputs.update }}
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm add --save-dev --save-exact "astro@$VERSION"
+          changed=$(git diff --name-only | sort | tr '\n' ' ')
+          [ "$changed" = "package.json pnpm-lock.yaml " ] || { echo "Unexpected changes: $changed"; exit 1; }
+      - name: Syntax checks
+        if: steps.check.outputs.update != ''
+        run: for f in public/*.js public/translations/*.js worker/*.js scripts/*.mjs; do node --check "$f" || exit 1; done
+      - name: Test suite and build
+        if: steps.check.outputs.update != ''
+        run: pnpm test
+      - name: Push to main
+        if: steps.check.outputs.update != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.check.outputs.update }}
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -am "Update Astro to $VERSION"
+          # Kept in an unexported variable, so the tests below never see it.
+          auth="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)"; unset GH_TOKEN
+          for attempt in 1 2 3; do
+            git -c http.https://github.com/.extraheader="$auth" push && { echo "Pushed Astro $VERSION." >> "$GITHUB_STEP_SUMMARY"; exit 0; }
+            git pull --rebase origin main
+            pnpm install --frozen-lockfile
+            pnpm test
+          done
+          exit 1
+      - name: Report a new major version
+        if: steps.check.outputs.major != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.check.outputs.major }}
+        run: |
+          title="Astro ${VERSION%%.*} is available"
+          open=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --search "\"$title\" in:title" --json number --jq '.[0].number')
+          [ -z "$open" ] || { echo "Issue #$open already open."; exit 0; }
+          gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" \
+            --body "Astro $VERSION is out. The daily Astro update job only installs releases in the current major version, so this one needs a manual upgrade: read Astro's upgrade guide, update package.json and pnpm-lock.yaml, and run the tests."

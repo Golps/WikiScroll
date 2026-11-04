@@ -65,6 +65,8 @@ The same checks run on GitHub for every push to `main` and every pull request (`
 
 WikiScroll is deployed **directly to Cloudflare Workers** with Wrangler. Cloudflare Workers Builds connects this repository to the existing Worker and deploys main-branch changes after its build checks pass. GitHub Actions runs tests independently. There is no GitHub Pages deployment.
 
+Astro patch and minor releases are installed automatically. The daily *Astro update* workflow (`.github/workflows/astro-update.yml`, `scripts/astro-update.mjs`) pins the newest release in the current major version once it has been out for three days, runs the syntax checks, tests and build, and pushes to `main`, which Cloudflare then builds, tests and deploys as usual. If any check fails, nothing is pushed and the site stays on the current version. A new major version opens an issue instead, because it can need code changes.
+
 ### Automatic production deployment
 
 Connect the **existing** `wikiscroll` Worker, rather than creating another application:

@@ -35,3 +35,12 @@ test('the reader loads the About film poster only when About opens',()=>{
  assert.equal(attrs.poster,undefined);
  links[0].click({button:0,preventDefault(){}});assert.equal(attrs.poster,'/media/film-poster.jpg');
 });
+test('Structured data dates are full ISO 8601 datetimes with a timezone',()=>{
+ for(const file of ['dist/index.html','dist/about/index.html']){
+  for(const [,json] of read(file).matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)){
+   const dates=[];JSON.parse(json,(key,value)=>{if(/date/i.test(key))dates.push([key,value]);return value});
+   for(const [key,value] of dates){assert.match(value,/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?(Z|[+-]\d{2}:\d{2})$/,`${file} ${key}`);assert.ok(!Number.isNaN(Date.parse(value)),`${file} ${key}`)}
+   if(file.includes('about'))assert.ok(dates.some(([key])=>key==='uploadDate'),'the About film keeps its uploadDate');
+  }
+ }
+});

@@ -4,6 +4,7 @@ Releases of this repository. Each entry describes what changed in the code; [doc
 
 ## Unreleased
 
+- The About film's structured data gave `uploadDate` as a bare date, which search engines flag as missing a timezone. It is now a full ISO 8601 datetime with an offset, and a test checks every date in the site's structured data.
 - Update Astro to 7.4.5, and add a daily *Astro update* workflow that installs new Astro patch and minor releases three days after they come out, once the tests and build pass. A new major version opens an issue instead.
 - Each card-library job ends by reading the language's manifest back from cards.wikiscroll.com and failing if it doesn't name the new build. A scheduled build that was not uploaded now fails too, so a run can't pass while publishing nothing.
 - Scheduled card-library runs built every language but never uploaded: the upload step's `inputs.upload != false` check is false when a run has no inputs, because GitHub compares null and false as equal. The step now reads that choice only on a manual run.

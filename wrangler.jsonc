@@ -16,7 +16,7 @@
     {"name":"REQUEST_LIMIT","namespace_id":"2026091701","simple":{"limit":240,"period":60}},
     {"name":"WORK_LIMIT","namespace_id":"2026091702","simple":{"limit":600,"period":60}}
   ],
-  "observability": { "enabled": true },
+  "observability": { "enabled": true, "redact_query_string": true },
   // wikiscroll.com is connected in the Cloudflare dashboard; deployments keep it.
   "keep_vars": true
 }

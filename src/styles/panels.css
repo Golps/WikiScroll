@@ -175,6 +175,7 @@ button.hi{display:block;width:100%;font:inherit;color:inherit;text-align:start;c
 .collection-dialog label{display:block;margin-bottom:10px;font:600 13px/1.4 var(--sans)}
 .collection-dialog input{box-sizing:border-box;width:100%;padding:12px;border:1px solid var(--rule);border-radius:12px;background:var(--surface-alt);color:var(--ink)}
 .collection-dialog [hidden]{display:none!important}
+.collection-save-error:not(:empty){margin-top:16px;color:var(--ink);font:400 13px/1.5 var(--sans)}
 #likedList .li-btn[data-collect]{font-size:11px}
 #likedList .li-btn[data-collect] span{white-space:nowrap}
 .collection-start{grid-template-columns: minmax(0,2fr) minmax(0,1fr)}

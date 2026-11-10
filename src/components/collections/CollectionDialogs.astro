@@ -14,6 +14,7 @@
       <input id="collectionChoiceName" class="collection-name-input" placeholder="New collection name…" maxlength="30" required>
       <div class="collection-dialog-actions"><button class="feature-action" type="submit">Create and save</button><button class="source-close collection-back" type="button">Back</button></div>
     </form>
+    <div class="collection-save-error" role="alert" aria-atomic="true"></div>
   </dialog>
 </template>
 <template id="collectionImportTemplate">
@@ -21,5 +22,6 @@
     <h2 id="collectionImportTitle"></h2>
     <p class="collection-import-note"></p>
     <div class="collection-dialog-actions"><button type="button" class="feature-action">Save collection</button><button type="button" class="source-close">Cancel</button></div>
+    <div class="collection-save-error" role="alert" aria-atomic="true"></div>
   </dialog>
 </template>

@@ -132,12 +132,12 @@ let fillGeneration = 0;
 function lsGet(k)    { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } }
 function lsSet(k, v) {
   const value = JSON.stringify(v);
-  try { localStorage.setItem(k, value); }
+  try { localStorage.setItem(k, value); return true; }
   catch {
     // A full quota must not silently lose saves, collections or settings: the
     // feed reserve is only a cache, so give its space back and retry once.
-    if (k === 'ws_feed_reserves') return;
-    try { localStorage.removeItem('ws_feed_reserves'); localStorage.setItem(k, value); } catch {}
+    if (k === 'ws_feed_reserves') return false;
+    try { localStorage.removeItem('ws_feed_reserves'); localStorage.setItem(k, value); return true; } catch { return false; }
   }
 }
 
@@ -224,7 +224,7 @@ function saveLiked()    { lsSet('ws_liked',    [...liked.values()]); }
 function saveTopics()   { lsSet('ws_topics',   [...curTopics]); }
 function saveSettings() { lsSet('ws_settings', { readingTextSize, dimImages, mature: showMature, imageless: showImageless, ambient: ambientEnabled, swipe: swipeEnabled, kbBar: kbBarEnabled, helpMode: helpMode, helpTypes, lightMode: lightMode, depth: depthLevel, lang: curLang }); }
 function saveHistory()     { lsSet('ws_history', history.slice(0, 50)); }
-function saveCollections() { lsSet('ws_collections', collections); }
+function saveCollections(next = collections) { return lsSet('ws_collections', next); }
 
 // ── INDEXEDDB (offline cache for liked articles) ───────────────────────────
 const IDB = (() => {
@@ -455,54 +455,71 @@ function renderCollTabs() {
   // saving the article again restores it, but the tab must match what it shows.
   c.innerHTML = tabs.map(t => `<button class="coll-tab${activeCollection===t.id?' on':''}" data-cid="${t.id}" dir="auto">${esc(t.name)}${t.id!==null?' ('+collections[t.id].ids.filter(id => liked.has(id)).length+')':''}</button>`).join('');
 }
-function createCollection(name) {
+function collectionSaveFailed() {
+  const message = 'Could not save collection changes. Device storage is full or unavailable. Try again.';
+  // A modal makes body-level toasts inert. Keep its error visible and announced
+  // inside the dialog, with the reader's entered name available for a retry.
+  const notice = document.querySelector('.collection-dialog[open] .collection-save-error');
+  if (notice) notice.textContent = window.WSI18n?.translate(message) || message;
+  else toast(message, 5000);
+  return false;
+}
+function createCollection(name, ids = []) {
   name = name.trim();
-  if (!name) return;
-  if (collections.some(c => c.name.toLowerCase()===name.toLowerCase())) { toast('A collection with this name already exists'); return; }
-  collections.push({name, ids:[]});
-  saveCollections();
+  if (!name) return false;
+  if (collections.some(c => c.name.toLowerCase()===name.toLowerCase())) { toast('A collection with this name already exists'); return false; }
+  const col = {name, ids: [...ids]};
+  if (saveCollections([...collections, col]) === false) return collectionSaveFailed();
+  collections.push(col);
   renderLikedList();
   toast('Collection "'+name+'" created');
+  return true;
 }
 function addToCollection(colIdx, articleId) {
   const col = collections[colIdx];
-  if (!col || col.ids.includes(articleId)) return;
-  col.ids.push(articleId);
-  saveCollections();
+  if (!col) return false;
+  if (col.ids.includes(articleId)) return true;
+  const ids = [...col.ids, articleId];
+  if (saveCollections(collections.map((c, i) => i === colIdx ? {...c, ids} : c)) === false) return collectionSaveFailed();
+  col.ids = ids;
   renderLikedList();
   toast('Added to "'+col.name+'"');
+  return true;
 }
 // A deleted collection can be restored for a few seconds from a notice at the
 // top of Saved Articles (inside the panel, so keyboard users can reach it).
 let deletedCollection = null;
 function deleteCollection(colIdx) {
-  const [col] = collections.splice(colIdx, 1);
+  const col = collections[colIdx];
   if (!col) return;
+  if (saveCollections(collections.filter((_, i) => i !== colIdx)) === false) return collectionSaveFailed();
+  collections.splice(colIdx, 1);
   clearTimeout(deletedCollection?.timer);
   deletedCollection = {col, index: colIdx, timer: setTimeout(() => { deletedCollection = null; renderLikedList(); }, 8000)};
   activeCollection = null;
-  saveCollections();
   renderLikedList();
   document.getElementById('undoDeleteBtn')?.focus({preventScroll: true});
 }
 function undoDeleteCollection() {
   if (!deletedCollection) return;
   const {col, index, timer} = deletedCollection;
-  clearTimeout(timer); deletedCollection = null;
   // A collection created with the same name in the meantime keeps its place.
   if (!collections.some(c => c.name.toLowerCase() === col.name.toLowerCase())) {
+    const next = [...collections]; next.splice(Math.min(index, next.length), 0, col);
+    if (saveCollections(next) === false) return collectionSaveFailed();
     collections.splice(Math.min(index, collections.length), 0, col);
     activeCollection = collections.indexOf(col);
-    saveCollections();
   }
+  clearTimeout(timer); deletedCollection = null;
   renderLikedList();
 }
 // Inside a collection, Remove takes the article out of that collection only;
 // it stays saved. In "All", Remove unsaves it.
 function removeFromCollection(colIdx, id) {
   const col = collections[colIdx]; if (!col) return;
-  col.ids = col.ids.filter(x => x !== id);
-  saveCollections();
+  const ids = col.ids.filter(x => x !== id);
+  if (saveCollections(collections.map((c, i) => i === colIdx ? {...c, ids} : c)) === false) return collectionSaveFailed();
+  col.ids = ids;
   renderLikedList();
 }
 
@@ -1764,11 +1781,10 @@ document.getElementById('collTabs').addEventListener('click', ev => {
 });
 document.getElementById('collNewBtn').addEventListener('click', () => {
   const input = document.getElementById('collNewInput');
-  createCollection(input.value);
-  input.value = '';
+  if (createCollection(input.value)) input.value = '';
 });
 document.getElementById('collNewInput').addEventListener('keydown', ev => {
-  if (ev.key === 'Enter') { createCollection(ev.target.value); ev.target.value = ''; }
+  if (ev.key === 'Enter' && createCollection(ev.target.value)) ev.target.value = '';
 });
 
 // ── SHARE ──────────────────────────────────────────────────────────────────
@@ -3119,8 +3135,8 @@ function openCollectionChooser(articleId) {
   const dlg=cloneUiTemplate('collectionChooserTemplate');
   dlg.querySelector('.collection-article').textContent=article.title;
   const choices=dlg.querySelector('.collection-options');
-  collections.forEach((col,i)=>{const b=document.createElement('button');b.type='button';b.className='collection-choice';b.textContent=col.name+(col.ids.includes(articleId)?' ✓ Added':' · Add here');b.disabled=col.ids.includes(articleId);b.onclick=()=>{addToCollection(i,articleId);dlg.close()};choices.append(b)});
-  dlg.querySelector('form').onsubmit=e=>{e.preventDefault();const input=dlg.querySelector('input'),name=input.value.trim();if(!name){input.setCustomValidity(window.WSI18n?.translate('Enter a collection name')||'Enter a collection name');input.reportValidity();return}let idx=collections.findIndex(c=>c.name.toLowerCase()===name.toLowerCase());if(idx<0){collections.push({name,ids:[]});idx=collections.length-1}addToCollection(idx,articleId);dlg.close()};
+  collections.forEach((col,i)=>{const b=document.createElement('button');b.type='button';b.className='collection-choice';b.textContent=col.name+(col.ids.includes(articleId)?' ✓ Added':' · Add here');b.disabled=col.ids.includes(articleId);b.onclick=()=>{if(addToCollection(i,articleId))dlg.close()};choices.append(b)});
+  dlg.querySelector('form').onsubmit=e=>{e.preventDefault();const input=dlg.querySelector('input'),name=input.value.trim();if(!name){input.setCustomValidity(window.WSI18n?.translate('Enter a collection name')||'Enter a collection name');input.reportValidity();return}const idx=collections.findIndex(c=>c.name.toLowerCase()===name.toLowerCase());if(idx<0?createCollection(name,[articleId]):addToCollection(idx,articleId))dlg.close()};
   dlg.querySelector('input').oninput=e=>e.target.setCustomValidity('');
   const form=dlg.querySelector('form'),start=dlg.querySelector('.collection-start');
   if(!collections.length)dlg.querySelector('.collection-guidance').textContent='Create your first collection to organize this article.';

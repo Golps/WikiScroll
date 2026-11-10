@@ -146,6 +146,31 @@ function installTravelFilters(){
 function syncTravel(){document.querySelectorAll('.travel-filters').forEach(f=>{f.elements.place.value=travelFilters.place||'';f.elements.style.value=travelFilters.style||'';showTripStyle(f);});}
 installTravelFilters();
 // Import is a deliberate save action, never triggered just by opening a link.
+// Persist both parts before showing success or closing the import dialog.
+function saveImportedCollection(data) {
+ let name=data.name;while(collections.some(c=>c.name.toLowerCase()===name.toLowerCase()))name+=' (copy)';
+ const ids=[],nextLiked=new Map(liked),added=[];
+ for(const a of data.items){
+  const key=a.lang==='en'?a.id:a.lang+':'+a.id;ids.push(key);
+  if(!nextLiked.has(key)){
+   const {lang,...item}=a,saved={...item,id:key,src:a.id[0]==='v'?'how':'wiki',img:a.img||'',url:`https://${lang}.${a.id[0]==='v'?'wikivoyage':'wikipedia'}.org/?curid=${a.id.slice(1)}`};
+   nextLiked.set(key,saved);added.push(saved);
+  }
+ }
+ const previous=[...liked.values()];
+ if(!lsSet('ws_liked',[...nextLiked.values()]))return collectionSaveFailed();
+ const col={name,ids};
+ if(saveCollections([...collections,col])===false){
+  // Restore the previous article snapshot if the second write fails. If the
+  // browser also refuses that rollback, keep the UI honest about the articles
+  // already stored, but never claim that the collection was saved.
+  if(!lsSet('ws_liked',previous)){liked=nextLiked;added.forEach(a=>IDB.put(a));updateBadge();renderLikedList();}
+  return collectionSaveFailed();
+ }
+ liked=nextLiked;collections.push(col);added.forEach(a=>IDB.put(a));
+ updateBadge();activeCollection=collections.length-1;renderLikedList();
+ toast('Collection saved');return true;
+}
 const importCode=new URL(location.href).searchParams.get('importCollection');
 if(importCode){
  (async()=>{try{
@@ -157,7 +182,7 @@ if(importCode){
  const heading=dlg.querySelector('h2');heading.textContent='Save “'+data.name+'”?';
  const note=dlg.querySelector('.collection-import-note');note.textContent=`Add ${data.items.length} articles to a new collection on this device.`;
  const save=dlg.querySelector('.feature-action'),cancel=dlg.querySelector('.source-close');
- save.onclick=()=>{let name=data.name;while(collections.some(c=>c.name.toLowerCase()===name.toLowerCase()))name+=' (copy)';const ids=[];for(const a of data.items){const key=a.lang==='en'?a.id:a.lang+':'+a.id;ids.push(key);if(!liked.has(key)){const {lang,...item}=a,saved={...item,id:key,src:a.id[0]==='v'?'how':'wiki',img:a.img||'',url:`https://${lang}.${a.id[0]==='v'?'wikivoyage':'wikipedia'}.org/?curid=${a.id.slice(1)}`};liked.set(key,saved);IDB.put(saved);}}collections.push({name,ids});saveCollections();saveLiked();updateBadge();activeCollection=collections.length-1;renderLikedList();dlg.close();toast('Collection saved');};
+ save.onclick=()=>{if(saveImportedCollection(data))dlg.close();};
  cancel.onclick=()=>dlg.close();dlg.addEventListener('keydown',e=>e.stopPropagation());dlg.addEventListener('close',()=>setTimeout(()=>dlg.remove(),400));document.body.append(dlg);dlg.showModal();
  }catch{toast('Could not verify this collection. Please reopen the link to try again.');}})();
  const clean=new URL(location.href);clean.searchParams.delete('importCollection');window.history.replaceState(null,'',clean);

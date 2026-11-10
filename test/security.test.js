@@ -73,3 +73,10 @@ test('the site answers only on its own domain, and the pool job keeps its write 
   assert.match(pool, /persist-credentials: false/);
   assert.match(pool, /unset GH_TOKEN/, 'the retry tests never see the token');
 });
+
+
+test('Worker observability keeps logging enabled while redacting collection query strings', () => {
+  const config = fs.readFileSync(new URL('../wrangler.jsonc', import.meta.url), 'utf8');
+  assert.match(config, /"observability"\s*:\s*\{[^}]*"enabled"\s*:\s*true/);
+  assert.match(config, /"observability"\s*:\s*\{[^}]*"redact_query_string"\s*:\s*true/);
+});

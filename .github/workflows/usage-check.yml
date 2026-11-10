@@ -2,8 +2,9 @@ name: Usage check
 # Daily early warning before any usage ceiling: compares yesterday's Worker
 # requests and this month's R2 storage and operations with Cloudflare's
 # included usage (scripts/usage-check.mjs). Past half of one, it opens an issue.
-# Needs a read-only CF_ANALYTICS_TOKEN secret (skipped until it is set) and
-# the R2_GUARDS secret for the billing day.
+# Needs a read-only CF_ANALYTICS_TOKEN secret, R2_ACCOUNT_ID and R2_GUARDS
+# for the billing day. Missing configuration or unavailable analytics fail
+# the run instead of reporting a successful check that never happened.
 on:
   schedule:
     - cron: '23 14 * * *'
@@ -29,13 +30,15 @@ jobs:
           package-manager-cache: false
       - name: Compare usage with its ceilings
         id: usage
-        if: env.CF_ANALYTICS_TOKEN != ''
         run: |
           set -o pipefail
           status=0; node scripts/usage-check.mjs > "$RUNNER_TEMP/usage.txt" 2>&1 || status=$?
           cat "$RUNNER_TEMP/usage.txt" | tee -a "$GITHUB_STEP_SUMMARY"
           echo "status=$status" >> "$GITHUB_OUTPUT"
-          [ "$status" -eq 0 ] || [ "$status" -eq 1 ]
+          if [ "$status" -ne 0 ] && [ "$status" -ne 1 ]; then
+            echo '::error::Usage was not checked. See the step summary for the configuration or analytics error.'
+            exit 1
+          fi
       - name: Open an issue past half of a ceiling
         if: steps.usage.outputs.status == '1'
         env:

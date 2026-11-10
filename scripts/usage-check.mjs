@@ -3,6 +3,7 @@
 // with a read-only token and fails (so GitHub opens an issue) when anything
 // passes half of its ceiling. It never changes anything. It prints
 // shares of each allowance only, since the run's log is public.
+// Exit 0: measured below the warning level; 1: measured warning; 2: not checked.
 //
 //   CF_ACCOUNT_ID=… CF_ANALYTICS_TOKEN=… R2_GUARDS=… node scripts/usage-check.mjs
 import {LIMITS, parseGuards, billingMonth} from './r2-guards.mjs';
@@ -48,30 +49,58 @@ export function window(billingDay, now = new Date()) {
 }
 
 export function readUsage(account) {
-  const workerRequests = (account.workers || []).reduce((sum, row) => sum + (row.sum?.requests || 0), 0);
-  const {a: classA, b: classB} = classify((account.operations || []).map(row => ({action: row.dimensions?.actionType, requests: row.sum?.requests || 0})));
+  // Missing or malformed analytics are not zero usage. Do not include API
+  // values in errors: the workflow's logs and warning issues are public.
+  const count = value => typeof value === 'number' && Number.isFinite(value) && value >= 0;
+  const named = value => typeof value === 'string' && value.length > 0;
+  if (!account || !Array.isArray(account.workers) || !Array.isArray(account.operations) || !Array.isArray(account.storage)
+    || account.workers.some(row => !count(row?.sum?.requests))
+    || account.operations.some(row => !count(row?.sum?.requests) || !named(row?.dimensions?.actionType))
+    || account.storage.some(row => !count(row?.max?.payloadSize) || !count(row?.max?.metadataSize) || !named(row?.dimensions?.bucketName))) {
+    throw Error('Usage query returned incomplete or invalid analytics.');
+  }
+  const workerRequests = account.workers.reduce((sum, row) => sum + row.sum.requests, 0);
+  const {a: classA, b: classB} = classify(account.operations.map(row => ({action: row.dimensions.actionType, requests: row.sum.requests})));
   // Storage is reported per bucket; the largest recent reading of each counts.
   const buckets = new Map();
-  for (const row of account.storage || []) {
-    const bytes = (row.max?.payloadSize || 0) + (row.max?.metadataSize || 0), name = row.dimensions?.bucketName;
+  for (const row of account.storage) {
+    const bytes = row.max.payloadSize + row.max.metadataSize, name = row.dimensions.bucketName;
     buckets.set(name, Math.max(buckets.get(name) || 0, bytes));
   }
   return {workerRequests, r2Bytes: [...buckets.values()].reduce((sum, bytes) => sum + bytes, 0), classA, classB};
 }
 
 const percent = share => (share * 100).toFixed(1) + '%';
-if (process.argv[1] && import.meta.url === new URL(process.argv[1], 'file:').href) {
-  const {CF_ACCOUNT_ID: account, CF_ANALYTICS_TOKEN: token} = process.env;
-  if (!account || !token) { console.error('Set CF_ACCOUNT_ID and CF_ANALYTICS_TOKEN.'); process.exit(2); }
+export async function checkUsage({env = process.env, fetchImpl = fetch, log = console.log, error = console.error, now = new Date()} = {}) {
+  const {CF_ACCOUNT_ID: account, CF_ANALYTICS_TOKEN: token} = env;
+  if (!account?.trim() || !token?.trim()) {
+    error('Usage not checked: set CF_ACCOUNT_ID (the R2_ACCOUNT_ID Actions secret) and CF_ANALYTICS_TOKEN.');
+    return 2;
+  }
   let billingDay;
-  try { ({billingDay} = parseGuards(process.env.R2_GUARDS)); } catch (error) { console.error(error.message); process.exit(2); }
-  const response = await fetch('https://api.cloudflare.com/client/v4/graphql', {method: 'POST', headers: {Authorization: `Bearer ${token}`, 'Content-Type': 'application/json'},
-    body: JSON.stringify({query: QUERY, variables: {account, ...window(billingDay)}})});
-  const data = await response.json().catch(() => null);
+  try { ({billingDay} = parseGuards(env.R2_GUARDS)); } catch (failure) { error(`Usage not checked: ${failure.message}`); return 2; }
+  let response, data;
+  try {
+    response = await fetchImpl('https://api.cloudflare.com/client/v4/graphql', {method: 'POST', headers: {Authorization: `Bearer ${token}`, 'Content-Type': 'application/json'},
+      signal: AbortSignal.timeout(30_000), body: JSON.stringify({query: QUERY, variables: {account, ...window(billingDay, now)}})});
+    data = await response.json().catch(() => null);
+  } catch {
+    // A network/timeout error is not a threshold warning (exit 1). Avoid
+    // printing exception details that might contain credentials or IDs.
+    error('Usage not checked: analytics request failed or timed out.');
+    return 2;
+  }
   const found = data?.data?.viewer?.accounts?.[0];
   // Error text can name the account, so only the HTTP status is reported.
-  if (!response.ok || data?.errors?.length || !found) { console.error(`Usage query failed (HTTP ${response.status}).`); process.exit(2); }
-  const {rows, warnings} = evaluate(readUsage(found));
-  for (const row of rows) console.log(`${row.name}: ${percent(row.share)} of its ceiling`);
-  if (warnings.length) { console.error(`Past ${percent(WARN_AT)} of a ceiling: ${warnings.map(row => row.name).join(', ')}.`); process.exit(1); }
+  if (!response.ok || data?.errors?.length || !found) { error(`Usage not checked: query failed (HTTP ${response.status}).`); return 2; }
+  let usage;
+  try { usage = readUsage(found); } catch (failure) { error(`Usage not checked: ${failure.message}`); return 2; }
+  const {rows, warnings} = evaluate(usage);
+  for (const row of rows) log(`${row.name}: ${percent(row.share)} of its ceiling`);
+  if (warnings.length) { error(`Past ${percent(WARN_AT)} of a ceiling: ${warnings.map(row => row.name).join(', ')}.`); return 1; }
+  return 0;
+}
+
+if (process.argv[1] && import.meta.url === new URL(process.argv[1], 'file:').href) {
+  process.exitCode = await checkUsage();
 }

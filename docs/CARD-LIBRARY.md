@@ -45,7 +45,7 @@ Every upload is checked before anything is written, so a faulty build can't over
 - **Storage:** a build is refused at more than `MAX_BYTES`, and an upload that would leave the bucket above the configured threshold is refused, which leaves room for the swap's brief second copy. Only one build per language is kept.
 - **Reads:** shards never change and are cached for a year, and the manifest for 5 minutes. With the cache rule below, most downloads never reach R2.
 - **Fails closed:** if `R2_GUARDS` is missing or malformed, the job stops before building and nothing is uploaded (`scripts/r2-guards.mjs`).
-- **Early warning:** the daily *Usage check* workflow (`scripts/usage-check.mjs`) checks yesterday's Worker requests and this month's R2 storage and operations, and opens an issue if any looks unusual. It needs a `CF_ANALYTICS_TOKEN` secret (a Cloudflare API token with only *Account Analytics: Read*; until it is set the check is skipped) and `R2_GUARDS` for the billing day.
+- **Early warning:** the daily *Usage check* workflow (`scripts/usage-check.mjs`) checks yesterday's Worker requests and this month's R2 storage and operations, and opens an issue at or above half of an allowance. It needs `CF_ANALYTICS_TOKEN`, `R2_ACCOUNT_ID` and `R2_GUARDS` for the billing day. Missing configuration, failed requests or incomplete analytics fail the run with a "Usage not checked" explanation; they never count as measured zero usage or open a threshold-warning issue. Check failed-run notifications in GitHub Actions as well as usage-warning issues.
 
 ## One-time setup
 
@@ -62,6 +62,7 @@ Every upload is checked before anything is written, so a faulty build can't over
    {"writeLimit": <writes>, "storageLimit": <bytes>, "billingDay": <day>}
    ```
    `writeLimit` is the most writes a billing month may record and `storageLimit` the most bytes the bucket may hold after an upload; leave room in storage for one build's brief second copy. `billingDay` (1 to 28) is the day of the month, in UTC, that R2's allowances reset, shown under Billing → Billable Usage. Secrets can't be read back, so keep a private note of the values.
+7. For daily usage monitoring, create a separate read-only Cloudflare API token with **Account → Account Analytics → Read**, restricted to the specific account used in `R2_ACCOUNT_ID`. No zone, Worker-edit or R2 object-write permissions are needed. Store it only as the repository's **Settings → Secrets and variables → Actions → Repository secrets → `CF_ANALYTICS_TOKEN`**. See [Cloudflare's analytics token setup](https://developers.cloudflare.com/analytics/graphql-api/getting-started/authentication/api-token-auth/). Do not reuse a deployment credential or put a token in source, logs or an issue.
 
 Without the R2 secrets from step 5, the workflow still builds the library and reports its size, but skips the upload. A manual run with *upload* switched off does the same.
 

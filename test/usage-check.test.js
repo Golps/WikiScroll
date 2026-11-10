@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {spawnSync} from 'node:child_process';
-import {classify,evaluate,readUsage,window,LIMITS} from '../scripts/usage-check.mjs';
+import {readFileSync} from 'node:fs';
+import {classify,evaluate,readUsage,window,LIMITS,checkUsage} from '../scripts/usage-check.mjs';
 import {parseGuards,billingMonth} from '../scripts/r2-guards.mjs';
 
 test('R2 operations are split into uncounted, Class A and Class B',()=>{
@@ -52,4 +53,82 @@ test('the guard script prints shell settings and never the raw secret on failure
  const bad=run({R2_GUARDS:'{"writeLimit":123456789}'});
  assert.equal(bad.status,2);assert.equal(bad.stdout,'');assert.doesNotMatch(bad.stderr,/123456789/);
  assert.equal(run({}).status,2);
+});
+
+const configured = {CF_ACCOUNT_ID:'test-account',CF_ANALYTICS_TOKEN:'test-token',R2_GUARDS:JSON.stringify({writeLimit:500_000,storageLimit:5e9,billingDay:15})};
+const emptyUsage = () => ({workers:[],operations:[],storage:[]});
+const analyticsResponse = account => ({ok:true,status:200,json:async()=>({data:{viewer:{accounts:[account]}}})});
+async function runCheck(options={}) {
+ const logs=[],errors=[];
+ const status=await checkUsage({env:configured,fetchImpl:async()=>analyticsResponse(emptyUsage()),log:line=>logs.push(line),error:line=>errors.push(line),...options});
+ return {status,logs,errors};
+}
+
+test('missing monitoring configuration fails before any analytics request',async()=>{
+ for(const env of [{},{...configured,CF_ACCOUNT_ID:''},{...configured,CF_ANALYTICS_TOKEN:''},{...configured,CF_ANALYTICS_TOKEN:'  '},{...configured,R2_GUARDS:''},{...configured,R2_GUARDS:'private-invalid-guard'}]) {
+  let called=false;
+  const result=await runCheck({env,fetchImpl:async()=>{called=true;throw Error('unexpected request');}});
+  assert.equal(result.status,2);assert.equal(called,false);assert.deepEqual(result.logs,[]);
+  assert.match(result.errors.join('\n'),/Usage not checked:/);
+  assert.doesNotMatch(result.errors.join('\n'),/test-account|test-token|private-invalid-guard/);
+ }
+ const cli=spawnSync(process.execPath,['scripts/usage-check.mjs'],{env:{PATH:process.env.PATH},encoding:'utf8'});
+ assert.equal(cli.status,2);assert.equal(cli.stdout,'');assert.match(cli.stderr,/Usage not checked:/);
+});
+
+test('verified readings keep the success and threshold-warning exit statuses',async()=>{
+ const quiet=await runCheck();
+ assert.equal(quiet.status,0);assert.equal(quiet.logs.length,4);assert.deepEqual(quiet.errors,[]);
+ const warning=await runCheck({fetchImpl:async()=>analyticsResponse({...emptyUsage(),workers:[{sum:{requests:50_000}}]})});
+ assert.equal(warning.status,1);assert.equal(warning.logs.length,4);assert.match(warning.errors[0],/Past 50.0% of a ceiling: Worker requests yesterday/);
+});
+
+test('network, HTTP, GraphQL and invalid JSON failures cannot become threshold warnings',async()=>{
+ for(const fetchImpl of [
+  async()=>{throw Error('private-network-detail test-token');},
+  async()=>({ok:false,status:403,json:async()=>({errors:[{message:'private-account-detail'}]})}),
+  async()=>({ok:true,status:200,json:async()=>({data:{viewer:{accounts:[emptyUsage()]}},errors:[{message:'private-account-detail'}]})}),
+  async()=>({ok:true,status:200,json:async()=>{throw Error('private-invalid-json');}}),
+  async()=>({ok:true,status:200,json:async()=>({data:{viewer:{accounts:[]}}})}),
+ ]) {
+  const result=await runCheck({fetchImpl});
+  assert.equal(result.status,2);assert.deepEqual(result.logs,[]);assert.match(result.errors.join('\n'),/Usage not checked:/);
+  assert.doesNotMatch(result.errors.join('\n'),/private-|test-token/);
+ }
+});
+
+test('missing or malformed datasets fail rather than being counted as zero',async()=>{
+ for(const account of [
+  {},{...emptyUsage(),workers:null},{...emptyUsage(),operations:undefined},{...emptyUsage(),storage:{}},
+  {...emptyUsage(),workers:[null]},{...emptyUsage(),workers:[{sum:{requests:-1}}]},
+  {...emptyUsage(),workers:[{sum:{requests:'5'}}]},{...emptyUsage(),workers:[{sum:{requests:NaN}}]},
+  {...emptyUsage(),operations:[{sum:{requests:1}}]},
+  {...emptyUsage(),storage:[{max:{payloadSize:1,metadataSize:null},dimensions:{bucketName:'private-bucket'}}]},
+  {...emptyUsage(),storage:[{max:{payloadSize:1,metadataSize:0}}]},
+ ]) {
+  assert.throws(()=>readUsage(account),/incomplete or invalid analytics/);
+  const result=await runCheck({fetchImpl:async()=>analyticsResponse(account)});
+  assert.equal(result.status,2);assert.deepEqual(result.logs,[]);assert.doesNotMatch(result.errors.join('\n'),/private-bucket/);
+ }
+});
+
+test('the analytics request stays read-only, bounded and uses the configured billing window',async()=>{
+ let request;
+ const result=await runCheck({now:new Date('2026-11-10T14:23:00Z'),fetchImpl:async(url,options)=>{request={url,...options};return analyticsResponse(emptyUsage());}});
+ assert.equal(result.status,0);assert.equal(request.url,'https://api.cloudflare.com/client/v4/graphql');
+ assert.equal(request.method,'POST');assert.equal(request.headers.Authorization,'Bearer test-token');
+ assert.ok(request.signal instanceof AbortSignal);assert.equal(request.signal.aborted,false);
+ const body=JSON.parse(request.body);
+ assert.match(body.query,/^query\(/);assert.doesNotMatch(body.query,/mutation/);
+ assert.equal(body.variables.account,'test-account');assert.equal(body.variables.monthStart,'2026-10-15T00:00:00.000Z');
+ assert.doesNotMatch(result.logs.join('\n'),/test-account|test-token/);
+});
+
+test('the workflow always checks configuration and only alerts for a measured warning',()=>{
+ const source=readFileSync(new URL('../.github/workflows/usage-check.yml',import.meta.url),'utf8');
+ const step=source.match(/      - name: Compare usage with its ceilings\n([\s\S]*?)(?=      - name:)/)?.[1];
+ assert.ok(step);assert.doesNotMatch(step,/^\s+if:/m);
+ assert.match(step,/node scripts\/usage-check\.mjs/);assert.match(step,/\[ "\$status" -ne 0 \] && \[ "\$status" -ne 1 \]/);
+ assert.match(step,/exit 1/);assert.match(source,/if: steps\.usage\.outputs\.status == '1'/);
+ assert.doesNotMatch(source,/continue-on-error:/);
 });

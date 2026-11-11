@@ -4,6 +4,10 @@ Releases of this repository. Each entry describes what changed in the code; [doc
 
 ## Unreleased
 
+- When the server answers a page request with an error (429 or 5xx), the service worker now opens the saved copy of that page instead of the error, so a reader who has visited before keeps reading from the card library. Without a saved copy the server's answer is shown as before.
+- A shared collection stays readable after one of its articles is deleted from Wikipedia or Wikivoyage, or moved out of the article namespace: the page shows the remaining articles and says how many are missing. Before, one such article made the link answer "retry shortly" for good. A collection with no articles left answers 404; a lookup Wikimedia didn't answer is still retried.
+- The card-library job uses a dump only once Wikimedia has marked it complete (the folder's `_SUCCESS` file), and no longer publishes a build much smaller than the live one (`scripts/library-size.mjs` compares the two manifests set by set). A manual run with *force* skips the size comparison.
+- The daily health check opens a separate issue for each measure it flags, and no longer flags the storage the 15 libraries normally use or the short overlap while a rebuild is swapped in.
 - The About film's structured data gave `uploadDate` as a bare date, which search engines flag as missing a timezone. It is now a full ISO 8601 datetime with an offset, and a test checks every date in the site's structured data.
 - Update Astro to 7.4.5, and add a daily *Astro update* workflow that installs new Astro patch and minor releases three days after they come out, once the tests and build pass. A new major version opens an issue instead.
 - Each card-library job ends by reading the language's manifest back from cards.wikiscroll.com and failing if it doesn't name the new build. A scheduled build that was not uploaded now fails too, so a run can't pass while publishing nothing.

@@ -1,7 +1,8 @@
 name: Usage check
 # Daily early warning before any usage ceiling: compares yesterday's Worker
 # requests and this month's R2 storage and operations with Cloudflare's
-# included usage (scripts/usage-check.mjs). Past half of one, it opens an issue.
+# included usage (scripts/usage-check.mjs). Past a measure's warning level, it
+# opens an issue for that measure.
 # Needs a read-only CF_ANALYTICS_TOKEN secret, R2_ACCOUNT_ID and R2_GUARDS
 # for the billing day. Missing configuration or unavailable analytics fail
 # the run instead of reporting a successful check that never happened.
@@ -39,14 +40,19 @@ jobs:
             echo '::error::Usage was not checked. See the step summary for the configuration or analytics error.'
             exit 1
           fi
-      - name: Open an issue past half of a ceiling
+      - name: Open an issue for each measure past its warning level
         if: steps.usage.outputs.status == '1'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          title='Cloudflare usage check'
-          if [ -n "$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --search "\"$title\" in:title" --json number --jq '.[].number')" ]; then
-            gh issue comment --repo "$GITHUB_REPOSITORY" "$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --search "\"$title\" in:title" --json number --jq '.[0].number')" --body-file "$RUNNER_TEMP/usage.txt"
-          else
-            gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" --body-file "$RUNNER_TEMP/usage.txt"
-          fi
+          # One issue per measure, so a new kind of warning is a new notification
+          # and never one more comment on an issue about something else.
+          grep -oP '^Past [0-9.]+% of its ceiling: \K.+$' "$RUNNER_TEMP/usage.txt" | while IFS= read -r measure; do
+            title="Cloudflare usage check: $measure"
+            open=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --search "\"$title\" in:title" --json number,title --jq "map(select(.title == \"$title\")) | .[0].number // empty")
+            if [ -n "$open" ]; then
+              gh issue comment --repo "$GITHUB_REPOSITORY" "$open" --body-file "$RUNNER_TEMP/usage.txt"
+            else
+              gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" --body-file "$RUNNER_TEMP/usage.txt"
+            fi
+          done

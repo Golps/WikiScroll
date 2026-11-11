@@ -16,6 +16,12 @@ test('only measures at half a ceiling or more warn',()=>{
  assert.deepEqual(busy.warnings.map(w=>w.name),['Worker requests yesterday','R2 Class B operations this month']);
 });
 
+test('storage warns only near its ceiling: a full set of libraries and a rebuild swap are normal',()=>{
+ const base={workerRequests:5_000,classA:290_000,classB:1_000};
+ for(const r2Bytes of [7.39e9,9.16e9])assert.equal(evaluate({...base,r2Bytes}).warnings.length,0,String(r2Bytes));
+ assert.deepEqual(evaluate({...base,r2Bytes:9.6e9}).warnings.map(w=>w.name),['R2 storage']);
+});
+
 test('the analytics answer is summed per measure, with storage per bucket',()=>{
  const usage=readUsage({workers:[{sum:{requests:300}},{sum:{requests:200}}],operations:[{sum:{requests:62_454},dimensions:{actionType:'PutObject'}},{sum:{requests:900},dimensions:{actionType:'GetObject'}}],
   storage:[{max:{payloadSize:1.7e9,metadataSize:1e6},dimensions:{bucketName:'cards'}},{max:{payloadSize:1.75e9,metadataSize:1e6},dimensions:{bucketName:'cards'}}]});
@@ -80,7 +86,9 @@ test('verified readings keep the success and threshold-warning exit statuses',as
  const quiet=await runCheck();
  assert.equal(quiet.status,0);assert.equal(quiet.logs.length,4);assert.deepEqual(quiet.errors,[]);
  const warning=await runCheck({fetchImpl:async()=>analyticsResponse({...emptyUsage(),workers:[{sum:{requests:50_000}}]})});
- assert.equal(warning.status,1);assert.equal(warning.logs.length,4);assert.match(warning.errors[0],/Past 50.0% of a ceiling: Worker requests yesterday/);
+ assert.equal(warning.status,1);assert.equal(warning.logs.length,4);assert.deepEqual(warning.errors,['Past 50.0% of its ceiling: Worker requests yesterday']);
+ const two=await runCheck({fetchImpl:async()=>analyticsResponse({...emptyUsage(),workers:[{sum:{requests:60_000}}],storage:[{max:{payloadSize:9.7e9,metadataSize:0},dimensions:{bucketName:'cards'}}]})});
+ assert.deepEqual(two.errors,['Past 50.0% of its ceiling: Worker requests yesterday','Past 95.0% of its ceiling: R2 storage'],'one line per measure');
 });
 
 test('network, HTTP, GraphQL and invalid JSON failures cannot become threshold warnings',async()=>{
@@ -131,4 +139,7 @@ test('the workflow always checks configuration and only alerts for a measured wa
  assert.match(step,/node scripts\/usage-check\.mjs/);assert.match(step,/\[ "\$status" -ne 0 \] && \[ "\$status" -ne 1 \]/);
  assert.match(step,/exit 1/);assert.match(source,/if: steps\.usage\.outputs\.status == '1'/);
  assert.doesNotMatch(source,/continue-on-error:/);
+ // Each warned measure gets its own issue, matched by exact title.
+ assert.match(source,/grep -oP '\^Past \[0-9\.\]\+% of its ceiling: \\K\.\+\$'/);
+ assert.match(source,/title="Cloudflare usage check: \$measure"/);assert.match(source,/select\(\.title == /);
 });

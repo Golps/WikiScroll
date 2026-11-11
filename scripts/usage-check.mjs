@@ -1,7 +1,7 @@
 // Daily early warning for the usage ceilings: Worker requests per day, and
 // R2 storage and operations per month. Reads Cloudflare's GraphQL analytics
-// with a read-only token and fails (so GitHub opens an issue) when anything
-// passes half of its ceiling. It never changes anything. It prints
+// with a read-only token and fails (so GitHub opens an issue) when requests or
+// operations pass half of their ceiling, or storage nears its own. It never changes anything. It prints
 // shares of each allowance only, since the run's log is public.
 // Exit 0: measured below the warning level; 1: measured warning; 2: not checked.
 //
@@ -9,6 +9,10 @@
 import {LIMITS, parseGuards, billingMonth} from './r2-guards.mjs';
 export {LIMITS};
 export const WARN_AT = 0.5;
+// The bucket holds one build of every library, which is a steady share of its
+// storage, and briefly two builds of one language while a rebuild is swapped
+// in. Only growth beyond both is worth a warning.
+export const STORAGE_WARN_AT = 0.95;
 // Deletes and aborted uploads are free; reads are Class B; other writes and listings are Class A.
 const FREE = new Set(['DeleteObject', 'DeleteObjects', 'DeleteBucket', 'AbortMultipartUpload']);
 const CLASS_B = new Set(['GetObject', 'HeadObject', 'HeadBucket', 'UsageSummary', 'GetBucketEncryption', 'GetBucketLocation', 'GetBucketCors', 'GetBucketLifecycleConfiguration']);
@@ -26,11 +30,11 @@ export function classify(operations) {
 export function evaluate({workerRequests, r2Bytes, classA, classB}) {
   const rows = [
     ['Worker requests yesterday', workerRequests, LIMITS.workerRequestsPerDay],
-    ['R2 storage', r2Bytes, LIMITS.r2Bytes],
+    ['R2 storage', r2Bytes, LIMITS.r2Bytes, STORAGE_WARN_AT],
     ['R2 Class A operations this month', classA, LIMITS.r2ClassAPerMonth],
     ['R2 Class B operations this month', classB, LIMITS.r2ClassBPerMonth],
-  ].map(([name, value, limit]) => ({name, value, limit, share: value / limit}));
-  return {rows, warnings: rows.filter(row => row.share >= WARN_AT)};
+  ].map(([name, value, limit, warnAt = WARN_AT]) => ({name, value, limit, warnAt, share: value / limit}));
+  return {rows, warnings: rows.filter(row => row.share >= row.warnAt)};
 }
 
 const QUERY = `query($account: string!, $dayStart: Time!, $dayEnd: Time!, $monthStart: Time!, $now: Time!) {
@@ -97,7 +101,10 @@ export async function checkUsage({env = process.env, fetchImpl = fetch, log = co
   try { usage = readUsage(found); } catch (failure) { error(`Usage not checked: ${failure.message}`); return 2; }
   const {rows, warnings} = evaluate(usage);
   for (const row of rows) log(`${row.name}: ${percent(row.share)} of its ceiling`);
-  if (warnings.length) { error(`Past ${percent(WARN_AT)} of a ceiling: ${warnings.map(row => row.name).join(', ')}.`); return 1; }
+  // One line per measure: the workflow opens a separate issue for each, so a
+  // new kind of warning is a new notification.
+  for (const row of warnings) error(`Past ${percent(row.warnAt)} of its ceiling: ${row.name}`);
+  if (warnings.length) return 1;
   return 0;
 }
 

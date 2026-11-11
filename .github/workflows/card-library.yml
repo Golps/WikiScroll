@@ -105,7 +105,11 @@ jobs:
           set -euo pipefail
           base="$DUMPS/other/cirrus_search_index"
           for date in $(curl -fsSL -A "$UA" "$base/" | grep -oE 'href="[0-9]{8}/"' | grep -oE '[0-9]{8}' | sort -r | head -n 3); do
-            files=$(curl -fsSL -A "$UA" "$base/$date/index_name=${WIKI}_content/" | grep -oE 'href="[^"]+\.json\.bz2"' | sed -E 's/^href="(.*)"$/\1/' | sed -E 's#^.*/##' | sort -V || true)
+            listing=$(curl -fsSL -A "$UA" "$base/$date/index_name=${WIKI}_content/" || true)
+            # Wikimedia adds an empty _SUCCESS file once every part of a dump is
+            # written. A folder without it is still being published.
+            if ! grep -q 'href="_SUCCESS"' <<< "$listing"; then echo "Dump $date is not marked complete."; continue; fi
+            files=$(grep -oE 'href="[^"]+\.json\.bz2"' <<< "$listing" | sed -E 's/^href="(.*)"$/\1/' | sed -E 's#^.*/##' | sort -V || true)
             if [ -n "$files" ]; then
               echo "date=$date" >> "$GITHUB_OUTPUT"
               # A forced rebuild of a live dump gets its own folder: shards are cached
@@ -148,7 +152,10 @@ jobs:
           base="$DUMPS/other/cirrus_search_index/${{ steps.dump.outputs.date }}/index_name=${VOYAGE}_content"
           : > "$RUNNER_TEMP/voyage.ndjson"
           # Korean, Arabic and Hindi have no Wikivoyage; their readers get English guides.
-          voyage=$(curl -fsSL -A "$UA" "$base/" 2>/dev/null | grep -oE 'href="[^"]+\.json\.bz2"' | sed -E 's/^href="(.*)"$/\1/' | sed -E 's#^.*/##' | sort -V || true)
+          listing=$(curl -fsSL -A "$UA" "$base/" 2>/dev/null || true)
+          voyage=$(grep -oE 'href="[^"]+\.json\.bz2"' <<< "$listing" | sed -E 's/^href="(.*)"$/\1/' | sed -E 's#^.*/##' | sort -V || true)
+          # A travel dump that is still being published would build a short set of guides.
+          if [ -n "$voyage" ] && ! grep -q 'href="_SUCCESS"' <<< "$listing"; then echo "The $VOYAGE dump is not marked complete." >&2; exit 1; fi
           if [ -z "$voyage" ]; then echo "No $VOYAGE dump: building without travel guides."; else get "$DUMPS/$VOYAGE/latest/$VOYAGE-latest-page_props.sql.gz" "$RUNNER_TEMP/voyage_props.sql.gz"; fi
           for file in $voyage; do
             get "$base/$file" "$RUNNER_TEMP/voyage-part.json.bz2"; lbzip2 -dc "$RUNNER_TEMP/voyage-part.json.bz2" >> "$RUNNER_TEMP/voyage.ndjson"; rm -f "$RUNNER_TEMP/voyage-part.json.bz2"
@@ -202,6 +209,12 @@ jobs:
           eval "$guards"
           : "${WRITE_LIMIT:?}" "${STORAGE_LIMIT:?}" "${LEDGER_MONTH:?}"
           share() { awk -v a="$1" -v b="$2" 'BEGIN{printf "%.0f%%", a * 100 / b}'; }
+          # Size check: a build much smaller than the live one is not published
+          # (scripts/library-size.mjs). A manual run with "force" skips it.
+          if [ "${{ inputs.force }}" != "true" ]; then
+            aws s3 cp "s3://$R2_BUCKET/$prefix/current.json" "$RUNNER_TEMP/live-current.json" --endpoint-url "$R2_ENDPOINT" --only-show-errors || echo "No live manifest for $LANG_CODE yet."
+            node scripts/library-size.mjs "$RUNNER_TEMP/live-current.json" "$RUNNER_TEMP/library/current.json" | tee -a "$GITHUB_STEP_SUMMARY"
+          fi
           # Listing an empty prefix (a language's first build) exits non-zero; it counts as 0.
           total() { { aws s3 ls "s3://$R2_BUCKET/$1" --recursive --summarize --endpoint-url "$R2_ENDPOINT" || true; } | awk '/Total Size:/{n=$3} END{print n+0}'; }
           # Storage guard: the bucket without this language's current build, plus the new build.

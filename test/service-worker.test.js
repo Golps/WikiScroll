@@ -145,3 +145,18 @@ test('install keeps the starter index, and the page’s language sets each get o
  const before=fetched.length;await send(['wiki-de-1','how-de']);
  assert.equal(fetched.length,before,'a set this device already holds is not downloaded again');
 });
+
+test('a server failure on a page opens the saved copy; without one the server answer is shown',async()=>{
+ for(const status of [429,500,503]){
+  const cache=cacheStore();await cache.put('/',new Response('Saved reader'));
+  const sw=harness({cache,fetcher:async()=>new Response('Server error page',{status})});
+  const saved=await sw.request('/?a=w12');
+  assert.equal(saved.response.status,200,String(status));assert.equal(await saved.response.text(),'Saved reader');await saved.done();
+  assert.equal(await (await cache.match('/')).text(),'Saved reader','a failure never replaces the saved page');
+  const bare=await sw.request('/about/');
+  assert.equal(bare.response.status,status);assert.equal(await bare.response.text(),'Server error page');await bare.done();
+ }
+ const cache=cacheStore();await cache.put('/',new Response('Saved reader'));
+ const sw=harness({cache,fetcher:async()=>new Response('Not found',{status:404})});
+ const missing=await sw.request('/');assert.equal(missing.response.status,404,'other answers pass through');await missing.done();
+});

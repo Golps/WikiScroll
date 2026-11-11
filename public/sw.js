@@ -1,4 +1,4 @@
-const CACHE='wikiscroll-atlas-v139';
+const CACHE='wikiscroll-atlas-v140';
 const SHELL=['/images/ui-icons.svg?v=5','/discovery.js?v=52','/about/','/about.css?v=51','/about.js?v=49','/images/wordmark-dark.svg','/images/wordmark-light.svg','/images/favicon.ico?v=42','/images/apple-touch-icon.png?v=42','/images/icon-192.png?v=42','/images/icon-512.png?v=42','/lang.js?v=21','/translations/es.js?v=21','/translations/fr.js?v=21','/translations/de.js?v=21','/translations/it.js?v=21','/translations/pt.js?v=21','/translations/ru.js?v=21','/translations/ja.js?v=21','/translations/zh.js?v=21','/translations/ar.js?v=21','/translations/hi.js?v=21','/translations/ko.js?v=21','/translations/nl.js?v=21','/translations/pl.js?v=21','/translations/he.js?v=21','/i18n.js?v=55','/features.js?v=75','/webmcp.js?v=1','/','/app.js?v=118','/atlas.js?v=57','/manifest.json','/images/icon-192.png','/images/icon-512.png',/* ASTRO_STYLES */];
 // Wikimedia serves article images from both hosts (thumb.wikimedia.org since 2026).
 const IMAGE_HOSTS=new Set(['upload.wikimedia.org','thumb.wikimedia.org']);
@@ -50,7 +50,12 @@ self.addEventListener('fetch',event=>{
       let timer;
       const winner=await Promise.race([network.catch(()=>null),new Promise(resolve=>{timer=setTimeout(()=>resolve(null),2500);})]);
       clearTimeout(timer);
-      return winner||await cache?.match(key).catch(()=>null)||await network.catch(()=>new Response('Offline — reconnect to load WikiScroll.',{status:503,headers:{'Content-Type':'text/plain'}}));
+      // A server that answers with a failure (429 or 5xx) is treated like no
+      // answer: the saved page opens, and the reader's cards still load from
+      // the card library. Without a saved page the server's answer is shown.
+      const failed=winner&&(winner.status===429||winner.status>=500);
+      if(winner&&!failed)return winner;
+      return await cache?.match(key).catch(()=>null)||winner||await network.catch(()=>new Response('Offline — reconnect to load WikiScroll.',{status:503,headers:{'Content-Type':'text/plain'}}));
     })());
     return;
   }

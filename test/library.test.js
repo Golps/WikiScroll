@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import zlib from 'node:zlib';
+import {spawnSync} from 'node:child_process';
 import crypto from 'node:crypto';
 import {readLocalFiles,trustedUploads,thumbURL,sqlRows,readTable,readPageProps,readLinkTargets,readCategoryLinks,readPages,topicCategories,cirrusReader,libraryCard,voyageCard,guideBanner,guidePhotoGaps,fillGuidePhoto,cardNeeds,cardSets,dailyViews,vitalLevels,buildLibrary,averageDailyViews,emptyProps,shorten,SETS,TOPICS,HELP,SHARD_SIZE,MINIMUM,MAX_FILES,MAX_BYTES,SLICE_CAP,BODY_CHARS,translateTitles,localRoots,placeIndex,placeHash,PLACE_CAP,PLACE_STYLE_CAP,voyageItems} from '../scripts/build-library.mjs';
 import {LIMITS} from '../scripts/r2-guards.mjs';
@@ -324,4 +325,45 @@ test('a scheduled build that is not uploaded fails, and uploads are read back fr
   assert.match(check[1], /steps\.live\.outputs\.skip != 'true'/);
   assert.match(check[2], /steps\.upload\.outcome \}\}" != "success"[\s\S]*exit 1/);
   assert.match(check[2], /cards\.wikiscroll\.com\/v1\/\$LANG_CODE\/current\.json/);
+});
+
+test('a dump is used only once Wikimedia marks it complete', () => {
+  const workflow = fs.readFileSync(new URL('../.github/workflows/card-library.yml', import.meta.url), 'utf8');
+  const find = workflow.match(/- name: Find the newest complete dump\n[\s\S]*?(?=\n {6}- name:)/)[0];
+  // The marker is checked before the folder's files are accepted.
+  assert.ok(find.indexOf(`grep -q 'href="_SUCCESS"'`) > 0 && find.indexOf(`grep -q 'href="_SUCCESS"'`) < find.indexOf('date=$date'));
+  assert.match(find, /not marked complete\."; continue; fi/);
+  const travel = workflow.match(/- name: Download page tables and Wikivoyage\n[\s\S]*?(?=\n {6}- name:)/)[0];
+  assert.match(travel, /\[ -n "\$voyage" \] && ! grep -q 'href="_SUCCESS"' <<< "\$listing"; then .*exit 1; fi/);
+});
+
+test('a build much smaller than the live library is not published', async () => {
+  const {shrunk, readManifest} = await import('../scripts/library-size.mjs');
+  const live = {sets: {'wiki-en-3': 12085, 'wiki-en-4': 22438, 'wiki-en-1': 8, 'how-en': 300, 'topic-en-space-3': 47}};
+  assert.deepEqual(shrunk(live, {sets: {...live.sets, 'wiki-en-3': 11900, 'wiki-en-1': 3, 'topic-en-space-3': 20, 'how-en-city': 40}}), [], 'weekly drift, small sets and new sets pass');
+  // A third of a dump passes the builder's own minimums but not this.
+  const partial = shrunk(live, {sets: {'wiki-en-3': 4000, 'wiki-en-4': 7500, 'wiki-en-1': 8, 'how-en': 300, 'topic-en-space-3': 47}});
+  assert.equal(partial.length, 3); assert.match(partial[0], /^The library has 34% /); assert.match(partial[1], /^wiki-en-3 has 33% /);
+  assert.match(shrunk(live, {sets: {...live.sets, 'how-en': 0}})[0], /^how-en has 0% /, 'one large set lost');
+  assert.match(shrunk(live, {sets: {'wiki-en-3': 12085, 'wiki-en-4': 22438}})[0], /^how-en has 0% /, 'a set missing from the new build');
+  assert.deepEqual(shrunk(null, {sets: {'wiki-ko-3': 900}}), [], 'a first build has nothing to compare with');
+  assert.equal(shrunk(live, null).length, 1);
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'library-size-'));
+  const write = (name, value, gzip) => { const file = path.join(dir, name); fs.writeFileSync(file, gzip ? zlib.gzipSync(JSON.stringify(value)) : JSON.stringify(value)); return file; };
+  const liveFile = write('live.json', live, true);
+  assert.deepEqual(readManifest(liveFile), live);
+  const run = next => spawnSync(process.execPath, ['scripts/library-size.mjs', liveFile, next], {encoding: 'utf8'});
+  const ok = run(write('same.json', live, true));
+  assert.equal(ok.status, 0); assert.match(ok.stdout, /as large as the live one/);
+  const small = run(write('small.json', {sets: {'wiki-en-3': 100}}, false));
+  assert.equal(small.status, 1); assert.match(small.stderr, /^Not uploading: /); assert.match(small.stderr, /"force"/);
+  const first = spawnSync(process.execPath, ['scripts/library-size.mjs', path.join(dir, 'absent.json'), liveFile], {encoding: 'utf8'});
+  assert.equal(first.status, 0); assert.match(first.stdout, /No live build/);
+  assert.equal(run(path.join(dir, 'absent.json')).status, 1, 'an unreadable new manifest is never published');
+  // The upload step runs it before anything is written, except on a forced run.
+  const workflow = fs.readFileSync(new URL('../.github/workflows/card-library.yml', import.meta.url), 'utf8');
+  const upload = workflow.match(/- name: Upload, then switch the site to the new build\n[\s\S]*?(?=\n {6}- name:)/)[0];
+  const check = upload.indexOf('node scripts/library-size.mjs');
+  assert.ok(check > 0 && check < upload.indexOf('aws s3 sync') && check < upload.indexOf('echo "{\\"writes\\"'));
+  assert.match(upload, /if \[ "\$\{\{ inputs\.force \}\}" != "true" \]; then\n\s+aws s3 cp "s3:\/\/\$R2_BUCKET\/\$prefix\/current\.json"/);
 });

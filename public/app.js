@@ -910,12 +910,7 @@ async function fetchLibraryBatch(gen,retried=false){
     library.drawn.get(set)?.delete(shard);
     // A missing shard means the build changed: read the manifest again, past
     // the browser cache, and retry once before leaving this draw to the Worker.
-    if(cards?.missing&&!retried){
-      library.manifest=null;
-      await libraryManifest(library,true);
-      if(gen!==fillGeneration)return [];
-      return fetchLibraryBatch(gen,true);
-    }
+    if(cards?.missing&&!retried)return await libraryRenewed(library,gen)?fetchLibraryBatch(gen,true):[];
     library.failedUntil=Date.now()+6e4;return null;
   }
   libraryDraw.draws++;
@@ -947,7 +942,15 @@ function placeHash(key,files){
 }
 // Returns guides, [] at the end (travelExhausted is set), or null when the
 // library can't stand in either (an unknown place, no library, a failure).
-async function fetchLibraryTravel(gen){
+// A file missing from the build the reader holds means a new build went live
+// and the old one was removed: read the manifest again, past the browser
+// cache, so the next request uses the new build. False when the feed changed.
+async function libraryRenewed(library,gen){
+  library.manifest=null;
+  await libraryManifest(library,true);
+  return gen===fillGeneration;
+}
+async function fetchLibraryTravel(gen,retried=false){
   const lang=voyageLang(),style=travelFilters.style||'',places=travelPlaces(travelFilters.place);
   if(!LIBRARY_LANGS.has(lang))return null;
   const library=libraryFor(lang);
@@ -964,6 +967,7 @@ async function fetchLibraryTravel(gen){
       if(!(manifest.places>0))return null;
       const files=await Promise.all(places.map(place=>libraryJSON(`${LIBRARY_ROOT}${lang}/${manifest.base}places/${placeHash(place,manifest.places)}.json`,6000)));
       if(gen!==fillGeneration)return [];
+      if(!retried&&files.some(file=>file?.missing))return await libraryRenewed(library,gen)?fetchLibraryTravel(gen,true):[];
       // A failed index download would turn into a short, finished result:
       // leave the search to the live/retry path until every file arrives.
       if(files.some(file=>!file||file.missing))return null;
@@ -971,7 +975,9 @@ async function fetchLibraryTravel(gen){
       if(lists.every(list=>!Array.isArray(list)))return null;
       // Alternate between the places, as the live search does.
       const ids=new Set();cards=[];
-      for(let i=0;lists.some(list=>Array.isArray(list)&&i<list.length);i++)for(const list of lists){const card=Array.isArray(list)&&list[i];if(fits(card)&&!ids.has(card.id)){ids.add(card.id);cards.push(card);}}
+      // Guides this feed already showed are left out, so a list rebuilt from a
+      // newer build carries on where the reader was instead of starting over.
+      for(let i=0;lists.some(list=>Array.isArray(list)&&i<list.length);i++)for(const list of lists){const card=Array.isArray(list)&&list[i];if(fits(card)&&!ids.has(card.id)&&!feedSeen.has(card.id)){ids.add(card.id);cards.push(card);}}
     }
     libraryTravel.key=key;libraryTravel.cards=cards;libraryTravel.pos=0;
   }
@@ -990,7 +996,11 @@ async function fetchLibraryTravel(gen){
     if(shard<0){travelExhausted=true;return [];}
     const cards=await libraryJSON(`${LIBRARY_ROOT}${lang}/${manifest.base}${set}/${shard}.json`,6000);
     if(gen!==fillGeneration)return [];
-    if(!Array.isArray(cards)){library.drawn.get(set)?.delete(shard);return null;}
+    if(!Array.isArray(cards)){
+      library.drawn.get(set)?.delete(shard);
+      if(cards?.missing&&!retried)return await libraryRenewed(library,gen)?fetchLibraryTravel(gen,true):[];
+      return null;
+    }
     const found=cards.filter(card=>card?.src==='how');
     if(found.length)return found;
   }

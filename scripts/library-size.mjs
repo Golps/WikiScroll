@@ -15,6 +15,13 @@ import {fileURLToPath} from 'node:url';
 export const KEEP = 0.7;
 // Small sets move by whole shards from week to week; only larger ones are compared.
 export const MIN_SHARDS = 50;
+// The Obscure depth (wiki-<lang>-5) holds articles read about twice a day or
+// less. Their readership is counted in whole views, so a small change in
+// Wikimedia's weekly figures moves large groups of them in or out of the set
+// (Hindi went from 117 to 24 shards between two complete dumps). That set is
+// left out of the set-by-set comparison; the whole-library comparison and the
+// builder's own minimum still cover it, and a partial dump shrinks every set.
+export const VOLATILE = /^wiki-[a-z]{2,3}-5$/;
 
 const count = value => Number.isSafeInteger(value) && value > 0 ? value : 0;
 const total = sets => Object.values(sets).reduce((sum, n) => sum + count(n), 0);
@@ -30,6 +37,7 @@ export function shrunk(live, next, keep = KEEP, minShards = MIN_SHARDS) {
   const was = total(before), is = total(after);
   if (was >= minShards && is < was * keep) reasons.push(`The library has ${share(is, was)} of the live build's files (${is} of ${was}).`);
   for (const [set, n] of Object.entries(before)) {
+    if (VOLATILE.test(set)) continue;
     const old = count(n), now = count(after[set]);
     if (old >= minShards && now < old * keep) reasons.push(`${set} has ${share(now, old)} of the live build's files (${now} of ${old}).`);
   }

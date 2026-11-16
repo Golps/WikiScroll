@@ -516,6 +516,45 @@ test('a missing shard retry is bounded even when the refreshed build is also mis
  assert.equal(await h.run('fetchLibraryBatch(fillGeneration)'),null);assert.equal(shards,2);
 });
 
+// A build that went live and removed the old one while the reader holds the old manifest.
+const switchedBuild=h=>{
+ const original=h.context.fetch,seen={manifests:0,caches:[]};
+ h.context.fetch=async(url,options={})=>{
+  if(url.endsWith('/en/current.json')){seen.manifests++;seen.caches.push(options.cache);const m=await (await original(url,options)).json();return Response.json(seen.manifests===1?{...m,build:'old',base:'old/'}:m);}
+  return url.includes('/old/')?new Response('',{status:404}):original(url,options);
+ };
+ return seen;
+};
+
+test('a trip-style feed moves to a new build without falling back to the live search',async()=>{
+ const h=harness({librarySets:{...LIBRARY_SETS,'how-en-heritage':2}});
+ h.change("curMode='how';travelFilters={place:'',style:'heritage'};");
+ const seen=switchedBuild(h);
+ const cards=await h.run('fetchLibraryTravel(fillGeneration)');
+ assert.equal(cards.length,100);assert.equal(seen.manifests,2);assert.equal(seen.caches[1],'reload');
+ assert.equal(h.shards.length,1);assert.equal(h.requests.length,0);assert.equal(h.directCalls,0);
+});
+
+test('a place search moves to a new build, and a rebuilt list carries on without repeats',async()=>{
+ const h=harness({librarySets:LIBRARY_SETS,places:PLACES});
+ h.change("curMode='how';travelFilters={place:'Japan',style:''};");
+ const seen=switchedBuild(h);
+ const cards=await h.run('fetchLibraryTravel(fillGeneration)');
+ assert.deepEqual([...cards].map(a=>a.title),['Osaka','Kyoto']);assert.equal(seen.manifests,2);
+ assert.equal(h.requests.length,0);assert.equal(h.directCalls,0);
+ // The list is rebuilt when the build changes; guides already in the feed are left out.
+ h.change("travelExhausted=false;feedSeen.add('v3');libraryTravel.key='older-build';");
+ assert.deepEqual([...await h.run('fetchLibraryTravel(fillGeneration)')].map(a=>a.title),['Kyoto']);
+});
+
+test('a travel retry is bounded when the refreshed build is also missing',async()=>{
+ const h=harness({librarySets:{...LIBRARY_SETS,'how-en-heritage':1}});
+ h.change("curMode='how';travelFilters={place:'',style:'heritage'};");
+ let manifests=0;
+ h.context.fetch=async url=>url.endsWith('current.json')?(manifests++,Response.json({v:1,build:'old',base:'old/',tripStyles:2,sets:{'how-en-heritage':1}})):new Response('',{status:404});
+ assert.equal(await h.run('fetchLibraryTravel(fillGeneration)'),null);assert.equal(manifests,2);
+});
+
 test('a failed place-index download stays retryable instead of ending the search',async()=>{
  const h=harness({librarySets:LIBRARY_SETS,places:PLACES});
  h.change("curMode='how';travelFilters={place:'Japan',style:''};");

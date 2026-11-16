@@ -347,6 +347,10 @@ test('a build much smaller than the live library is not published', async () => 
   assert.match(shrunk(live, {sets: {...live.sets, 'how-en': 0}})[0], /^how-en has 0% /, 'one large set lost');
   assert.match(shrunk(live, {sets: {'wiki-en-3': 12085, 'wiki-en-4': 22438}})[0], /^how-en has 0% /, 'a set missing from the new build');
   assert.deepEqual(shrunk(null, {sets: {'wiki-ko-3': 900}}), [], 'a first build has nothing to compare with');
+  // The Obscure set swings with Wikimedia's weekly readership; only the whole library is compared for it.
+  const hindi = {sets: {'wiki-hi-3': 900, 'wiki-hi-4': 620, 'wiki-hi-5': 117}};
+  assert.deepEqual(shrunk(hindi, {sets: {...hindi.sets, 'wiki-hi-5': 24}}), [], 'a smaller Obscure set alone passes');
+  assert.match(shrunk(hindi, {sets: {'wiki-hi-3': 300, 'wiki-hi-4': 200, 'wiki-hi-5': 117}})[0], /^The library has /, 'a partial dump is still caught');
   assert.equal(shrunk(live, null).length, 1);
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'library-size-'));
   const write = (name, value, gzip) => { const file = path.join(dir, name); fs.writeFileSync(file, gzip ? zlib.gzipSync(JSON.stringify(value)) : JSON.stringify(value)); return file; };
@@ -366,4 +370,16 @@ test('a build much smaller than the live library is not published', async () => 
   const check = upload.indexOf('node scripts/library-size.mjs');
   assert.ok(check > 0 && check < upload.indexOf('aws s3 sync') && check < upload.indexOf('echo "{\\"writes\\"'));
   assert.match(upload, /if \[ "\$\{\{ inputs\.force \}\}" != "true" \]; then\n\s+aws s3 cp "s3:\/\/\$R2_BUCKET\/\$prefix\/current\.json"/);
+});
+
+test('a failed shard upload is retried, and a build that still fails is removed before the switch', () => {
+  const workflow = fs.readFileSync(new URL('../.github/workflows/card-library.yml', import.meta.url), 'utf8');
+  assert.match(workflow, /\n  AWS_RETRY_MODE: standard\n  AWS_MAX_ATTEMPTS: '\d+'\n/);
+  const upload = workflow.match(/- name: Upload, then switch the site to the new build\n[\s\S]*?(?=\n {6}- name:)/)[0];
+  const sync = upload.indexOf('aws s3 sync'), retry = upload.indexOf('for try in 1 2 3; do'), failed = upload.indexOf('if [ "$synced" != true ]; then');
+  const remove = upload.indexOf('aws s3 rm "s3://$R2_BUCKET/$prefix/$build" --recursive'), manifest = upload.indexOf('"s3://$R2_BUCKET/$prefix/current.json" --endpoint-url "$R2_ENDPOINT" --only-show-errors \\\n');
+  assert.ok(retry > 0 && retry < sync && sync < failed && failed < remove && remove < manifest, 'retry the sync, and clean up a failed one, before the manifest switch');
+  // Never the live build: the site may still be reading it.
+  assert.match(upload.slice(failed, remove), /if \[ -n "\$live" \] && \[ "\$live" != "\$build" \]; then/);
+  assert.match(upload.slice(remove, manifest), /exit 1\n\s+fi\n/);
 });

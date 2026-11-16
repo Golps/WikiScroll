@@ -49,6 +49,10 @@ env:
   # R2 accepts only the checksums S3 requires.
   AWS_REQUEST_CHECKSUM_CALCULATION: when_required
   AWS_RESPONSE_CHECKSUM_VALIDATION: when_required
+  # R2 now and then answers a write with 503 "reduce your request rate"; the
+  # CLI backs off and retries each request before giving up on it.
+  AWS_RETRY_MODE: standard
+  AWS_MAX_ATTEMPTS: '8'
   R2_ENDPOINT: ${{ secrets.R2_ACCOUNT_ID && format('https://{0}.r2.cloudflarestorage.com', secrets.R2_ACCOUNT_ID) || '' }}
   R2_BUCKET: ${{ secrets.R2_BUCKET }}
 jobs:
@@ -233,10 +237,28 @@ jobs:
           if [ $((written + cost)) -gt "$WRITE_LIMIT" ]; then echo "Not uploading: this month's writes would pass the write limit. The current library keeps serving." >&2; exit 1; fi
           # Recorded before uploading, so a job uploading at the same time counts it.
           echo "{\"writes\":$(( $(recorded) + cost ))}" | aws s3 cp - "s3://$R2_BUCKET/$ledger" --endpoint-url "$R2_ENDPOINT" --only-show-errors --content-type application/json --cache-control no-store
-          aws configure set default.s3.max_concurrent_requests 32
+          aws configure set default.s3.max_concurrent_requests 16
           # Shards never change once uploaded; the manifest is re-read every few minutes.
-          aws s3 sync "$RUNNER_TEMP/library/$build" "s3://$R2_BUCKET/$prefix/$build" --endpoint-url "$R2_ENDPOINT" --only-show-errors \
-            --content-type application/json --content-encoding gzip --cache-control 'public, max-age=31536000, immutable'
+          # A sync that misses a few shards is run again: it sends only the shards
+          # not yet stored, so a retry costs a handful of writes.
+          synced=false
+          for try in 1 2 3; do
+            if aws s3 sync "$RUNNER_TEMP/library/$build" "s3://$R2_BUCKET/$prefix/$build" --endpoint-url "$R2_ENDPOINT" --only-show-errors \
+              --content-type application/json --content-encoding gzip --cache-control 'public, max-age=31536000, immutable'; then synced=true; break; fi
+            echo "Some shards did not upload (try $try of 3)."
+            [ "$try" = 3 ] || sleep 60
+          done
+          if [ "$synced" != true ]; then
+            # The site never pointed at this build, so nothing reads it. Remove the
+            # part that was uploaded, unless it is the live build, so it doesn't
+            # hold storage and stop the next language's upload at the storage guard.
+            live=$({ aws s3 cp "s3://$R2_BUCKET/$prefix/current.json" - --endpoint-url "$R2_ENDPOINT" 2>/dev/null || true; } | { gunzip 2>/dev/null || true; } | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{console.log(JSON.parse(s).build||"")}catch{console.log("")}})')
+            if [ -n "$live" ] && [ "$live" != "$build" ]; then
+              aws s3 rm "s3://$R2_BUCKET/$prefix/$build" --recursive --endpoint-url "$R2_ENDPOINT" --only-show-errors || true
+              echo "Removed the partly uploaded $LANG_CODE $build." | tee -a "$GITHUB_STEP_SUMMARY"
+            fi
+            echo "Not switching: some shards did not upload. The current library keeps serving." >&2; exit 1
+          fi
           aws s3 cp "$RUNNER_TEMP/library/current.json" "s3://$R2_BUCKET/$prefix/current.json" --endpoint-url "$R2_ENDPOINT" --only-show-errors \
             --content-type application/json --content-encoding gzip --cache-control 'public, max-age=300'
           # Only one build stays stored, which keeps the library inside the storage guard.

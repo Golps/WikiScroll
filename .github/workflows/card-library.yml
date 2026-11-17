@@ -265,9 +265,19 @@ jobs:
           # Readers may hold the old manifest for its 5-minute edge cache; wait that
           # out so their next shard still loads, then delete the old build.
           sleep 330
-          for old in $(aws s3 ls "s3://$R2_BUCKET/$prefix/" --endpoint-url "$R2_ENDPOINT" | awk '$1=="PRE"{print $2}' | tr -d /); do
-            if [ "$old" != "$build" ]; then aws s3 rm "s3://$R2_BUCKET/$prefix/$old" --recursive --endpoint-url "$R2_ENDPOINT" --only-show-errors; fi
+          # The site already serves the new build, so a delete the storage service
+          # turns away is tried again rather than failing the job; whatever is
+          # still left is removed with this language's next build.
+          left=""
+          for try in 1 2 3; do
+            left=""
+            for old in $(aws s3 ls "s3://$R2_BUCKET/$prefix/" --endpoint-url "$R2_ENDPOINT" | awk '$1=="PRE"{print $2}' | tr -d /); do
+              if [ "$old" != "$build" ] && ! aws s3 rm "s3://$R2_BUCKET/$prefix/$old" --recursive --endpoint-url "$R2_ENDPOINT" --only-show-errors; then left="$left $old"; fi
+            done
+            [ -z "$left" ] && break
+            [ "$try" = 3 ] || sleep 60
           done
+          if [ -n "$left" ]; then echo "::warning::Part of the previous $LANG_CODE build ($left) is still stored; the next $LANG_CODE build removes it." | tee -a "$GITHUB_STEP_SUMMARY"; fi
           if [ -f "$RUNNER_TEMP/place-facts.json.gz" ]; then
             aws s3 cp "$RUNNER_TEMP/place-facts.json.gz" "s3://$R2_BUCKET/facts/$LANG_CODE/place-facts.json.gz" --endpoint-url "$R2_ENDPOINT" --only-show-errors --cache-control no-store
           fi

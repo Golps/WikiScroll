@@ -383,3 +383,15 @@ test('a failed shard upload is retried, and a build that still fails is removed 
   assert.match(upload.slice(failed, remove), /if \[ -n "\$live" \] && \[ "\$live" != "\$build" \]; then/);
   assert.match(upload.slice(remove, manifest), /exit 1\n\s+fi\n/);
 });
+
+test('a refused delete of the old build is retried and never fails a library that is already live', () => {
+  const workflow = fs.readFileSync(new URL('../.github/workflows/card-library.yml', import.meta.url), 'utf8');
+  const upload = workflow.match(/- name: Upload, then switch the site to the new build\n[\s\S]*?(?=\n {6}- name:)/)[0];
+  const manifest = upload.indexOf('"s3://$R2_BUCKET/$prefix/current.json" --endpoint-url "$R2_ENDPOINT" --only-show-errors \\\n');
+  const cleanup = upload.slice(upload.indexOf('sleep 330'));
+  assert.ok(manifest > 0 && manifest < upload.indexOf('sleep 330'));
+  assert.match(cleanup, /for try in 1 2 3; do/);
+  assert.match(cleanup, /if \[ "\$old" != "\$build" \] && ! aws s3 rm /, 'a failed delete is noted, not fatal');
+  assert.match(cleanup, /::warning::/);
+  assert.doesNotMatch(cleanup.slice(0, cleanup.indexOf('::warning::')), /exit 1/);
+});
